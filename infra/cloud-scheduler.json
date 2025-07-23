@@ -1,0 +1,13 @@
+{
+  "name": "projects/YOUR_PROJECT_ID/locations/us-central1/jobs/printer-collector-job",
+  "description": "Collect printer data every 15 minutes",
+  "schedule": "*/15 * * * *",
+  "timeZone": "America/New_York",
+  "httpTarget": {
+    "uri": "https://printer-collector-YOUR_HASH-uc.a.run.app",
+    "httpMethod": "GET",
+    "oidcToken": {
+      "serviceAccountEmail": "printer-agent@YOUR_PROJECT_ID.iam.gserviceaccount.com"
+    }
+  }
+}
