@@ -1,13 +1,20 @@
 {
-  "name": "projects/YOUR_PROJECT_ID/locations/us-central1/jobs/printer-collector-job",
-  "description": "Collect printer data every 15 minutes",
-  "schedule": "*/15 * * * *",
-  "timeZone": "America/New_York",
+  "name": "projects/PROJECT_ID/locations/REGION/jobs/printer-data-collection",
+  "description": "Scheduled job to collect printer data every hour",
+  "schedule": "0 * * * *",
+  "timeZone": "Europe/Athens",
   "httpTarget": {
-    "uri": "https://printer-collector-YOUR_HASH-uc.a.run.app",
+    "uri": "https://printer-collector-HASH-ew.a.run.app",
     "httpMethod": "GET",
-    "oidcToken": {
-      "serviceAccountEmail": "printer-agent@YOUR_PROJECT_ID.iam.gserviceaccount.com"
+    "headers": {
+      "Content-Type": "application/json"
     }
+  },
+  "retryConfig": {
+    "retryCount": 3,
+    "maxRetryDuration": "300s",
+    "minBackoffDuration": "5s",
+    "maxBackoffDuration": "60s",
+    "maxDoublings": 3
   }
 }

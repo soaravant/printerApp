@@ -3,9 +3,9 @@
 import { ProtectedRoute } from "@/components/protected-route"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { User, Shield, Mail } from "lucide-react"
+import { User, Mail, Building, Shield } from "lucide-react"
 
 export default function ProfilePage() {
   const { user } = useAuth()
@@ -21,63 +21,58 @@ export default function ProfilePage() {
           <div className="px-4 py-6 sm:px-0">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900">Προφίλ Χρήστη</h1>
-              <p className="text-gray-600">Διαχείριση στοιχείων λογαριασμού</p>
+              <p className="text-gray-600">Προβολή των στοιχείων του λογαριασμού σας</p>
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Στοιχεία Λογαριασμού
-                </CardTitle>
-                <CardDescription>Τα στοιχεία του προφίλ σας</CardDescription>
+                <CardTitle>Στοιχεία Χρήστη</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        Username
-                      </label>
-                      <p className="mt-1 text-lg font-mono bg-gray-50 p-2 rounded">{user.username}</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                      <User className="h-4 w-4" />
+                      Username
                     </div>
+                    <div className="text-lg font-mono bg-gray-50 p-3 rounded-lg">{user.username}</div>
+                  </div>
 
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Όνομα</label>
-                      <p className="mt-1 text-lg">{user.displayName}</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                      <Shield className="h-4 w-4" />
+                      Ρόλος
+                    </div>
+                    <div className="text-lg">
+                      <Badge variant={user.role === "admin" ? "default" : "secondary"} className="text-sm px-3 py-1">
+                        {user.role === "admin" ? "Διαχειριστής" : "Χρήστης"}
+                      </Badge>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        Ρόλος
-                      </label>
-                      <div className="mt-1">
-                        <Badge variant={user.role === "admin" ? "default" : "secondary"} className="text-sm">
-                          {user.role === "admin" ? "Διαχειριστής" : "Χρήστης"}
-                        </Badge>
-                      </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                      <User className="h-4 w-4" />
+                      Όνομα
                     </div>
-
-                    {user.email && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                          <Mail className="h-4 w-4" />
-                          Email
-                        </label>
-                        <p className="mt-1 text-lg">{user.email}</p>
-                      </div>
-                    )}
+                    <div className="text-lg bg-gray-50 p-3 rounded-lg">{user.displayName}</div>
                   </div>
-                </div>
 
-                <div className="pt-4 border-t">
-                  <p className="text-sm text-gray-500">
-                    Λογαριασμός δημιουργήθηκε: {user.createdAt.toLocaleDateString("el-GR")}
-                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                      <Mail className="h-4 w-4" />
+                      Email
+                    </div>
+                    <div className="text-lg bg-gray-50 p-3 rounded-lg">{user.email || "Δεν έχει οριστεί"}</div>
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                      <Building className="h-4 w-4" />
+                      Τμήμα
+                    </div>
+                    <div className="text-lg bg-gray-50 p-3 rounded-lg">{user.department}</div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

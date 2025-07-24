@@ -1,4 +1,5 @@
-// Dummy database that mimics Firebase structure
+// Enhanced dummy database with additional methods for admin functionality
+
 export interface User {
   uid: string
   username: string
@@ -92,325 +93,298 @@ export interface LaminationBilling {
 export interface PriceTable {
   id: string
   name: string
-  type: "printing" | "lamination"
   prices: {
-    // Printing prices
-    a4BW?: number
-    a4Color?: number
-    a3BW?: number
-    a3Color?: number
-    scan?: number
-    copy?: number
-    // Lamination prices
-    A3?: number
-    A4?: number
-    card_small?: number
-    card_large?: number
+    [key: string]: number
   }
   isActive: boolean
   createdAt: Date
   updatedAt: Date
 }
 
-// Dummy data
-const DUMMY_USERS: User[] = [
-  {
-    uid: "user-408",
-    username: "408",
-    role: "user",
-    displayName: "Χρήστης 408",
-    department: "Γραφείο Α",
-    email: "user408@example.com",
-    createdAt: new Date("2024-01-01"),
-  },
-  {
-    uid: "user-409",
-    username: "409",
-    role: "user",
-    displayName: "Χρήστης 409",
-    department: "Γραφείο Β",
-    email: "user409@example.com",
-    createdAt: new Date("2024-01-01"),
-  },
-  {
-    uid: "admin-001",
-    username: "admin",
-    role: "admin",
-    displayName: "Διαχειριστής",
-    department: "Πληροφορική",
-    email: "admin@example.com",
-    createdAt: new Date("2024-01-01"),
-  },
-]
+class DummyDatabase {
+  private users: User[] = []
+  private printJobs: PrintJob[] = []
+  private laminationJobs: LaminationJob[] = []
+  private printBilling: PrintBilling[] = []
+  private laminationBilling: LaminationBilling[] = []
+  private priceTables: PriceTable[] = []
 
-const PRINTING_PRICE_TABLE: PriceTable = {
-  id: "printing-prices",
-  name: "Τιμοκατάλογος Εκτυπώσεων",
-  type: "printing",
-  prices: {
-    a4BW: 0.05,
-    a4Color: 0.15,
-    a3BW: 0.1,
-    a3Color: 0.3,
-    scan: 0.02,
-    copy: 0.03,
-  },
-  isActive: true,
-  createdAt: new Date("2024-01-01"),
-  updatedAt: new Date("2024-01-01"),
-}
+  constructor() {
+    this.initializeData()
+  }
 
-const LAMINATION_PRICE_TABLE: PriceTable = {
-  id: "lamination-prices",
-  name: "Τιμοκατάλογος Πλαστικοποιήσεων",
-  type: "lamination",
-  prices: {
-    A3: 2.0,
-    A4: 1.5,
-    card_small: 0.5,
-    card_large: 1.0,
-  },
-  isActive: true,
-  createdAt: new Date("2024-01-01"),
-  updatedAt: new Date("2024-01-01"),
-}
+  private initializeData() {
+    // Initialize users
+    this.users = [
+      {
+        uid: "admin-1",
+        username: "admin",
+        role: "admin",
+        displayName: "Διαχειριστής",
+        department: "Διοίκηση",
+        email: "admin@example.com",
+        createdAt: new Date("2024-01-01"),
+      },
+      {
+        uid: "user-408",
+        username: "408",
+        role: "user",
+        displayName: "Χρήστης 408",
+        department: "Γραφείο Α",
+        email: "user408@example.com",
+        createdAt: new Date("2024-01-15"),
+      },
+      {
+        uid: "user-409",
+        username: "409",
+        role: "user",
+        displayName: "Χρήστης 409",
+        department: "Γραφείο Β",
+        email: "user409@example.com",
+        createdAt: new Date("2024-01-20"),
+      },
+    ]
 
-// Generate dummy print jobs
-const generatePrintJobs = (): PrintJob[] => {
-  const jobs: PrintJob[] = []
-  const printerIPs = ["192.168.3.41", "192.168.3.42"]
-  const printerNames = ["Canon iR-ADV C3330", "HP LaserJet Pro M404"]
+    // Initialize price tables
+    this.priceTables = [
+      {
+        id: "printing",
+        name: "Εκτυπώσεις",
+        prices: {
+          a4BW: 0.05,
+          a4Color: 0.15,
+          a3BW: 0.1,
+          a3Color: 0.3,
+          scan: 0.02,
+          copy: 0.03,
+        },
+        isActive: true,
+        createdAt: new Date("2024-01-01"),
+        updatedAt: new Date("2024-01-01"),
+      },
+      {
+        id: "lamination",
+        name: "Πλαστικοποιήσεις",
+        prices: {
+          A4: 1.5,
+          A3: 3.0,
+          card_small: 0.5,
+          card_large: 1.0,
+        },
+        isActive: true,
+        createdAt: new Date("2024-01-01"),
+        updatedAt: new Date("2024-01-01"),
+      },
+    ]
 
-  DUMMY_USERS.filter((u) => u.role === "user").forEach((user, userIndex) => {
-    for (let i = 0; i < 25 + userIndex * 10; i++) {
-      const daysAgo = Math.floor(Math.random() * 90)
-      const timestamp = new Date()
-      timestamp.setDate(timestamp.getDate() - daysAgo)
+    // Generate sample data
+    this.generateSampleData()
+  }
 
-      const pagesA4BW = Math.floor(Math.random() * 20) + 1
-      const pagesA4Color = Math.floor(Math.random() * 10)
-      const pagesA3BW = Math.floor(Math.random() * 5)
-      const pagesA3Color = Math.floor(Math.random() * 3)
-      const scans = Math.floor(Math.random() * 5)
-      const copies = Math.floor(Math.random() * 8)
+  private generateSampleData() {
+    const now = new Date()
+    const userIds = this.users.filter((u) => u.role === "user").map((u) => u.uid)
 
-      const deviceIndex = Math.floor(Math.random() * printerIPs.length)
+    // Generate print jobs for the last 6 months
+    for (let monthOffset = 0; monthOffset < 6; monthOffset++) {
+      for (const userId of userIds) {
+        const user = this.users.find((u) => u.uid === userId)!
+        const jobsCount = Math.floor(Math.random() * 10) + 5
 
-      const costA4BW = pagesA4BW * PRINTING_PRICE_TABLE.prices.a4BW!
-      const costA4Color = pagesA4Color * PRINTING_PRICE_TABLE.prices.a4Color!
-      const costA3BW = pagesA3BW * PRINTING_PRICE_TABLE.prices.a3BW!
-      const costA3Color = pagesA3Color * PRINTING_PRICE_TABLE.prices.a3Color!
-      const costScans = scans * PRINTING_PRICE_TABLE.prices.scan!
-      const costCopies = copies * PRINTING_PRICE_TABLE.prices.copy!
+        for (let i = 0; i < jobsCount; i++) {
+          const jobDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, Math.floor(Math.random() * 28) + 1)
+          const printJob: PrintJob = {
+            jobId: `print-${userId}-${monthOffset}-${i}`,
+            uid: userId,
+            userDisplayName: user.displayName,
+            department: user.department,
+            pagesA4BW: Math.floor(Math.random() * 20),
+            pagesA4Color: Math.floor(Math.random() * 10),
+            pagesA3BW: Math.floor(Math.random() * 5),
+            pagesA3Color: Math.floor(Math.random() * 3),
+            scans: Math.floor(Math.random() * 5),
+            copies: Math.floor(Math.random() * 10),
+            deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 10)}`,
+            deviceName: `Printer-${Math.floor(Math.random() * 3) + 1}`,
+            timestamp: jobDate,
+            costA4BW: 0,
+            costA4Color: 0,
+            costA3BW: 0,
+            costA3Color: 0,
+            costScans: 0,
+            costCopies: 0,
+            totalCost: 0,
+            status: "completed",
+          }
 
-      const totalCost = costA4BW + costA4Color + costA3BW + costA3Color + costScans + costCopies
+          // Calculate costs
+          const prices = this.priceTables.find((p) => p.id === "printing")?.prices || {}
+          printJob.costA4BW = printJob.pagesA4BW * (prices.a4BW || 0)
+          printJob.costA4Color = printJob.pagesA4Color * (prices.a4Color || 0)
+          printJob.costA3BW = printJob.pagesA3BW * (prices.a3BW || 0)
+          printJob.costA3Color = printJob.pagesA3Color * (prices.a3Color || 0)
+          printJob.costScans = printJob.scans * (prices.scan || 0)
+          printJob.costCopies = printJob.copies * (prices.copy || 0)
+          printJob.totalCost =
+            printJob.costA4BW +
+            printJob.costA4Color +
+            printJob.costA3BW +
+            printJob.costA3Color +
+            printJob.costScans +
+            printJob.costCopies
 
-      jobs.push({
-        jobId: `print-job-${user.uid}-${i}`,
-        uid: user.uid,
-        userDisplayName: user.displayName,
-        department: user.department,
-        pagesA4BW,
-        pagesA4Color,
-        pagesA3BW,
-        pagesA3Color,
-        scans,
-        copies,
-        deviceIP: printerIPs[deviceIndex],
-        deviceName: printerNames[deviceIndex],
-        timestamp,
-        costA4BW: Number.parseFloat(costA4BW.toFixed(3)),
-        costA4Color: Number.parseFloat(costA4Color.toFixed(3)),
-        costA3BW: Number.parseFloat(costA3BW.toFixed(3)),
-        costA3Color: Number.parseFloat(costA3Color.toFixed(3)),
-        costScans: Number.parseFloat(costScans.toFixed(3)),
-        costCopies: Number.parseFloat(costCopies.toFixed(3)),
-        totalCost: Number.parseFloat(totalCost.toFixed(2)),
-        status: "completed",
-      })
-    }
-  })
+          this.printJobs.push(printJob)
+        }
 
-  return jobs
-}
+        // Generate lamination jobs
+        const laminationJobsCount = Math.floor(Math.random() * 5) + 2
+        for (let i = 0; i < laminationJobsCount; i++) {
+          const jobDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, Math.floor(Math.random() * 28) + 1)
+          const types: ("A3" | "A4" | "card_small" | "card_large")[] = ["A3", "A4", "card_small", "card_large"]
+          const type = types[Math.floor(Math.random() * types.length)]
+          const quantity = Math.floor(Math.random() * 10) + 1
+          const prices = this.priceTables.find((p) => p.id === "lamination")?.prices || {}
+          const pricePerUnit = prices[type] || 0
 
-// Generate dummy lamination jobs
-const generateLaminationJobs = (): LaminationJob[] => {
-  const jobs: LaminationJob[] = []
-  const types: Array<"A3" | "A4" | "card_small" | "card_large"> = ["A3", "A4", "card_small", "card_large"]
+          const laminationJob: LaminationJob = {
+            jobId: `lamination-${userId}-${monthOffset}-${i}`,
+            uid: userId,
+            userDisplayName: user.displayName,
+            department: user.department,
+            type,
+            quantity,
+            pricePerUnit,
+            totalCost: quantity * pricePerUnit,
+            timestamp: jobDate,
+            status: "completed",
+            notes: Math.random() > 0.7 ? "Επείγον" : undefined,
+          }
 
-  DUMMY_USERS.filter((u) => u.role === "user").forEach((user, userIndex) => {
-    for (let i = 0; i < 15 + userIndex * 5; i++) {
-      const daysAgo = Math.floor(Math.random() * 90)
-      const timestamp = new Date()
-      timestamp.setDate(timestamp.getDate() - daysAgo)
-
-      const type = types[Math.floor(Math.random() * types.length)]
-      const quantity = Math.floor(Math.random() * 10) + 1
-      const pricePerUnit = LAMINATION_PRICE_TABLE.prices[type]!
-      const totalCost = quantity * pricePerUnit
-
-      jobs.push({
-        jobId: `lamination-job-${user.uid}-${i}`,
-        uid: user.uid,
-        userDisplayName: user.displayName,
-        department: user.department,
-        type,
-        quantity,
-        pricePerUnit,
-        totalCost: Number.parseFloat(totalCost.toFixed(2)),
-        timestamp,
-        status: "completed",
-        notes: Math.random() > 0.7 ? "Επείγουσα παραγγελία" : undefined,
-      })
-    }
-  })
-
-  return jobs
-}
-
-// Generate billing records
-const generatePrintBilling = (printJobs: PrintJob[]): PrintBilling[] => {
-  const billingMap = new Map<string, PrintBilling>()
-
-  printJobs.forEach((job) => {
-    const date = new Date(job.timestamp)
-    const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-    const key = `${job.uid}-${period}`
-
-    if (!billingMap.has(key)) {
-      const dueDate = new Date(date.getFullYear(), date.getMonth() + 1, 15)
-
-      billingMap.set(key, {
-        billingId: `print-billing-${key}`,
-        uid: job.uid,
-        userDisplayName: job.userDisplayName,
-        department: job.department,
-        period,
-        totalA4BW: 0,
-        totalA4Color: 0,
-        totalA3BW: 0,
-        totalA3Color: 0,
-        totalScans: 0,
-        totalCopies: 0,
-        totalCost: 0,
-        paid: Math.random() > 0.3,
-        paidAmount: 0,
-        remainingBalance: 0,
-        dueDate,
-        generatedAt: new Date(),
-        lastUpdated: new Date(),
-      })
+          this.laminationJobs.push(laminationJob)
+        }
+      }
     }
 
-    const billing = billingMap.get(key)!
-    billing.totalA4BW += job.pagesA4BW
-    billing.totalA4Color += job.pagesA4Color
-    billing.totalA3BW += job.pagesA3BW
-    billing.totalA3Color += job.pagesA3Color
-    billing.totalScans += job.scans
-    billing.totalCopies += job.copies
-    billing.totalCost += job.totalCost
-  })
+    // Generate billing records
+    this.generateBillingRecords()
+  }
 
-  return Array.from(billingMap.values()).map((billing) => {
-    const finalCost = Number.parseFloat(billing.totalCost.toFixed(2))
-    const paidAmount = billing.paid ? finalCost : Number.parseFloat((Math.random() * finalCost).toFixed(2))
-    const remainingBalance = finalCost - paidAmount
+  private generateBillingRecords() {
+    const userIds = this.users.filter((u) => u.role === "user").map((u) => u.uid)
+    const now = new Date()
 
-    return {
-      ...billing,
-      totalCost: finalCost,
-      paidAmount,
-      remainingBalance: Number.parseFloat(remainingBalance.toFixed(2)),
-      paidDate: billing.paid ? new Date() : undefined,
+    for (let monthOffset = 0; monthOffset < 6; monthOffset++) {
+      const periodDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
+      const period = periodDate.toISOString().slice(0, 7)
+
+      for (const userId of userIds) {
+        const user = this.users.find((u) => u.uid === userId)!
+
+        // Print billing
+        const monthPrintJobs = this.printJobs.filter(
+          (j) => j.uid === userId && j.timestamp.toISOString().slice(0, 7) === period,
+        )
+
+        if (monthPrintJobs.length > 0) {
+          const totalA4BW = monthPrintJobs.reduce((sum, j) => sum + j.pagesA4BW, 0)
+          const totalA4Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA4Color, 0)
+          const totalA3BW = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3BW, 0)
+          const totalA3Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3Color, 0)
+          const totalScans = monthPrintJobs.reduce((sum, j) => sum + j.scans, 0)
+          const totalCopies = monthPrintJobs.reduce((sum, j) => sum + j.copies, 0)
+          const totalCost = monthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
+
+          const isPaid = Math.random() > 0.3
+          const paidAmount = isPaid ? totalCost : Math.random() * totalCost
+
+          const printBilling: PrintBilling = {
+            billingId: `print-billing-${userId}-${period}`,
+            uid: userId,
+            userDisplayName: user.displayName,
+            department: user.department,
+            period,
+            totalA4BW,
+            totalA4Color,
+            totalA3BW,
+            totalA3Color,
+            totalScans,
+            totalCopies,
+            totalCost,
+            paid: isPaid,
+            paidDate: isPaid ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) : undefined,
+            paidAmount,
+            remainingBalance: totalCost - paidAmount,
+            dueDate: new Date(periodDate.getTime() + 30 * 24 * 60 * 60 * 1000),
+            generatedAt: new Date(periodDate.getTime() + 5 * 24 * 60 * 60 * 1000),
+            lastUpdated: new Date(),
+          }
+
+          this.printBilling.push(printBilling)
+        }
+
+        // Lamination billing
+        const monthLaminationJobs = this.laminationJobs.filter(
+          (j) => j.uid === userId && j.timestamp.toISOString().slice(0, 7) === period,
+        )
+
+        if (monthLaminationJobs.length > 0) {
+          const totalA3 = monthLaminationJobs.filter((j) => j.type === "A3").reduce((sum, j) => sum + j.quantity, 0)
+          const totalA4 = monthLaminationJobs.filter((j) => j.type === "A4").reduce((sum, j) => sum + j.quantity, 0)
+          const totalCardSmall = monthLaminationJobs
+            .filter((j) => j.type === "card_small")
+            .reduce((sum, j) => sum + j.quantity, 0)
+          const totalCardLarge = monthLaminationJobs
+            .filter((j) => j.type === "card_large")
+            .reduce((sum, j) => sum + j.quantity, 0)
+          const totalCost = monthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
+
+          const isPaid = Math.random() > 0.4
+          const paidAmount = isPaid ? totalCost : Math.random() * totalCost
+
+          const laminationBilling: LaminationBilling = {
+            billingId: `lamination-billing-${userId}-${period}`,
+            uid: userId,
+            userDisplayName: user.displayName,
+            department: user.department,
+            period,
+            totalA3,
+            totalA4,
+            totalCardSmall,
+            totalCardLarge,
+            totalCost,
+            paid: isPaid,
+            paidDate: isPaid ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) : undefined,
+            paidAmount,
+            remainingBalance: totalCost - paidAmount,
+            dueDate: new Date(periodDate.getTime() + 30 * 24 * 60 * 60 * 1000),
+            generatedAt: new Date(periodDate.getTime() + 5 * 24 * 60 * 60 * 1000),
+            lastUpdated: new Date(),
+          }
+
+          this.laminationBilling.push(laminationBilling)
+        }
+      }
     }
-  })
-}
+  }
 
-const generateLaminationBilling = (laminationJobs: LaminationJob[]): LaminationBilling[] => {
-  const billingMap = new Map<string, LaminationBilling>()
-
-  laminationJobs.forEach((job) => {
-    const date = new Date(job.timestamp)
-    const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-    const key = `${job.uid}-${period}`
-
-    if (!billingMap.has(key)) {
-      const dueDate = new Date(date.getFullYear(), date.getMonth() + 1, 15)
-
-      billingMap.set(key, {
-        billingId: `lamination-billing-${key}`,
-        uid: job.uid,
-        userDisplayName: job.userDisplayName,
-        department: job.department,
-        period,
-        totalA3: 0,
-        totalA4: 0,
-        totalCardSmall: 0,
-        totalCardLarge: 0,
-        totalCost: 0,
-        paid: Math.random() > 0.4,
-        paidAmount: 0,
-        remainingBalance: 0,
-        dueDate,
-        generatedAt: new Date(),
-        lastUpdated: new Date(),
-      })
-    }
-
-    const billing = billingMap.get(key)!
-    if (job.type === "A3") billing.totalA3 += job.quantity
-    if (job.type === "A4") billing.totalA4 += job.quantity
-    if (job.type === "card_small") billing.totalCardSmall += job.quantity
-    if (job.type === "card_large") billing.totalCardLarge += job.quantity
-    billing.totalCost += job.totalCost
-  })
-
-  return Array.from(billingMap.values()).map((billing) => {
-    const finalCost = Number.parseFloat(billing.totalCost.toFixed(2))
-    const paidAmount = billing.paid ? finalCost : Number.parseFloat((Math.random() * finalCost).toFixed(2))
-    const remainingBalance = finalCost - paidAmount
-
-    return {
-      ...billing,
-      totalCost: finalCost,
-      paidAmount,
-      remainingBalance: Number.parseFloat(remainingBalance.toFixed(2)),
-      paidDate: billing.paid ? new Date() : undefined,
-    }
-  })
-}
-
-// Initialize dummy data
-const DUMMY_PRINT_JOBS = generatePrintJobs()
-const DUMMY_LAMINATION_JOBS = generateLaminationJobs()
-const DUMMY_PRINT_BILLING = generatePrintBilling(DUMMY_PRINT_JOBS)
-const DUMMY_LAMINATION_BILLING = generateLaminationBilling(DUMMY_LAMINATION_JOBS)
-
-// Database class
-export class DummyDatabase {
-  private users: User[] = [...DUMMY_USERS]
-  private printJobs: PrintJob[] = [...DUMMY_PRINT_JOBS]
-  private laminationJobs: LaminationJob[] = [...DUMMY_LAMINATION_JOBS]
-  private printBilling: PrintBilling[] = [...DUMMY_PRINT_BILLING]
-  private laminationBilling: LaminationBilling[] = [...DUMMY_LAMINATION_BILLING]
-  private priceTables: PriceTable[] = [PRINTING_PRICE_TABLE, LAMINATION_PRICE_TABLE]
-
-  // Users
+  // User methods
   getUsers(): User[] {
     return [...this.users]
   }
 
-  getUserById(uid: string): User | null {
-    return this.users.find((u) => u.uid === uid) || null
+  saveUsers(users: User[]): void {
+    this.users = [...users]
   }
 
-  getUserByUsername(username: string): User | null {
-    return this.users.find((u) => u.username === username) || null
+  getUserByUsername(username: string): User | undefined {
+    return this.users.find((u) => u.username === username)
   }
 
-  // Print Jobs
+  getUserById(uid: string): User | undefined {
+    return this.users.find((u) => u.uid === uid)
+  }
+
+  // Print job methods
   getPrintJobs(uid?: string): PrintJob[] {
     if (uid) {
       return this.printJobs.filter((job) => job.uid === uid)
@@ -418,11 +392,15 @@ export class DummyDatabase {
     return [...this.printJobs]
   }
 
+  getAllPrintJobs(): PrintJob[] {
+    return [...this.printJobs]
+  }
+
   addPrintJob(job: PrintJob): void {
     this.printJobs.push(job)
   }
 
-  // Lamination Jobs
+  // Lamination job methods
   getLaminationJobs(uid?: string): LaminationJob[] {
     if (uid) {
       return this.laminationJobs.filter((job) => job.uid === uid)
@@ -430,16 +408,35 @@ export class DummyDatabase {
     return [...this.laminationJobs]
   }
 
+  getAllLaminationJobs(): LaminationJob[] {
+    return [...this.laminationJobs]
+  }
+
   addLaminationJob(job: LaminationJob): void {
     this.laminationJobs.push(job)
   }
 
-  // Print Billing
+  // Billing methods
   getPrintBilling(uid?: string): PrintBilling[] {
     if (uid) {
       return this.printBilling.filter((billing) => billing.uid === uid)
     }
     return [...this.printBilling]
+  }
+
+  getAllPrintBilling(): PrintBilling[] {
+    return [...this.printBilling]
+  }
+
+  getLaminationBilling(uid?: string): LaminationBilling[] {
+    if (uid) {
+      return this.laminationBilling.filter((billing) => billing.uid === uid)
+    }
+    return [...this.laminationBilling]
+  }
+
+  getAllLaminationBilling(): LaminationBilling[] {
+    return [...this.laminationBilling]
   }
 
   updatePrintBilling(billingId: string, updates: Partial<PrintBilling>): void {
@@ -449,14 +446,6 @@ export class DummyDatabase {
     }
   }
 
-  // Lamination Billing
-  getLaminationBilling(uid?: string): LaminationBilling[] {
-    if (uid) {
-      return this.laminationBilling.filter((billing) => billing.uid === uid)
-    }
-    return [...this.laminationBilling]
-  }
-
   updateLaminationBilling(billingId: string, updates: Partial<LaminationBilling>): void {
     const index = this.laminationBilling.findIndex((b) => b.billingId === billingId)
     if (index !== -1) {
@@ -464,19 +453,42 @@ export class DummyDatabase {
     }
   }
 
-  // Price Tables
+  // Price table methods
   getPriceTables(): PriceTable[] {
     return [...this.priceTables]
   }
 
-  getPriceTable(type: "printing" | "lamination"): PriceTable | null {
-    return this.priceTables.find((pt) => pt.type === type && pt.isActive) || null
+  getPriceTable(id: string): PriceTable | undefined {
+    return this.priceTables.find((table) => table.id === id)
   }
 
   updatePriceTable(id: string, updates: Partial<PriceTable>): void {
-    const index = this.priceTables.findIndex((pt) => pt.id === id)
+    const index = this.priceTables.findIndex((table) => table.id === id)
     if (index !== -1) {
       this.priceTables[index] = { ...this.priceTables[index], ...updates, updatedAt: new Date() }
+    }
+  }
+
+  // Statistics methods
+  getTotalUnpaidForUser(uid: string): { print: number; lamination: number; total: number } {
+    const printUnpaid = this.printBilling
+      .filter((b) => b.uid === uid && !b.paid)
+      .reduce((sum, b) => sum + b.remainingBalance, 0)
+    const laminationUnpaid = this.laminationBilling
+      .filter((b) => b.uid === uid && !b.paid)
+      .reduce((sum, b) => sum + b.remainingBalance, 0)
+
+    return {
+      print: printUnpaid,
+      lamination: laminationUnpaid,
+      total: printUnpaid + laminationUnpaid,
+    }
+  }
+
+  getJobCountsForUser(uid: string): { print: number; lamination: number } {
+    return {
+      print: this.printJobs.filter((j) => j.uid === uid).length,
+      lamination: this.laminationJobs.filter((j) => j.uid === uid).length,
     }
   }
 }

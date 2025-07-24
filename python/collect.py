@@ -1,54 +1,348 @@
+#!/usr/bin/env python3
+"""
+Printer Data Collector for Firebase Integration
+Collects print job data from network printers and stores in Firestore
+"""
+
 import os
+import sys
 import json
+import time
 import logging
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any
 import requests
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from requests.auth import HTTPBasicAuth
 import firebase_admin
 from firebase_admin import credentials, firestore
+from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 import hashlib
-import time
+import xml.etree.ElementTree as ET
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('printer_collector.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger(__name__)
 
 class PrinterCollector:
     def __init__(self):
-        """Initialize Firebase Admin SDK and printer configuration"""
-        self.setup_firebase()
-        self.setup_printer_config()
-        
-    def setup_firebase(self):
+        """Initialize the printer collector with Firebase connection"""
+        self.db = None
+        self.printers = []
+        self.initialize_firebase()
+        self.load_printer_config()
+    
+    def initialize_firebase(self):
         """Initialize Firebase Admin SDK"""
         try:
             # Initialize Firebase Admin SDK
             if not firebase_admin._apps:
                 # Use service account key from environment variable
-                service_account_info = json.loads(os.environ.get('SERVICE_ACCOUNT_JSON', '{}'))
+                service_account_info = json.loads(os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY'))
                 cred = credentials.Certificate(service_account_info)
                 firebase_admin.initialize_app(cred)
             
             self.db = firestore.client()
-            logger.info("Firebase Admin SDK initialized successfully")
+            logger.info("Firebase initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Firebase: {e}")
-            raise
+            sys.exit(1)
     
-    def setup_printer_config(self):
-        """Setup printer configuration from environment variables"""
-        self.printer_ips = os.environ.get('PRINTER_IPS', '192.168.3.41,192.168.3.42').split(',')
-        self.printer_ips = [ip.strip() for ip in self.printer_ips]
-        
-        # Pricing configuration
-        self.bw_rate = float(os.environ.get('BW_RATE', '0.05'))
-        self.color_rate = float(os.environ.get('COLOR_RATE', '0.15'))
-        self.scan_rate = float(os.environ.get('SCAN_RATE', '0.02'))
-        
-        logger.info(f"Configured for printers: {self.printer_ips}")
-        logger.info(f"Rates - B&W: ${self.bw_rate}, Color: ${self.color_rate}, Scan: ${self.scan_rate}")
+    def load_printer_config(self):
+        """Load printer configuration from environment or config file"""
+        try:
+            # Load from environment variable or default config
+            printer_config = os.getenv('PRINTER_CONFIG', '''[
+                {
+                    "ip": "192.168.3.41",
+                    "name": "Canon iR-ADV C3330",
+                    "model": "canon_ir_adv",
+                    "username": "admin",
+                    "password": "admin"
+                },
+                {
+                    "ip": "192.168.3.42", 
+                    "name": "HP LaserJet Pro M404",
+                    "model": "hp_laserjet",
+                    "username": "admin",
+                    "password": "admin"
+                }
+            ]''')
+            
+            self.printers = json.loads(printer_config)
+            logger.info(f"Loaded {len(self.printers)} printer configurations")
+        except Exception as e:
+            logger.error(f"Failed to load printer config: {e}")
+            self.printers = []
     
+    def collect_canon_data(self, printer: Dict[str, str]) -> List[Dict[str, Any]]:
+        """Collect data from Canon iR-ADV series printers"""
+        jobs = []
+        try:
+            # Canon specific API endpoints
+            base_url = f"http://{printer['ip']}"
+            
+            # Get job history (this is a simplified example)
+            response = requests.get(
+                f"{base_url}/rui/api/jobhistory",
+                auth=HTTPBasicAuth(printer.get('username', 'admin'), 
+                                 printer.get('password', 'admin')),
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Parse Canon-specific job data format
+                for job in data.get('jobs', []):
+                    job_data = self.parse_canon_job(job, printer)
+                    if job_data:
+                        jobs.append(job_data)
+            
+        except Exception as e:
+            logger.error(f"Failed to collect Canon data from {printer['ip']}: {e}")
+        
+        return jobs
+    
+    def collect_hp_data(self, printer: Dict[str, str]) -> List[Dict[str, Any]]:
+        """Collect data from HP LaserJet series printers"""
+        jobs = []
+        try:
+            # HP specific API endpoints
+            base_url = f"http://{printer['ip']}"
+            
+            # Get job history
+            response = requests.get(
+                f"{base_url}/DevMgmt/JobDataDyn.xml",
+                auth=HTTPBasicAuth(printer.get('username', 'admin'),
+                                 printer.get('password', 'admin')),
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                # Parse HP XML response
+                jobs = self.parse_hp_xml(response.text, printer)
+            
+        except Exception as e:
+            logger.error(f"Failed to collect HP data from {printer['ip']}: {e}")
+        
+        return jobs
+    
+    def parse_canon_job(self, job_data: Dict, printer: Dict) -> Optional[Dict[str, Any]]:
+        """Parse Canon job data into standardized format"""
+        try:
+            return {
+                'jobId': job_data.get('id', f"canon_{int(time.time())}"),
+                'deviceIP': printer['ip'],
+                'deviceName': printer['name'],
+                'timestamp': datetime.fromisoformat(job_data.get('timestamp', datetime.now().isoformat())),
+                'pagesA4BW': job_data.get('pages_a4_bw', 0),
+                'pagesA4Color': job_data.get('pages_a4_color', 0),
+                'pagesA3BW': job_data.get('pages_a3_bw', 0),
+                'pagesA3Color': job_data.get('pages_a3_color', 0),
+                'scans': job_data.get('scans', 0),
+                'copies': job_data.get('copies', 0),
+                'userCode': job_data.get('user_code', 'unknown'),
+                'status': 'completed'
+            }
+        except Exception as e:
+            logger.error(f"Failed to parse Canon job: {e}")
+            return None
+    
+    def parse_hp_xml(self, xml_data: str, printer: Dict) -> List[Dict[str, Any]]:
+        """Parse HP XML job data"""
+        jobs = []
+        try:
+            # Simplified XML parsing - in production, use proper XML parser
+            # This is a placeholder for HP-specific parsing logic
+            root = ET.fromstring(xml_data)
+            
+            for job_elem in root.findall('.//Job'):
+                job_data = {
+                    'jobId': job_elem.get('id', f"hp_{int(time.time())}"),
+                    'deviceIP': printer['ip'],
+                    'deviceName': printer['name'],
+                    'timestamp': datetime.now(),
+                    'pagesA4BW': int(job_elem.findtext('PagesA4BW', '0')),
+                    'pagesA4Color': int(job_elem.findtext('PagesA4Color', '0')),
+                    'pagesA3BW': int(job_elem.findtext('PagesA3BW', '0')),
+                    'pagesA3Color': int(job_elem.findtext('PagesA3Color', '0')),
+                    'scans': int(job_elem.findtext('Scans', '0')),
+                    'copies': int(job_elem.findtext('Copies', '0')),
+                    'userCode': job_elem.findtext('UserCode', 'unknown'),
+                    'status': 'completed'
+                }
+                jobs.append(job_data)
+                
+        except Exception as e:
+            logger.error(f"Failed to parse HP XML: {e}")
+        
+        return jobs
+    
+    def get_user_from_code(self, user_code: str) -> Optional[Dict[str, str]]:
+        """Get user information from user code"""
+        try:
+            # Query Firestore for user with matching username/code
+            users_ref = self.db.collection('users')
+            query = users_ref.where('username', '==', user_code).limit(1)
+            docs = query.stream()
+            
+            for doc in docs:
+                user_data = doc.to_dict()
+                return {
+                    'uid': doc.id,
+                    'displayName': user_data.get('displayName', f'User {user_code}'),
+                    'department': user_data.get('department', 'Unknown')
+                }
+        except Exception as e:
+            logger.error(f"Failed to get user from code {user_code}: {e}")
+        
+        return None
+    
+    def calculate_costs(self, job_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate costs for a print job based on current pricing"""
+        try:
+            # Get current pricing from Firestore
+            pricing_doc = self.db.collection('settings').document('pricing').get()
+            if pricing_doc.exists:
+                prices = pricing_doc.to_dict()
+            else:
+                # Default pricing
+                prices = {
+                    'a4BW': 0.05,
+                    'a4Color': 0.15,
+                    'a3BW': 0.10,
+                    'a3Color': 0.30,
+                    'scan': 0.02,
+                    'copy': 0.03
+                }
+            
+            # Calculate individual costs
+            cost_a4_bw = job_data['pagesA4BW'] * prices['a4BW']
+            cost_a4_color = job_data['pagesA4Color'] * prices['a4Color']
+            cost_a3_bw = job_data['pagesA3BW'] * prices['a3BW']
+            cost_a3_color = job_data['pagesA3Color'] * prices['a3Color']
+            cost_scans = job_data['scans'] * prices['scan']
+            cost_copies = job_data['copies'] * prices['copy']
+            
+            total_cost = cost_a4_bw + cost_a4_color + cost_a3_bw + cost_a3_color + cost_scans + cost_copies
+            
+            job_data.update({
+                'costA4BW': round(cost_a4_bw, 3),
+                'costA4Color': round(cost_a4_color, 3),
+                'costA3BW': round(cost_a3_bw, 3),
+                'costA3Color': round(cost_a3_color, 3),
+                'costScans': round(cost_scans, 3),
+                'costCopies': round(cost_copies, 3),
+                'totalCost': round(total_cost, 2)
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to calculate costs: {e}")
+            # Set default costs to 0
+            job_data.update({
+                'costA4BW': 0, 'costA4Color': 0, 'costA3BW': 0,
+                'costA3Color': 0, 'costScans': 0, 'costCopies': 0, 'totalCost': 0
+            })
+        
+        return job_data
+    
+    def store_job_data(self, jobs: List[Dict[str, Any]]):
+        """Store collected job data in Firestore"""
+        try:
+            batch = self.db.batch()
+            stored_count = 0
+            
+            for job in jobs:
+                # Get user information
+                user_info = self.get_user_from_code(job['userCode'])
+                if user_info:
+                    job.update({
+                        'uid': user_info['uid'],
+                        'userDisplayName': user_info['displayName'],
+                        'department': user_info['department']
+                    })
+                else:
+                    # Skip jobs without valid user codes
+                    logger.warning(f"Skipping job with unknown user code: {job['userCode']}")
+                    continue
+                
+                # Calculate costs
+                job = self.calculate_costs(job)
+                
+                # Check if job already exists
+                existing_job = self.db.collection('printJobs').document(job['jobId']).get()
+                if not existing_job.exists:
+                    # Add to batch
+                    job_ref = self.db.collection('printJobs').document(job['jobId'])
+                    batch.set(job_ref, job)
+                    stored_count += 1
+            
+            # Commit batch
+            if stored_count > 0:
+                batch.commit()
+                logger.info(f"Stored {stored_count} new print jobs")
+            else:
+                logger.info("No new jobs to store")
+                
+        except Exception as e:
+            logger.error(f"Failed to store job data: {e}")
+    
+    def collect_all_printers(self):
+        """Collect data from all configured printers"""
+        logger.info("Starting printer data collection")
+        all_jobs = []
+        
+        for printer in self.printers:
+            logger.info(f"Collecting data from {printer['name']} ({printer['ip']})")
+            
+            try:
+                if printer['model'] == 'canon_ir_adv':
+                    jobs = self.collect_canon_data(printer)
+                elif printer['model'] == 'hp_laserjet':
+                    jobs = self.collect_hp_data(printer)
+                else:
+                    logger.warning(f"Unknown printer model: {printer['model']}")
+                    continue
+                
+                all_jobs.extend(jobs)
+                logger.info(f"Collected {len(jobs)} jobs from {printer['name']}")
+                
+            except Exception as e:
+                logger.error(f"Failed to collect from {printer['name']}: {e}")
+        
+        # Store all collected jobs
+        if all_jobs:
+            self.store_job_data(all_jobs)
+        
+        logger.info(f"Collection completed. Total jobs processed: {len(all_jobs)}")
+    
+    def run_health_check(self):
+        """Run health check on all printers"""
+        logger.info("Running printer health check")
+        
+        for printer in self.printers:
+            try:
+                response = requests.get(
+                    f"http://{printer['ip']}/",
+                    timeout=10
+                )
+                if response.status_code == 200:
+                    logger.info(f"✓ {printer['name']} is online")
+                else:
+                    logger.warning(f"⚠ {printer['name']} returned status {response.status_code}")
+            except Exception as e:
+                logger.error(f"✗ {printer['name']} is offline: {e}")
+
     def fetch_printer_status(self, printer_ip: str) -> Optional[Dict]:
         """Fetch printer status from network printer web interface"""
         try:
@@ -275,21 +569,20 @@ class PrinterCollector:
 
 def main():
     """Main execution function"""
-    try:
-        collector = PrinterCollector()
-        
-        # Collect printer data
-        collector.collect_from_all_printers()
-        
-        # Generate monthly billing (run this less frequently)
-        if datetime.now().hour == 0:  # Run once per day at midnight
-            collector.generate_monthly_billing()
-        
-        logger.info("Collection cycle completed successfully")
-        
-    except Exception as e:
-        logger.error(f"Collection failed: {e}")
-        raise
+    collector = PrinterCollector()
+    
+    # Check command line arguments
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'health':
+            collector.run_health_check()
+            return
+        elif sys.argv[1] == 'test':
+            logger.info("Running in test mode")
+            collector.collect_all_printers()
+            return
+    
+    # Normal collection mode
+    collector.collect_all_printers()
 
 if __name__ == "__main__":
     main()

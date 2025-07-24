@@ -1,27 +1,53 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read and write their own user document
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    // Users collection - users can read their own data, admins can read all
+    match /users/{userId} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
-    // Users can read their own jobs, but only the system can write them
-    match /jobs/{jobId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.uid;
-      allow write: if false; // Only server-side writes allowed
+    // Print jobs - users can read their own, admins can read all
+    match /printJobs/{jobId} {
+      allow read: if request.auth != null && 
+        (resource.data.uid == request.auth.uid || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
-    // Users can read their own billing records
+    // Lamination jobs - same rules as print jobs
+    match /laminationJobs/{jobId} {
+      allow read: if request.auth != null && 
+        (resource.data.uid == request.auth.uid || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Billing records - users can read their own, admins can read/write all
     match /billing/{billingId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.uid;
-      allow write: if false; // Only server-side writes allowed
+      allow read: if request.auth != null && 
+        (resource.data.uid == request.auth.uid || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
-    // Admin users can read all documents
-    match /{document=**} {
+    // Settings - only admins can read/write
+    match /settings/{settingId} {
       allow read, write: if request.auth != null && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Price tables - only admins can read/write
+    match /priceTables/{tableId} {
+      allow read, write: if request.auth != null && 
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
   }
