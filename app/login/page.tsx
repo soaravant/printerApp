@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useAuth } from "@/lib/simple-auth-context"
+import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -47,8 +47,8 @@ export default function LoginPage() {
             <div className="flex justify-center mb-4">
               <Printer className="h-12 w-12 text-blue-600" />
             </div>
-            <CardTitle className="text-2xl">Σύστημα Χρέωσης Εκτυπωτών</CardTitle>
-            <CardDescription>Εισάγετε τα στοιχεία σας για σύνδεση</CardDescription>
+            <CardTitle className="text-2xl">Σύστημα Χρέωσης</CardTitle>
+            <CardDescription>Εκτυπώσεις & Πλαστικοποιήσεις</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -99,11 +99,11 @@ export default function LoginPage() {
           <CardContent className="space-y-3">
             <div className="text-sm space-y-2">
               <div className="flex justify-between">
-                <span className="font-medium">Χρήστης 1:</span>
+                <span className="font-medium">Χρήστης 408:</span>
                 <span className="font-mono">408 / 08</span>
               </div>
               <div className="flex justify-between">
-                <span className="font-medium">Χρήστης 2:</span>
+                <span className="font-medium">Χρήστης 409:</span>
                 <span className="font-mono">409 / 09</span>
               </div>
               <div className="flex justify-between">
