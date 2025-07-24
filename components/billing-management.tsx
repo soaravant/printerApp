@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { CreditCard, DollarSign, FileText, Download } from "lucide-react"
 import type { PrintBilling, LaminationBilling, User } from "@/lib/dummy-database"
+import * as XLSX from "xlsx"
 
 export function BillingManagement() {
   const [printBilling, setPrintBilling] = useState<PrintBilling[]>([])
@@ -84,18 +85,6 @@ export function BillingManagement() {
       ...laminationBilling.map((b) => ({ ...b, type: "lamination" })),
     ]
 
-    const csvData = allBilling.map((billing) => ({
-      type: billing.type,
-      user: billing.userDisplayName,
-      department: billing.department,
-      period: billing.period,
-      totalCost: billing.totalCost.toFixed(2),
-      paid: billing.paid ? "Yes" : "No",
-      paidAmount: billing.paidAmount.toFixed(2),
-      remainingBalance: billing.remainingBalance.toFixed(2),
-      dueDate: billing.dueDate.toLocaleDateString(),
-    }))
-
     const headers = [
       "Type",
       "User",
@@ -107,18 +96,46 @@ export function BillingManagement() {
       "Remaining (€)",
       "Due Date",
     ]
-    const csvContent = [headers.join(","), ...csvData.map((row) => Object.values(row).join(","))].join("\n")
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `billing_export_${new Date().toISOString().split("T")[0]}.csv`)
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    const worksheetData = [
+      headers,
+      ...allBilling.map((billing) => [
+        billing.type,
+        billing.userDisplayName,
+        billing.department,
+        billing.period,
+        billing.totalCost.toFixed(2),
+        billing.paid ? "Yes" : "No",
+        billing.paidAmount.toFixed(2),
+        billing.remainingBalance.toFixed(2),
+        billing.dueDate.toLocaleDateString(),
+      ])
+    ]
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
+    
+    // Style the header row (make it bold and add background color)
+    const headerRange = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
+    for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
+      if (!worksheet[cellAddress]) {
+        worksheet[cellAddress] = { v: headers[col] }
+      }
+      worksheet[cellAddress].s = {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "4472C4" } },
+        alignment: { horizontal: "center", vertical: "center" }
+      }
+    }
+    
+    // Set column widths
+    const columnWidths = headers.map(header => Math.max(header.length * 1.2, 12))
+    worksheet['!cols'] = columnWidths.map(width => ({ width }))
+    
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1")
+    XLSX.writeFile(workbook, `billing_export_${new Date().toISOString().split("T")[0]}.xlsx`)
   }
+
+  const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
 
   // Filter data based on selections
   const filteredPrintBilling = printBilling.filter((billing) => {
@@ -171,7 +188,7 @@ export function BillingManagement() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">€{totalPrintRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{formatPrice(totalPrintRevenue)}</div>
           </CardContent>
         </Card>
 
@@ -181,7 +198,7 @@ export function BillingManagement() {
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">€{totalLaminationRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{formatPrice(totalLaminationRevenue)}</div>
           </CardContent>
         </Card>
 
@@ -191,7 +208,7 @@ export function BillingManagement() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">€{totalUnpaidPrint.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-red-600">{formatPrice(totalUnpaidPrint)}</div>
           </CardContent>
         </Card>
 
@@ -201,7 +218,7 @@ export function BillingManagement() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">€{totalUnpaidLamination.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-red-600">{formatPrice(totalUnpaidLamination)}</div>
           </CardContent>
         </Card>
       </div>
@@ -268,7 +285,7 @@ export function BillingManagement() {
               <Label>Ενέργειες</Label>
               <Button onClick={exportBillingData} variant="outline" className="w-full bg-transparent">
                 <Download className="h-4 w-4 mr-2" />
-                Εξαγωγή CSV
+                Εξαγωγή XLSX
               </Button>
             </div>
           </div>
@@ -304,9 +321,9 @@ export function BillingManagement() {
                     <TableCell className="font-medium">{billing.userDisplayName}</TableCell>
                     <TableCell>{billing.department}</TableCell>
                     <TableCell>{billing.period}</TableCell>
-                    <TableCell>€{billing.totalCost.toFixed(2)}</TableCell>
-                    <TableCell>€{billing.paidAmount.toFixed(2)}</TableCell>
-                    <TableCell>€{billing.remainingBalance.toFixed(2)}</TableCell>
+                    <TableCell>{formatPrice(billing.totalCost)}</TableCell>
+                    <TableCell>{formatPrice(billing.paidAmount)}</TableCell>
+                    <TableCell>{formatPrice(billing.remainingBalance)}</TableCell>
                     <TableCell>
                       {billing.paid ? (
                         <Badge className="bg-green-100 text-green-800">Πληρωμένο</Badge>
@@ -358,9 +375,9 @@ export function BillingManagement() {
                     <TableCell className="font-medium">{billing.userDisplayName}</TableCell>
                     <TableCell>{billing.department}</TableCell>
                     <TableCell>{billing.period}</TableCell>
-                    <TableCell>€{billing.totalCost.toFixed(2)}</TableCell>
-                    <TableCell>€{billing.paidAmount.toFixed(2)}</TableCell>
-                    <TableCell>€{billing.remainingBalance.toFixed(2)}</TableCell>
+                    <TableCell>{formatPrice(billing.totalCost)}</TableCell>
+                    <TableCell>{formatPrice(billing.paidAmount)}</TableCell>
+                    <TableCell>{formatPrice(billing.remainingBalance)}</TableCell>
                     <TableCell>
                       {billing.paid ? (
                         <Badge className="bg-green-100 text-green-800">Πληρωμένο</Badge>

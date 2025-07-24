@@ -34,6 +34,8 @@ export function BillingTable() {
     )
   }
 
+  const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
+
   return (
     <Table>
       <TableHeader>
@@ -49,10 +51,10 @@ export function BillingTable() {
         {billingRecords.map((record) => (
           <TableRow key={record.billingId}>
             <TableCell>{record.period}</TableCell>
-            <TableCell>€{record.totalCost.toFixed(2)}</TableCell>
-            <TableCell>€{(record.paidAmount || 0).toFixed(2)}</TableCell>
+            <TableCell>{formatPrice(record.totalCost)}</TableCell>
+            <TableCell>{formatPrice(record.paidAmount || 0)}</TableCell>
             <TableCell className={record.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
-              €{record.remainingBalance.toFixed(2)}
+              {formatPrice(record.remainingBalance)}
             </TableCell>
             <TableCell>
               <Badge variant={record.paid ? "default" : "destructive"}>{record.paid ? "Paid" : "Unpaid"}</Badge>

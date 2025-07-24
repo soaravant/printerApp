@@ -36,6 +36,8 @@ export function UserDashboard() {
     return <div className="text-center py-8">Φόρτωση δεδομένων...</div>
   }
 
+  const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
@@ -75,10 +77,10 @@ export function UserDashboard() {
                     {billingRecords.map((record) => (
                       <TableRow key={record.billingId}>
                         <TableCell className="font-medium">{record.period}</TableCell>
-                        <TableCell>€{record.totalCost.toFixed(2)}</TableCell>
-                        <TableCell>€{(record.paidAmount || 0).toFixed(2)}</TableCell>
+                        <TableCell>{formatPrice(record.totalCost)}</TableCell>
+                        <TableCell>{formatPrice(record.paidAmount || 0)}</TableCell>
                         <TableCell className={record.remainingBalance > 0 ? "text-red-600 font-semibold" : ""}>
-                          €{record.remainingBalance.toFixed(2)}
+                          {formatPrice(record.remainingBalance)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -138,7 +140,7 @@ export function UserDashboard() {
                         <TableCell>{job.pagesA3BW || 0}</TableCell>
                         <TableCell>{job.pagesA3Color || 0}</TableCell>
                         <TableCell>{job.scans || 0}</TableCell>
-                        <TableCell>€{job.totalCost.toFixed(2)}</TableCell>
+                        <TableCell>{formatPrice(job.totalCost)}</TableCell>
                         <TableCell>
                           <Badge variant={job.status === "completed" ? "default" : "secondary"}>
                             {job.status === "completed" ? "Ολοκληρώθηκε" : job.status}

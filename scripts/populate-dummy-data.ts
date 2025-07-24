@@ -35,7 +35,7 @@ export function populateDummyData() {
     priceTables.forEach((table) => {
       console.log(`   ${table.name}:`)
       Object.entries(table.prices).forEach(([key, value]) => {
-        console.log(`     ${key}: €${value.toFixed(3)}`)
+        console.log(`     ${key}: €${value.toFixed(2).replace('.', ',')}`);
       })
     })
 
@@ -48,11 +48,11 @@ export function populateDummyData() {
       .reduce((sum, b) => sum + b.remainingBalance, 0)
 
     console.log("\n📈 Statistics:")
-    console.log(`   Total Print Revenue: €${totalPrintCost.toFixed(2)}`)
-    console.log(`   Total Lamination Revenue: €${totalLaminationCost.toFixed(2)}`)
-    console.log(`   Unpaid Print Bills: €${totalUnpaidPrint.toFixed(2)}`)
-    console.log(`   Unpaid Lamination Bills: €${totalUnpaidLamination.toFixed(2)}`)
-    console.log(`   Total Outstanding: €${(totalUnpaidPrint + totalUnpaidLamination).toFixed(2)}`)
+    console.log(`   Total Print Revenue: €${totalPrintCost.toFixed(2).replace('.', ',')}`);
+    console.log(`   Total Lamination Revenue: €${totalLaminationCost.toFixed(2).replace('.', ',')}`);
+    console.log(`   Unpaid Print Bills: €${totalUnpaidPrint.toFixed(2).replace('.', ',')}`);
+    console.log(`   Unpaid Lamination Bills: €${totalUnpaidLamination.toFixed(2).replace('.', ',')}`);
+    console.log(`   Total Outstanding: €${(totalUnpaidPrint + totalUnpaidLamination).toFixed(2).replace('.', ',')}`);
 
     console.log("\n✅ Dummy data population completed successfully!")
     return true

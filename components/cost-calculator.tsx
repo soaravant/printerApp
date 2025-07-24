@@ -37,6 +37,8 @@ export function CostCalculator() {
     copy: 0.03,
   }
 
+  const formatPrice = (price: number) => `€${price.toFixed(3).replace('.', ',')}`
+
   const calculateCosts = (): CostBreakdown => {
     return {
       a4BW: quantities.a4BW * prices.a4BW,
@@ -96,7 +98,7 @@ export function CostCalculator() {
                 onChange={(e) => handleQuantityChange("a4BW", e.target.value)}
                 placeholder="0"
               />
-              <span className="text-sm text-gray-500">€{prices.a4BW.toFixed(3)}</span>
+              <span className="text-sm text-gray-500">{formatPrice(prices.a4BW)}</span>
             </div>
           </div>
 
@@ -111,7 +113,7 @@ export function CostCalculator() {
                 onChange={(e) => handleQuantityChange("a4Color", e.target.value)}
                 placeholder="0"
               />
-              <span className="text-sm text-gray-500">€{prices.a4Color.toFixed(3)}</span>
+              <span className="text-sm text-gray-500">{formatPrice(prices.a4Color)}</span>
             </div>
           </div>
 
@@ -126,7 +128,7 @@ export function CostCalculator() {
                 onChange={(e) => handleQuantityChange("a3BW", e.target.value)}
                 placeholder="0"
               />
-              <span className="text-sm text-gray-500">€{prices.a3BW.toFixed(3)}</span>
+              <span className="text-sm text-gray-500">{formatPrice(prices.a3BW)}</span>
             </div>
           </div>
 
@@ -141,7 +143,7 @@ export function CostCalculator() {
                 onChange={(e) => handleQuantityChange("a3Color", e.target.value)}
                 placeholder="0"
               />
-              <span className="text-sm text-gray-500">€{prices.a3Color.toFixed(3)}</span>
+              <span className="text-sm text-gray-500">{formatPrice(prices.a3Color)}</span>
             </div>
           </div>
 
@@ -156,7 +158,7 @@ export function CostCalculator() {
                 onChange={(e) => handleQuantityChange("scans", e.target.value)}
                 placeholder="0"
               />
-              <span className="text-sm text-gray-500">€{prices.scan.toFixed(3)}</span>
+              <span className="text-sm text-gray-500">{formatPrice(prices.scan)}</span>
             </div>
           </div>
 
@@ -171,7 +173,7 @@ export function CostCalculator() {
                 onChange={(e) => handleQuantityChange("copies", e.target.value)}
                 placeholder="0"
               />
-              <span className="text-sm text-gray-500">€{prices.copy.toFixed(3)}</span>
+              <span className="text-sm text-gray-500">{formatPrice(prices.copy)}</span>
             </div>
           </div>
         </div>
@@ -186,42 +188,42 @@ export function CostCalculator() {
             {costs.a4BW > 0 && (
               <div className="flex justify-between">
                 <span>A4 B&W ({quantities.a4BW} pages)</span>
-                <span>€{costs.a4BW.toFixed(3)}</span>
+                <span>{formatPrice(costs.a4BW)}</span>
               </div>
             )}
             {costs.a4Color > 0 && (
               <div className="flex justify-between">
                 <span>A4 Color ({quantities.a4Color} pages)</span>
-                <span>€{costs.a4Color.toFixed(3)}</span>
+                <span>{formatPrice(costs.a4Color)}</span>
               </div>
             )}
             {costs.a3BW > 0 && (
               <div className="flex justify-between">
                 <span>A3 B&W ({quantities.a3BW} pages)</span>
-                <span>€{costs.a3BW.toFixed(3)}</span>
+                <span>{formatPrice(costs.a3BW)}</span>
               </div>
             )}
             {costs.a3Color > 0 && (
               <div className="flex justify-between">
                 <span>A3 Color ({quantities.a3Color} pages)</span>
-                <span>€{costs.a3Color.toFixed(3)}</span>
+                <span>{formatPrice(costs.a3Color)}</span>
               </div>
             )}
             {costs.scans > 0 && (
               <div className="flex justify-between">
                 <span>Scans ({quantities.scans})</span>
-                <span>€{costs.scans.toFixed(3)}</span>
+                <span>{formatPrice(costs.scans)}</span>
               </div>
             )}
             {costs.copies > 0 && (
               <div className="flex justify-between">
                 <span>Copies ({quantities.copies})</span>
-                <span>€{costs.copies.toFixed(3)}</span>
+                <span>{formatPrice(costs.copies)}</span>
               </div>
             )}
             <div className="border-t pt-2 flex justify-between font-semibold">
               <span>Total Cost</span>
-              <span>€{costs.total.toFixed(2)}</span>
+              <span>{formatPrice(costs.total)}</span>
             </div>
           </div>
         </div>

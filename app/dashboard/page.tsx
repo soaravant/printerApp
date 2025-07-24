@@ -12,10 +12,45 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { UsageChart } from "@/components/usage-chart"
+import dynamic from "next/dynamic"
 import { useState, useEffect } from "react"
-import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download } from "lucide-react"
-import type { PrintJob, LaminationJob, PrintBilling, LaminationBilling, User } from "@/lib/dummy-database"
+import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download, RotateCcw, Filter } from "lucide-react"
+import * as XLSX from "xlsx-js-style"
+
+// Dynamic import for UsageChart (must be at module scope)
+const UsageChart = dynamic(() => import("@/components/usage-chart"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση γραφήματος...</div>,
+  ssr: false,
+})
+const PrintJobsTable = dynamic(() => import("@/components/print-jobs-table"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση εκτυπώσεων...</div>,
+  ssr: false,
+})
+const LaminationJobsTable = dynamic(() => import("@/components/lamination-jobs-table"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση πλαστικοποιήσεων...</div>,
+  ssr: false,
+})
+const PrintBillingTable = dynamic(() => import("@/components/print-billing-table"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση χρεώσεων εκτυπώσεων...</div>,
+  ssr: false,
+})
+const LaminationBillingTable = dynamic(() => import("@/components/lamination-billing-table"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση χρεώσεων πλαστικοποιήσεων...</div>,
+  ssr: false,
+})
+
+// Pagination helper
+function Pagination({ page, total, pageSize, onPageChange }: { page: number; total: number; pageSize: number; onPageChange: (p: number) => void }) {
+  const totalPages = Math.ceil(total / pageSize)
+  if (totalPages <= 1) return null
+  return (
+    <div className="flex gap-2 justify-end items-center mt-2">
+      <Button size="sm" variant="outline" onClick={() => onPageChange(page - 1)} disabled={page === 1}>&lt;</Button>
+      <span className="text-xs">Σελίδα {page} από {totalPages}</span>
+      <Button size="sm" variant="outline" onClick={() => onPageChange(page + 1)} disabled={page === totalPages}>&gt;</Button>
+    </div>
+  )
+}
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -39,6 +74,13 @@ export default function DashboardPage() {
   const [filteredPrintJobs, setFilteredPrintJobs] = useState<PrintJob[]>([])
   const [filteredLaminationBilling, setFilteredLaminationBilling] = useState<LaminationBilling[]>([])
   const [filteredLaminationJobs, setFilteredLaminationJobs] = useState<LaminationJob[]>([])
+
+  // Pagination state
+  const [printJobsPage, setPrintJobsPage] = useState(1)
+  const [laminationJobsPage, setLaminationJobsPage] = useState(1)
+  const [printBillingPage, setPrintBillingPage] = useState(1)
+  const [laminationBillingPage, setLaminationBillingPage] = useState(1)
+  const PAGE_SIZE = 10
 
   useEffect(() => {
     if (!user) return
@@ -86,6 +128,14 @@ export default function DashboardPage() {
     printBilling,
     laminationBilling,
   ])
+
+  // Reset page on filter change
+  useEffect(() => {
+    setPrintJobsPage(1)
+    setLaminationJobsPage(1)
+    setPrintBillingPage(1)
+    setLaminationBillingPage(1)
+  }, [searchTerm, dateFrom, dateTo, statusFilter, typeFilter, deviceFilter, userFilter])
 
   const applyFilters = () => {
     // Filter Print Billing
@@ -203,21 +253,57 @@ export default function DashboardPage() {
     setUserFilter("all")
   }
 
-  const exportTableCSV = (data: any[], filename: string, headers: string[]) => {
-    const csvContent = [
-      headers.join(","),
-      ...data.map((row) => headers.map((header) => row[header] || "").join(",")),
-    ].join("\n")
+  type RGB = string // e.g. "4472C4"
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `${filename}_${new Date().toISOString().split("T")[0]}.csv`)
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  // Helper for friendly Greek column names and dynamic column widths
+  const exportTableXLSX = (
+    data: any[],
+    filename: string,
+    columns: { key: string, label: string }[],
+    headerColor: string
+  ) => {
+    // Build AOA (array of arrays)
+    const aoa = [
+      columns.map(col => col.label),
+      ...data.map(row => columns.map(col => row[col.key] ?? ""))
+    ]
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+    // Style header row
+    const range = XLSX.utils.decode_range(ws['!ref']!)
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cellAddr = XLSX.utils.encode_cell({ r: 0, c })
+      const cell = ws[cellAddr] ?? (ws[cellAddr] = { v: columns[c].label })
+      cell.s = {
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
+        fill: { patternType: "solid", fgColor: { rgb: headerColor } },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: {
+          top:    { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left:   { style: "thin", color: { rgb: "000000" } },
+          right:  { style: "thin", color: { rgb: "000000" } }
+        }
+      }
+    }
+
+    // Dynamic column widths based on max content length, with extra space for header
+    const colWidths = columns.map((col, i) => ({
+      wch: Math.max(
+        col.label.length * 1.7, // more space for header
+        ...data.map(row => String(row[col.key] ?? "").length),
+        10 // increased minimum width
+      ) + 1 // extra padding
+    }))
+    ws['!cols'] = colWidths
+
+    // Row height for header
+    ws['!rows'] = [{ hpt: 25 }]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
+    XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split("T")[0]}.xlsx`)
   }
 
   if (!user) return null
@@ -256,6 +342,8 @@ export default function DashboardPage() {
         return type
     }
   }
+
+  const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
 
   // Generate chart data for last 6 months
   const generateChartData = () => {
@@ -313,7 +401,7 @@ export default function DashboardPage() {
                   <Receipt className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-red-600">€{totalUnpaid.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-red-600">{formatPrice(totalUnpaid)}</div>
                   <p className="text-xs text-muted-foreground">Εκτυπώσεις + Πλαστικοποιήσεις</p>
                 </CardContent>
               </Card>
@@ -324,7 +412,7 @@ export default function DashboardPage() {
                   <Printer className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">€{printUnpaid.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
                   <p className="text-xs text-muted-foreground">{relevantPrintJobs.length} συνολικές εκτυπώσεις</p>
                 </CardContent>
               </Card>
@@ -335,7 +423,7 @@ export default function DashboardPage() {
                   <CreditCard className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-600">€{laminationUnpaid.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-green-600">{formatPrice(laminationUnpaid)}</div>
                   <p className="text-xs text-muted-foreground">
                     {relevantLaminationJobs.length} συνολικές πλαστικοποιήσεις
                   </p>
@@ -349,7 +437,7 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    €{(currentMonthPrintCost + currentMonthLaminationCost).toFixed(2)}
+                    {formatPrice(currentMonthPrintCost + currentMonthLaminationCost)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {currentMonthPrintJobs.length + currentMonthLaminationJobs.length} εργασίες
@@ -361,121 +449,119 @@ export default function DashboardPage() {
             {/* Unified Filters */}
             <Card className="mb-6">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Φίλτρα
-                </CardTitle>
+                <div className="flex items-center justify-between w-full">
+                  <CardTitle className="flex items-center gap-2">
+                    <Filter className="h-5 w-5" />
+                    Φίλτρα
+                  </CardTitle>
+                  <button
+                    type="button"
+                    aria-label="Επαναφορά φίλτρων"
+                    className="p-2 rounded-full border border-gray-300 hover:bg-gray-100 transition ml-2"
+                    onClick={clearFilters}
+                  >
+                    <RotateCcw className="h-4 w-4 text-gray-500" />
+                  </button>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 p-4 bg-gray-50 rounded-lg">
-                  {/* Search */}
-                  <div className="space-y-2">
-                    <Label htmlFor="search">Αναζήτηση</Label>
-                    <Input
-                      id="search"
-                      placeholder="Αναζήτηση..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Date From */}
-                  <div className="space-y-2">
-                    <Label htmlFor="dateFrom">Από Ημερομηνία</Label>
-                    <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                  </div>
-
-                  {/* Date To */}
-                  <div className="space-y-2">
-                    <Label htmlFor="dateTo">Έως Ημερομηνία</Label>
-                    <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-                  </div>
-
-                  {/* Status Filter */}
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Κατάσταση</Label>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Όλες</SelectItem>
-                        <SelectItem value="paid">Πληρωμένο</SelectItem>
-                        <SelectItem value="unpaid">Απλήρωτο</SelectItem>
-                        <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
-                        <SelectItem value="pending">Εκκρεμεί</SelectItem>
-                        <SelectItem value="failed">Αποτυχία</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Device Filter */}
-                  <div className="space-y-2">
-                    <Label htmlFor="device">Εκτυπωτής</Label>
-                    <Select value={deviceFilter} onValueChange={setDeviceFilter}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Όλοι</SelectItem>
-                        {uniqueDevices.map((device) => (
-                          <SelectItem key={device} value={device}>
-                            {device}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Type Filter */}
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Τύπος Πλαστικοποίησης</Label>
-                    <Select value={typeFilter} onValueChange={setTypeFilter}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Όλοι</SelectItem>
-                        <SelectItem value="A3">A3</SelectItem>
-                        <SelectItem value="A4">A4</SelectItem>
-                        <SelectItem value="card_small">Κάρτα Μικρή</SelectItem>
-                        <SelectItem value="card_large">Κάρτα Μεγάλη</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* User Filter - Only for Admin */}
-                  {user.role === "admin" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="userFilter">Χρήστης</Label>
-                      <Select value={userFilter} onValueChange={setUserFilter}>
+                <div className="relative">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                    {/* Row 1: Search (col 1-2), Status (col 3), Printer (col 4) */}
+                    <div className="md:col-span-2 flex flex-col justify-end">
+                      <Label htmlFor="search">Αναζήτηση</Label>
+                      <Input
+                        id="search"
+                        placeholder="Αναζήτηση..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <Label htmlFor="status">Κατάσταση</Label>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">Όλοι οι χρήστες</SelectItem>
-                          {allUsers
-                            .filter((u) => u.role === "user")
-                            .map((u) => (
-                              <SelectItem key={u.uid} value={u.uid}>
-                                {u.displayName} ({u.username})
-                              </SelectItem>
-                            ))}
+                          <SelectItem value="all">Όλες</SelectItem>
+                          <SelectItem value="paid">Πληρωμένο</SelectItem>
+                          <SelectItem value="unpaid">Απλήρωτο</SelectItem>
+                          <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
+                          <SelectItem value="pending">Εκκρεμεί</SelectItem>
+                          <SelectItem value="failed">Αποτυχία</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                  )}
-                </div>
+                    <div className="flex flex-col justify-end">
+                      <Label htmlFor="device">Εκτυπωτής</Label>
+                      <Select value={deviceFilter} onValueChange={setDeviceFilter}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Όλοι</SelectItem>
+                          {uniqueDevices.map((device) => (
+                            <SelectItem key={device} value={device}>
+                              {device}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
+                    {/* Row 2: Date From (col 1), Date To (col 2), Type (col 3), User (col 4, admin only) */}
+                    <div className="flex flex-col justify-end">
+                      <Label htmlFor="dateFrom">Από Ημερομηνία</Label>
+                      <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <Label htmlFor="dateTo">Έως Ημερομηνία</Label>
+                      <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <Label htmlFor="type">Τύπος Πλαστικοποίησης</Label>
+                      <Select value={typeFilter} onValueChange={setTypeFilter}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Όλοι</SelectItem>
+                          <SelectItem value="A3">A3</SelectItem>
+                          <SelectItem value="A4">A4</SelectItem>
+                          <SelectItem value="card_small">Κάρτα Μικρή</SelectItem>
+                          <SelectItem value="card_large">Κάρτα Μεγάλη</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {user.role === "admin" ? (
+                      <div className="flex flex-col justify-end">
+                        <Label htmlFor="userFilter">Χρήστης</Label>
+                        <Select value={userFilter} onValueChange={setUserFilter}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Όλοι οι χρήστες</SelectItem>
+                            {allUsers
+                              .filter((u) => u.role === "user")
+                              .map((u) => (
+                                <SelectItem key={u.uid} value={u.uid}>
+                                  {u.displayName} ({u.username})
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div></div>
+                    )}
+                  </div>
+                </div>
                 <div className="flex justify-between items-center mt-4">
                   <div className="text-sm text-gray-600">
-                    Εκτυπώσεις: {filteredPrintJobs.length}/{printJobs.length} | Πλαστικοποιήσεις:{" "}
-                    {filteredLaminationJobs.length}/{laminationJobs.length}
+                    Εκτυπώσεις: {filteredPrintJobs.length}/{printJobs.length} | Πλαστικοποιήσεις: {filteredLaminationJobs.length}/{laminationJobs.length}
                   </div>
-                  <Button onClick={clearFilters} variant="outline" size="sm" className="bg-transparent">
-                    <X className="h-4 w-4 mr-2" />
-                    Καθαρισμός
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -511,7 +597,7 @@ export default function DashboardPage() {
                         </div>
                         <Button
                           onClick={() =>
-                            exportTableCSV(
+                            exportTableXLSX(
                               filteredPrintBilling.map((b) => ({
                                 period: b.period,
                                 userDisplayName: b.userDisplayName,
@@ -521,105 +607,47 @@ export default function DashboardPage() {
                                 totalA3BW: b.totalA3BW,
                                 totalA3Color: b.totalA3Color,
                                 totalScans: b.totalScans,
-                                totalCost: b.totalCost.toFixed(2),
-                                paidAmount: b.paidAmount.toFixed(2),
-                                remainingBalance: b.remainingBalance.toFixed(2),
+                                totalCost: formatPrice(b.totalCost),
+                                paidAmount: formatPrice(b.paidAmount),
+                                remainingBalance: formatPrice(b.remainingBalance),
                                 dueDate: b.dueDate.toLocaleDateString("el-GR"),
                                 status: b.paid ? "Πληρωμένο" : "Απλήρωτο",
                               })),
                               "print_billing",
                               [
-                                "period",
-                                "userDisplayName",
-                                "department",
-                                "totalA4BW",
-                                "totalA4Color",
-                                "totalA3BW",
-                                "totalA3Color",
-                                "totalScans",
-                                "totalCost",
-                                "paidAmount",
-                                "remainingBalance",
-                                "dueDate",
-                                "status",
+                                { key: "period", label: "Περίοδος" },
+                                { key: "userDisplayName", label: "Χρήστης" },
+                                { key: "department", label: "Τμήμα" },
+                                { key: "totalA4BW", label: "A4 Ασπρόμαυρες" },
+                                { key: "totalA4Color", label: "A4 Έγχρωμες" },
+                                { key: "totalA3BW", label: "A3 Ασπρόμαυρες" },
+                                { key: "totalA3Color", label: "A3 Έγχρωμες" },
+                                { key: "totalScans", label: "Σαρώσεις" },
+                                { key: "totalCost", label: "Σύνολο Κόστους" },
+                                { key: "paidAmount", label: "Πληρωμένο Ποσό" },
+                                { key: "remainingBalance", label: "Υπόλοιπο" },
+                                { key: "dueDate", label: "Ημ/νία Λήξης" },
+                                { key: "status", label: "Κατάσταση" }
                               ],
+                              "4472C4"
                             )
                           }
                           variant="outline"
                           size="sm"
                         >
                           <Download className="h-4 w-4 mr-2" />
-                          Εξαγωγή CSV
+                          Εξαγωγή XLSX
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="border rounded-lg" style={{ maxHeight: "400px", overflowY: "auto" }}>
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-white z-10">
-                            <TableRow>
-                              <TableHead className="font-medium">Περίοδος</TableHead>
-                              {user.role === "admin" && <TableHead>Χρήστης</TableHead>}
-                              {user.role === "admin" && <TableHead>Τμήμα</TableHead>}
-                              <TableHead>A4 Α/Μ</TableHead>
-                              <TableHead>A4 Έγχρωμο</TableHead>
-                              <TableHead>A3 Α/Μ</TableHead>
-                              <TableHead>A3 Έγχρωμο</TableHead>
-                              <TableHead>Σαρώσεις</TableHead>
-                              <TableHead>Συνολικό Κόστος</TableHead>
-                              <TableHead>Πληρωμένο</TableHead>
-                              <TableHead>Υπόλοιπο</TableHead>
-                              <TableHead>Ημ. Εξόφλησης</TableHead>
-                              <TableHead>Κατάσταση</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredPrintBilling.length === 0 ? (
-                              <TableRow>
-                                <TableCell
-                                  colSpan={user.role === "admin" ? 13 : 11}
-                                  className="text-center py-8 text-gray-500"
-                                >
-                                  Δεν βρέθηκαν αποτελέσματα
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              filteredPrintBilling.map((billing) => (
-                                <TableRow key={billing.billingId}>
-                                  <TableCell className="font-medium">{billing.period}</TableCell>
-                                  {user.role === "admin" && <TableCell>{billing.userDisplayName}</TableCell>}
-                                  {user.role === "admin" && <TableCell>{billing.department}</TableCell>}
-                                  <TableCell>{billing.totalA4BW}</TableCell>
-                                  <TableCell>{billing.totalA4Color}</TableCell>
-                                  <TableCell>{billing.totalA3BW}</TableCell>
-                                  <TableCell>{billing.totalA3Color}</TableCell>
-                                  <TableCell>{billing.totalScans}</TableCell>
-                                  <TableCell>€{billing.totalCost.toFixed(2)}</TableCell>
-                                  <TableCell>€{billing.paidAmount.toFixed(2)}</TableCell>
-                                  <TableCell
-                                    className={
-                                      billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"
-                                    }
-                                  >
-                                    €{billing.remainingBalance.toFixed(2)}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-4 w-4" />
-                                      {billing.dueDate.toLocaleDateString("el-GR")}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant={billing.paid ? "default" : "destructive"}>
-                                      {billing.paid ? "Πληρωμένο" : "Απλήρωτο"}
-                                    </Badge>
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      <PrintBillingTable
+                        data={filteredPrintBilling}
+                        page={printBillingPage}
+                        pageSize={PAGE_SIZE}
+                        onPageChange={setPrintBillingPage}
+                        userRole={user.role}
+                      />
                     </CardContent>
                   </Card>
 
@@ -633,7 +661,7 @@ export default function DashboardPage() {
                         </div>
                         <Button
                           onClick={() =>
-                            exportTableCSV(
+                            exportTableXLSX(
                               filteredPrintJobs.map((j) => ({
                                 timestamp: j.timestamp.toLocaleDateString("el-GR"),
                                 userDisplayName: j.userDisplayName,
@@ -645,90 +673,43 @@ export default function DashboardPage() {
                                 pagesA3Color: j.pagesA3Color,
                                 scans: j.scans,
                                 copies: j.copies,
-                                totalCost: j.totalCost.toFixed(2),
+                                totalCost: formatPrice(j.totalCost),
                                 status: j.status === "completed" ? "Ολοκληρώθηκε" : j.status,
                               })),
                               "print_jobs",
                               [
-                                "timestamp",
-                                "userDisplayName",
-                                "department",
-                                "deviceName",
-                                "pagesA4BW",
-                                "pagesA4Color",
-                                "pagesA3BW",
-                                "pagesA3Color",
-                                "scans",
-                                "copies",
-                                "totalCost",
-                                "status",
+                                { key: "timestamp", label: "Ημερομηνία" },
+                                { key: "userDisplayName", label: "Χρήστης" },
+                                { key: "department", label: "Τμήμα" },
+                                { key: "deviceName", label: "Εκτυπωτής" },
+                                { key: "pagesA4BW", label: "A4 Ασπρόμαυρες" },
+                                { key: "pagesA4Color", label: "A4 Έγχρωμες" },
+                                { key: "pagesA3BW", label: "A3 Ασπρόμαυρες" },
+                                { key: "pagesA3Color", label: "A3 Έγχρωμες" },
+                                { key: "scans", label: "Σαρώσεις" },
+                                { key: "copies", label: "Αντίγραφα" },
+                                { key: "totalCost", label: "Σύνολο Κόστους" },
+                                { key: "status", label: "Κατάσταση" }
                               ],
+                              "4472C4"
                             )
                           }
                           variant="outline"
                           size="sm"
                         >
                           <Download className="h-4 w-4 mr-2" />
-                          Εξαγωγή CSV
+                          Εξαγωγή XLSX
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="border rounded-lg" style={{ maxHeight: "400px", overflowY: "auto" }}>
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-white z-10">
-                            <TableRow>
-                              <TableHead>Ημερομηνία</TableHead>
-                              {user.role === "admin" && <TableHead>Χρήστης</TableHead>}
-                              {user.role === "admin" && <TableHead>Τμήμα</TableHead>}
-                              <TableHead>Εκτυπωτής</TableHead>
-                              <TableHead>A4 Α/Μ</TableHead>
-                              <TableHead>A4 Έγχρωμο</TableHead>
-                              <TableHead>A3 Α/Μ</TableHead>
-                              <TableHead>A3 Έγχρωμο</TableHead>
-                              <TableHead>Σαρώσεις</TableHead>
-                              <TableHead>Φωτοαντίγραφα</TableHead>
-                              <TableHead>Κόστος</TableHead>
-                              <TableHead>Κατάσταση</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredPrintJobs.length === 0 ? (
-                              <TableRow>
-                                <TableCell
-                                  colSpan={user.role === "admin" ? 12 : 10}
-                                  className="text-center py-8 text-gray-500"
-                                >
-                                  Δεν βρέθηκαν αποτελέσματα
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              filteredPrintJobs.map((job) => (
-                                <TableRow key={job.jobId}>
-                                  <TableCell>{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
-                                  {user.role === "admin" && <TableCell>{job.userDisplayName}</TableCell>}
-                                  {user.role === "admin" && <TableCell>{job.department}</TableCell>}
-                                  <TableCell>
-                                    <Badge variant="outline">{job.deviceName}</Badge>
-                                  </TableCell>
-                                  <TableCell>{job.pagesA4BW}</TableCell>
-                                  <TableCell>{job.pagesA4Color}</TableCell>
-                                  <TableCell>{job.pagesA3BW}</TableCell>
-                                  <TableCell>{job.pagesA3Color}</TableCell>
-                                  <TableCell>{job.scans}</TableCell>
-                                  <TableCell>{job.copies}</TableCell>
-                                  <TableCell>€{job.totalCost.toFixed(2)}</TableCell>
-                                  <TableCell>
-                                    <Badge variant={job.status === "completed" ? "default" : "secondary"}>
-                                      {job.status === "completed" ? "Ολοκληρώθηκε" : job.status}
-                                    </Badge>
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      <PrintJobsTable
+                        data={filteredPrintJobs}
+                        page={printJobsPage}
+                        pageSize={PAGE_SIZE}
+                        onPageChange={setPrintJobsPage}
+                        userRole={user.role}
+                      />
                     </CardContent>
                   </Card>
                 </div>
@@ -746,7 +727,7 @@ export default function DashboardPage() {
                         </div>
                         <Button
                           onClick={() =>
-                            exportTableCSV(
+                            exportTableXLSX(
                               filteredLaminationBilling.map((b) => ({
                                 period: b.period,
                                 userDisplayName: b.userDisplayName,
@@ -755,102 +736,46 @@ export default function DashboardPage() {
                                 totalA4: b.totalA4,
                                 totalCardSmall: b.totalCardSmall,
                                 totalCardLarge: b.totalCardLarge,
-                                totalCost: b.totalCost.toFixed(2),
-                                paidAmount: b.paidAmount.toFixed(2),
-                                remainingBalance: b.remainingBalance.toFixed(2),
+                                totalCost: formatPrice(b.totalCost),
+                                paidAmount: formatPrice(b.paidAmount),
+                                remainingBalance: formatPrice(b.remainingBalance),
                                 dueDate: b.dueDate.toLocaleDateString("el-GR"),
                                 status: b.paid ? "Πληρωμένο" : "Απλήρωτο",
                               })),
                               "lamination_billing",
                               [
-                                "period",
-                                "userDisplayName",
-                                "department",
-                                "totalA3",
-                                "totalA4",
-                                "totalCardSmall",
-                                "totalCardLarge",
-                                "totalCost",
-                                "paidAmount",
-                                "remainingBalance",
-                                "dueDate",
-                                "status",
+                                { key: "period", label: "Περίοδος" },
+                                { key: "userDisplayName", label: "Χρήστης" },
+                                { key: "department", label: "Τμήμα" },
+                                { key: "totalA3", label: "A3" },
+                                { key: "totalA4", label: "A4" },
+                                { key: "totalCardSmall", label: "Κάρτα Μικρή" },
+                                { key: "totalCardLarge", label: "Κάρτα Μεγάλη" },
+                                { key: "totalCost", label: "Σύνολο Κόστους" },
+                                { key: "paidAmount", label: "Πληρωμένο Ποσό" },
+                                { key: "remainingBalance", label: "Υπόλοιπο" },
+                                { key: "dueDate", label: "Ημ/νία Λήξης" },
+                                { key: "status", label: "Κατάσταση" }
                               ],
+                              "22C55E"
                             )
                           }
                           variant="outline"
                           size="sm"
                         >
                           <Download className="h-4 w-4 mr-2" />
-                          Εξαγωγή CSV
+                          Εξαγωγή XLSX
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="border rounded-lg" style={{ maxHeight: "400px", overflowY: "auto" }}>
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-white z-10">
-                            <TableRow>
-                              <TableHead className="font-medium">Περίοδος</TableHead>
-                              {user.role === "admin" && <TableHead>Χρήστης</TableHead>}
-                              {user.role === "admin" && <TableHead>Τμήμα</TableHead>}
-                              <TableHead>A3</TableHead>
-                              <TableHead>A4</TableHead>
-                              <TableHead>Κάρτα Μικρή</TableHead>
-                              <TableHead>Κάρτα Μεγάλη</TableHead>
-                              <TableHead>Συνολικό Κόστος</TableHead>
-                              <TableHead>Πληρωμένο</TableHead>
-                              <TableHead>Υπόλοιπο</TableHead>
-                              <TableHead>Ημ. Εξόφλησης</TableHead>
-                              <TableHead>Κατάσταση</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredLaminationBilling.length === 0 ? (
-                              <TableRow>
-                                <TableCell
-                                  colSpan={user.role === "admin" ? 12 : 10}
-                                  className="text-center py-8 text-gray-500"
-                                >
-                                  Δεν βρέθηκαν αποτελέσματα
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              filteredLaminationBilling.map((billing) => (
-                                <TableRow key={billing.billingId}>
-                                  <TableCell className="font-medium">{billing.period}</TableCell>
-                                  {user.role === "admin" && <TableCell>{billing.userDisplayName}</TableCell>}
-                                  {user.role === "admin" && <TableCell>{billing.department}</TableCell>}
-                                  <TableCell>{billing.totalA3}</TableCell>
-                                  <TableCell>{billing.totalA4}</TableCell>
-                                  <TableCell>{billing.totalCardSmall}</TableCell>
-                                  <TableCell>{billing.totalCardLarge}</TableCell>
-                                  <TableCell>€{billing.totalCost.toFixed(2)}</TableCell>
-                                  <TableCell>€{billing.paidAmount.toFixed(2)}</TableCell>
-                                  <TableCell
-                                    className={
-                                      billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"
-                                    }
-                                  >
-                                    €{billing.remainingBalance.toFixed(2)}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-4 w-4" />
-                                      {billing.dueDate.toLocaleDateString("el-GR")}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant={billing.paid ? "default" : "destructive"}>
-                                      {billing.paid ? "Πληρωμένο" : "Απλήρωτο"}
-                                    </Badge>
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      <LaminationBillingTable
+                        data={filteredLaminationBilling}
+                        page={laminationBillingPage}
+                        pageSize={PAGE_SIZE}
+                        onPageChange={setLaminationBillingPage}
+                        userRole={user.role}
+                      />
                     </CardContent>
                   </Card>
 
@@ -864,7 +789,7 @@ export default function DashboardPage() {
                         </div>
                         <Button
                           onClick={() =>
-                            exportTableCSV(
+                            exportTableXLSX(
                               filteredLaminationJobs.map((j) => ({
                                 timestamp: j.timestamp.toLocaleDateString("el-GR"),
                                 userDisplayName: j.userDisplayName,
@@ -872,82 +797,41 @@ export default function DashboardPage() {
                                 type: getLaminationTypeLabel(j.type),
                                 quantity: j.quantity,
                                 pricePerUnit: j.pricePerUnit.toFixed(2),
-                                totalCost: j.totalCost.toFixed(2),
+                                totalCost: formatPrice(j.totalCost),
                                 status: j.status === "completed" ? "Ολοκληρώθηκε" : j.status,
                                 notes: j.notes || "-",
                               })),
                               "lamination_jobs",
                               [
-                                "timestamp",
-                                "userDisplayName",
-                                "department",
-                                "type",
-                                "quantity",
-                                "pricePerUnit",
-                                "totalCost",
-                                "status",
-                                "notes",
+                                { key: "timestamp", label: "Ημερομηνία" },
+                                { key: "userDisplayName", label: "Χρήστης" },
+                                { key: "department", label: "Τμήμα" },
+                                { key: "type", label: "Τύπος" },
+                                { key: "quantity", label: "Ποσότητα" },
+                                { key: "pricePerUnit", label: "Τιμή ανά μονάδα" },
+                                { key: "totalCost", label: "Σύνολο Κόστους" },
+                                { key: "status", label: "Κατάσταση" },
+                                { key: "notes", label: "Σημειώσεις" }
                               ],
+                              "22C55E"
                             )
                           }
                           variant="outline"
                           size="sm"
                         >
                           <Download className="h-4 w-4 mr-2" />
-                          Εξαγωγή CSV
+                          Εξαγωγή XLSX
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="border rounded-lg" style={{ maxHeight: "400px", overflowY: "auto" }}>
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-white z-10">
-                            <TableRow>
-                              <TableHead>Ημερομηνία</TableHead>
-                              {user.role === "admin" && <TableHead>Χρήστης</TableHead>}
-                              {user.role === "admin" && <TableHead>Τμήμα</TableHead>}
-                              <TableHead>Τύπος</TableHead>
-                              <TableHead>Ποσότητα</TableHead>
-                              <TableHead>Τιμή/Μονάδα</TableHead>
-                              <TableHead>Συνολικό Κόστος</TableHead>
-                              <TableHead>Κατάσταση</TableHead>
-                              <TableHead>Σημειώσεις</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredLaminationJobs.length === 0 ? (
-                              <TableRow>
-                                <TableCell
-                                  colSpan={user.role === "admin" ? 9 : 7}
-                                  className="text-center py-8 text-gray-500"
-                                >
-                                  Δεν βρέθηκαν αποτελέσματα
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              filteredLaminationJobs.map((job) => (
-                                <TableRow key={job.jobId}>
-                                  <TableCell>{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
-                                  {user.role === "admin" && <TableCell>{job.userDisplayName}</TableCell>}
-                                  {user.role === "admin" && <TableCell>{job.department}</TableCell>}
-                                  <TableCell>
-                                    <Badge variant="outline">{getLaminationTypeLabel(job.type)}</Badge>
-                                  </TableCell>
-                                  <TableCell>{job.quantity}</TableCell>
-                                  <TableCell>€{job.pricePerUnit.toFixed(2)}</TableCell>
-                                  <TableCell>€{job.totalCost.toFixed(2)}</TableCell>
-                                  <TableCell>
-                                    <Badge variant={job.status === "completed" ? "default" : "secondary"}>
-                                      {job.status === "completed" ? "Ολοκληρώθηκε" : job.status}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-sm text-gray-500">{job.notes || "-"}</TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      <LaminationJobsTable
+                        data={filteredLaminationJobs}
+                        page={laminationJobsPage}
+                        pageSize={PAGE_SIZE}
+                        onPageChange={setLaminationJobsPage}
+                        userRole={user.role}
+                      />
                     </CardContent>
                   </Card>
                 </div>

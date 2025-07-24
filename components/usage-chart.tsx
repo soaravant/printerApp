@@ -16,7 +16,7 @@ interface UsageChartProps {
   laminationLabel: string
 }
 
-export function UsageChart({ data, title, printLabel, laminationLabel }: UsageChartProps) {
+const UsageChart = ({ data, title, printLabel, laminationLabel }: UsageChartProps) => {
   if (data.length === 0) {
     return (
       <Card>
@@ -34,6 +34,7 @@ export function UsageChart({ data, title, printLabel, laminationLabel }: UsageCh
   }
 
   const maxValue = Math.max(...data.map((d) => Math.max(d.printValue, d.laminationValue)))
+  const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
 
   return (
     <Card>
@@ -50,19 +51,19 @@ export function UsageChart({ data, title, printLabel, laminationLabel }: UsageCh
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">{item.label}</span>
                 <div className="text-xs text-gray-500">
-                  {printLabel}: €{item.printValue.toFixed(2)} | {laminationLabel}: €{item.laminationValue.toFixed(2)}
+                  {printLabel}: {formatPrice(item.printValue)} | {laminationLabel}: {formatPrice(item.laminationValue)}
                 </div>
               </div>
               <div className="flex gap-1 h-6">
                 <div
                   className="bg-blue-500 rounded-l"
                   style={{ width: `${maxValue > 0 ? (item.printValue / maxValue) * 100 : 0}%` }}
-                  title={`${printLabel}: €${item.printValue.toFixed(2)}`}
+                  title={`${printLabel}: ${formatPrice(item.printValue)}`}
                 />
                 <div
                   className="bg-green-500 rounded-r"
                   style={{ width: `${maxValue > 0 ? (item.laminationValue / maxValue) * 100 : 0}%` }}
-                  title={`${laminationLabel}: €${item.laminationValue.toFixed(2)}`}
+                  title={`${laminationLabel}: ${formatPrice(item.laminationValue)}`}
                 />
               </div>
             </div>
@@ -84,3 +85,5 @@ export function UsageChart({ data, title, printLabel, laminationLabel }: UsageCh
     </Card>
   )
 }
+
+export default UsageChart

@@ -114,7 +114,11 @@ class DummyDatabase {
   }
 
   private initializeData() {
-    // Initialize users
+    // Initialize 20 users
+    const departments = [
+      "Γραφείο Α", "Γραφείο Β", "Γραφείο Γ", "Γραφείο Δ", "Γραφείο Ε", "Γραφείο ΣΤ", "Γραφείο Ζ", "Γραφείο Η", "Γραφείο Θ", "Γραφείο Ι",
+      "Γραφείο Κ", "Γραφείο Λ", "Γραφείο Μ", "Γραφείο Ν", "Γραφείο Ξ", "Γραφείο Ο", "Γραφείο Π", "Γραφείο Ρ", "Γραφείο Σ", "Γραφείο Τ"
+    ];
     this.users = [
       {
         uid: "admin-1",
@@ -125,27 +129,21 @@ class DummyDatabase {
         email: "admin@example.com",
         createdAt: new Date("2024-01-01"),
       },
-      {
-        uid: "user-408",
-        username: "408",
-        role: "user",
-        displayName: "Χρήστης 408",
-        department: "Γραφείο Α",
-        email: "user408@example.com",
-        createdAt: new Date("2024-01-15"),
-      },
-      {
-        uid: "user-409",
-        username: "409",
-        role: "user",
-        displayName: "Χρήστης 409",
-        department: "Γραφείο Β",
-        email: "user409@example.com",
-        createdAt: new Date("2024-01-20"),
-      },
-    ]
+      ...Array.from({ length: 20 }).map((_, i) => {
+        const num = 400 + i;
+        return {
+          uid: `user-${num}`,
+          username: `${num}`,
+          role: "user",
+          displayName: `Χρήστης ${num}`,
+          department: departments[i % departments.length],
+          email: `user${num}@example.com`,
+          createdAt: new Date(`2024-01-${(i % 28) + 1}`),
+        };
+      })
+    ];
 
-    // Initialize price tables
+    // Initialize price tables (unchanged)
     this.priceTables = [
       {
         id: "printing",
@@ -175,35 +173,35 @@ class DummyDatabase {
         createdAt: new Date("2024-01-01"),
         updatedAt: new Date("2024-01-01"),
       },
-    ]
+    ];
 
     // Generate sample data
-    this.generateSampleData()
+    this.generateSampleData();
   }
 
   private generateSampleData() {
-    const now = new Date()
-    const userIds = this.users.filter((u) => u.role === "user").map((u) => u.uid)
+    const now = new Date();
+    const userIds = this.users.filter((u) => u.role === "user").map((u) => u.uid);
 
-    // Generate print jobs for the last 6 months
+    // Generate print and lamination jobs for the last 6 months
     for (let monthOffset = 0; monthOffset < 6; monthOffset++) {
       for (const userId of userIds) {
-        const user = this.users.find((u) => u.uid === userId)!
-        const jobsCount = Math.floor(Math.random() * 10) + 5
-
+        const user = this.users.find((u) => u.uid === userId)!;
+        // 10-20 print jobs per user per month
+        const jobsCount = Math.floor(Math.random() * 11) + 10;
         for (let i = 0; i < jobsCount; i++) {
-          const jobDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, Math.floor(Math.random() * 28) + 1)
+          const jobDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, Math.floor(Math.random() * 28) + 1);
           const printJob: PrintJob = {
             jobId: `print-${userId}-${monthOffset}-${i}`,
             uid: userId,
             userDisplayName: user.displayName,
             department: user.department,
-            pagesA4BW: Math.floor(Math.random() * 20),
-            pagesA4Color: Math.floor(Math.random() * 10),
-            pagesA3BW: Math.floor(Math.random() * 5),
-            pagesA3Color: Math.floor(Math.random() * 3),
-            scans: Math.floor(Math.random() * 5),
-            copies: Math.floor(Math.random() * 10),
+            pagesA4BW: Math.floor(Math.random() * 8) + 1, // 1-8
+            pagesA4Color: Math.floor(Math.random() * 4),   // 0-3
+            pagesA3BW: Math.floor(Math.random() * 3),      // 0-2
+            pagesA3Color: Math.floor(Math.random() * 2),   // 0-1
+            scans: Math.floor(Math.random() * 3),          // 0-2
+            copies: Math.floor(Math.random() * 5),         // 0-4
             deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 10)}`,
             deviceName: `Printer-${Math.floor(Math.random() * 3) + 1}`,
             timestamp: jobDate,
@@ -215,37 +213,33 @@ class DummyDatabase {
             costCopies: 0,
             totalCost: 0,
             status: "completed",
-          }
-
+          };
           // Calculate costs
-          const prices = this.priceTables.find((p) => p.id === "printing")?.prices || {}
-          printJob.costA4BW = printJob.pagesA4BW * (prices.a4BW || 0)
-          printJob.costA4Color = printJob.pagesA4Color * (prices.a4Color || 0)
-          printJob.costA3BW = printJob.pagesA3BW * (prices.a3BW || 0)
-          printJob.costA3Color = printJob.pagesA3Color * (prices.a3Color || 0)
-          printJob.costScans = printJob.scans * (prices.scan || 0)
-          printJob.costCopies = printJob.copies * (prices.copy || 0)
+          const prices = this.priceTables.find((p) => p.id === "printing")?.prices || {};
+          printJob.costA4BW = printJob.pagesA4BW * (prices.a4BW || 0);
+          printJob.costA4Color = printJob.pagesA4Color * (prices.a4Color || 0);
+          printJob.costA3BW = printJob.pagesA3BW * (prices.a3BW || 0);
+          printJob.costA3Color = printJob.pagesA3Color * (prices.a3Color || 0);
+          printJob.costScans = printJob.scans * (prices.scan || 0);
+          printJob.costCopies = printJob.copies * (prices.copy || 0);
           printJob.totalCost =
             printJob.costA4BW +
             printJob.costA4Color +
             printJob.costA3BW +
             printJob.costA3Color +
             printJob.costScans +
-            printJob.costCopies
-
-          this.printJobs.push(printJob)
+            printJob.costCopies;
+          this.printJobs.push(printJob);
         }
-
-        // Generate lamination jobs
-        const laminationJobsCount = Math.floor(Math.random() * 5) + 2
+        // 3-8 lamination jobs per user per month
+        const laminationJobsCount = Math.floor(Math.random() * 6) + 3;
         for (let i = 0; i < laminationJobsCount; i++) {
-          const jobDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, Math.floor(Math.random() * 28) + 1)
-          const types: ("A3" | "A4" | "card_small" | "card_large")[] = ["A3", "A4", "card_small", "card_large"]
-          const type = types[Math.floor(Math.random() * types.length)]
-          const quantity = Math.floor(Math.random() * 10) + 1
-          const prices = this.priceTables.find((p) => p.id === "lamination")?.prices || {}
-          const pricePerUnit = prices[type] || 0
-
+          const jobDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, Math.floor(Math.random() * 28) + 1);
+          const types: ("A3" | "A4" | "card_small" | "card_large")[] = ["A3", "A4", "card_small", "card_large"];
+          const type = types[Math.floor(Math.random() * types.length)];
+          const quantity = Math.floor(Math.random() * 3) + 1; // 1-3
+          const prices = this.priceTables.find((p) => p.id === "lamination")?.prices || {};
+          const pricePerUnit = prices[type] || 0;
           const laminationJob: LaminationJob = {
             jobId: `lamination-${userId}-${monthOffset}-${i}`,
             uid: userId,
@@ -258,22 +252,20 @@ class DummyDatabase {
             timestamp: jobDate,
             status: "completed",
             notes: Math.random() > 0.7 ? "Επείγον" : undefined,
-          }
-
-          this.laminationJobs.push(laminationJob)
+          };
+          this.laminationJobs.push(laminationJob);
         }
       }
     }
-
     // Generate billing records
-    this.generateBillingRecords()
+    this.generateBillingRecords();
   }
 
   private generateBillingRecords() {
     const userIds = this.users.filter((u) => u.role === "user").map((u) => u.uid)
     const now = new Date()
 
-    for (let monthOffset = 0; monthOffset < 6; monthOffset++) {
+    for (let monthOffset = 0; monthOffset < 3; monthOffset++) {
       const periodDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
       const period = periodDate.toISOString().slice(0, 7)
 
@@ -490,6 +482,15 @@ class DummyDatabase {
       print: this.printJobs.filter((j) => j.uid === uid).length,
       lamination: this.laminationJobs.filter((j) => j.uid === uid).length,
     }
+  }
+
+  // Reset method to clear all data and regenerate
+  reset(): void {
+    this.printJobs = []
+    this.laminationJobs = []
+    this.printBilling = []
+    this.laminationBilling = []
+    this.initializeData()
   }
 }
 

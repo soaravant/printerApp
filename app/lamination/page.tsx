@@ -86,6 +86,8 @@ export default function LaminationPage() {
     ],
   }
 
+  const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
@@ -106,7 +108,7 @@ export default function LaminationPage() {
                   <CreditCard className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-red-600">€{totalUnpaid.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-red-600">{formatPrice(totalUnpaid)}</div>
                   <p className="text-xs text-muted-foreground">Απλήρωτες χρεώσεις</p>
                 </CardContent>
               </Card>
@@ -128,7 +130,7 @@ export default function LaminationPage() {
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">€{totalCost.toFixed(2)}</div>
+                  <div className="text-2xl font-bold">{formatPrice(totalCost)}</div>
                   <p className="text-xs text-muted-foreground">Όλων των εποχών</p>
                 </CardContent>
               </Card>
@@ -188,10 +190,10 @@ export default function LaminationPage() {
                               <TableCell>{billing.totalA4}</TableCell>
                               <TableCell>{billing.totalCardSmall}</TableCell>
                               <TableCell>{billing.totalCardLarge}</TableCell>
-                              <TableCell>€{billing.totalCost.toFixed(2)}</TableCell>
-                              <TableCell>€{billing.paidAmount.toFixed(2)}</TableCell>
+                              <TableCell>{formatPrice(billing.totalCost)}</TableCell>
+                              <TableCell>{formatPrice(billing.paidAmount)}</TableCell>
                               <TableCell className={billing.remainingBalance > 0 ? "text-red-600 font-semibold" : ""}>
-                                €{billing.remainingBalance.toFixed(2)}
+                                {formatPrice(billing.remainingBalance)}
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
@@ -247,8 +249,8 @@ export default function LaminationPage() {
                                 <Badge variant="outline">{getLaminationTypeLabel(job.type)}</Badge>
                               </TableCell>
                               <TableCell>{job.quantity}</TableCell>
-                              <TableCell>€{job.pricePerUnit.toFixed(2)}</TableCell>
-                              <TableCell>€{job.totalCost.toFixed(2)}</TableCell>
+                              <TableCell>{formatPrice(job.pricePerUnit)}</TableCell>
+                              <TableCell>{formatPrice(job.totalCost)}</TableCell>
                               <TableCell>
                                 <Badge variant={job.status === "completed" ? "default" : "secondary"}>
                                   {job.status === "completed" ? "Ολοκληρώθηκε" : job.status}

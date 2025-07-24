@@ -44,6 +44,8 @@ export function DashboardStats() {
     })
   }, [user])
 
+  const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <Card>
@@ -52,7 +54,7 @@ export function DashboardStats() {
           <Calendar className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">€{stats.currentMonthCost.toFixed(2)}</div>
+          <div className="text-2xl font-bold">{formatPrice(stats.currentMonthCost)}</div>
           <p className="text-xs text-muted-foreground">{stats.currentMonthJobs} εκτυπώσεις</p>
         </CardContent>
       </Card>
@@ -63,7 +65,7 @@ export function DashboardStats() {
           <Receipt className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-red-600">€{stats.unpaidAmount.toFixed(2)}</div>
+          <div className="text-2xl font-bold text-red-600">{formatPrice(stats.unpaidAmount)}</div>
           <p className="text-xs text-muted-foreground">Εκκρεμείς πληρωμές</p>
         </CardContent>
       </Card>
@@ -85,7 +87,7 @@ export function DashboardStats() {
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">€{stats.totalCost.toFixed(2)}</div>
+          <div className="text-2xl font-bold">{formatPrice(stats.totalCost)}</div>
           <p className="text-xs text-muted-foreground">Όλων των εποχών</p>
         </CardContent>
       </Card>

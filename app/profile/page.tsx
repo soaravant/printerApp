@@ -4,7 +4,7 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { RoleBadge } from "@/components/role-badge"
 import { User, Mail, Building, Shield } from "lucide-react"
 
 export default function ProfilePage() {
@@ -44,9 +44,7 @@ export default function ProfilePage() {
                       Ρόλος
                     </div>
                     <div className="text-lg">
-                      <Badge variant={user.role === "admin" ? "default" : "secondary"} className="text-sm px-3 py-1">
-                        {user.role === "admin" ? "Διαχειριστής" : "Χρήστης"}
-                      </Badge>
+                      <RoleBadge role={user.role} />
                     </div>
                   </div>
 

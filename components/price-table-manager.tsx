@@ -100,6 +100,8 @@ export function PriceTableManager() {
     }
   }
 
+  const formatPrice = (price: number) => `€${price.toFixed(3).replace('.', ',')}`
+
   return (
     <div className="space-y-6">
       <Card>
@@ -139,12 +141,12 @@ export function PriceTableManager() {
                 {priceTables.map((table) => (
                   <TableRow key={table.id}>
                     <TableCell className="font-medium">{table.name}</TableCell>
-                    <TableCell>€{table.prices.a4BW.toFixed(3)}</TableCell>
-                    <TableCell>€{table.prices.a4Color.toFixed(3)}</TableCell>
-                    <TableCell>€{table.prices.a3BW.toFixed(3)}</TableCell>
-                    <TableCell>€{table.prices.a3Color.toFixed(3)}</TableCell>
-                    <TableCell>€{table.prices.scan.toFixed(3)}</TableCell>
-                    <TableCell>€{table.prices.copy.toFixed(3)}</TableCell>
+                    <TableCell>{formatPrice(table.prices.a4BW)}</TableCell>
+                    <TableCell>{formatPrice(table.prices.a4Color)}</TableCell>
+                    <TableCell>{formatPrice(table.prices.a3BW)}</TableCell>
+                    <TableCell>{formatPrice(table.prices.a3Color)}</TableCell>
+                    <TableCell>{formatPrice(table.prices.scan)}</TableCell>
+                    <TableCell>{formatPrice(table.prices.copy)}</TableCell>
                     <TableCell>
                       <Badge variant={table.isActive ? "default" : "secondary"}>
                         {table.isActive ? "Ενεργός" : "Ανενεργός"}
