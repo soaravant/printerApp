@@ -1,5 +1,7 @@
 # Printer Billing Application - File Structure
 
+> File structure current as of December 2024, including new admin UI components and scripts for price editing, filtering, and data reset features.
+
 ## Root Structure
 ```
 printerApp/

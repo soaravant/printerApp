@@ -4,6 +4,7 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { dummyDB } from "@/lib/dummy-database"
+import type { PrintJob, LaminationJob, PrintBilling, LaminationBilling, User } from "@/lib/dummy-database"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -839,12 +840,14 @@ export default function DashboardPage() {
             </Tabs>
 
             {/* Chart at the bottom */}
-            <UsageChart
-              data={generateChartData()}
-              title="Μηνιαία Κόστη (Τελευταίοι 6 Μήνες)"
-              printLabel="Εκτυπώσεις"
-              laminationLabel="Πλαστικοποιήσεις"
-            />
+            <div className="bg-blue-50 p-6 rounded-lg space-y-6 w-full max-w-full">
+              <UsageChart
+                data={generateChartData()}
+                title="Μηνιαία Κόστη (Τελευταίοι 6 Μήνες)"
+                printLabel="Εκτυπώσεις"
+                laminationLabel="Πλαστικοποιήσεις"
+              />
+            </div>
           </div>
         </main>
       </div>

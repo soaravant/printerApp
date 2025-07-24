@@ -1,5 +1,12 @@
 # Development Lessons & Solutions
 
+## Recent Lessons & Improvements (December 2024)
+
+- **UI/UX Enhancements**: Improved admin tab styling for clarity; added inline editing for price tables with validation and feedback; implemented a dynamic price range filter with histogram and real-time distribution in admin user management.
+- **Dummy Data Realism**: Adjusted dummy data generation for more realistic values (fewer jobs, lower page counts, and lamination quantities); added a `reset()` method and UI button for regenerating data with confirmation dialog.
+- **Dependency Management**: Added missing `@radix-ui/react-radio-group` for radio buttons; always check for required Radix UI dependencies when adding new shadcn/ui components.
+- **React 19 Compatibility**: Updated Radix UI packages to latest versions to resolve React 19 ref errors; always update Radix UI when upgrading React.
+
 ## Expanded Dummy Data Generation (December 2024)
 
 **Problem**: Needed more extensive dummy data for testing and demo purposes, with 20 users and hundreds of print/lamination jobs over the last 6 months, but without creating unrealistic debts or values.

@@ -51,7 +51,7 @@ const UsageChart = ({ data, title, printLabel, laminationLabel }: UsageChartProp
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">{item.label}</span>
                 <div className="text-xs text-gray-500">
-                  {printLabel}: {formatPrice(item.printValue)} | {laminationLabel}: {formatPrice(item.laminationValue)}
+                  {printLabel}: {formatPrice(item.printValue)} | {laminationLabel}: {formatPrice(item.laminationValue)} | <span className="font-semibold">Σύνολο: {formatPrice(item.printValue + item.laminationValue)}</span>
                 </div>
               </div>
               <div className="flex gap-1 h-6">

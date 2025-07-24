@@ -594,6 +594,59 @@ export default function AdminPage() {
               </TabsContent>
 
               <TabsContent value="users" className="mt-6">
+                <div className="flex justify-start mb-4">
+                  <Dialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog}>
+                    <DialogTrigger asChild>
+                      <Button
+                        onClick={() => setShowAddUserDialog(true)}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold flex items-center gap-2"
+                      >
+                        Προσθήκη Χρήστη <Plus className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Προσθήκη Χρήστη</DialogTitle>
+                        <DialogDescription>Συμπληρώστε τα στοιχεία του νέου χρήστη.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="username">Username</Label>
+                          <Input id="username" value={newUser.username} onChange={e => setNewUser({ ...newUser, username: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label htmlFor="password">Password</Label>
+                          <Input id="password" type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label htmlFor="displayName">Όνομα</Label>
+                          <Input id="displayName" value={newUser.displayName} onChange={e => setNewUser({ ...newUser, displayName: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label htmlFor="department">Τμήμα</Label>
+                          <Input id="department" value={newUser.department} onChange={e => setNewUser({ ...newUser, department: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label htmlFor="email">Email</Label>
+                          <Input id="email" type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label htmlFor="role">Ρόλος</Label>
+                          <Select value={newUser.role} onValueChange={role => setNewUser({ ...newUser, role: role as "user" | "admin" })}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">Χρήστης</SelectItem>
+                              <SelectItem value="admin">Διαχειριστής</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button onClick={handleAddUser} className="w-full">Προσθήκη</Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
                 <AdminUsersTab
                   users={users}
                   usersTabSearchTerm={usersTabSearchTerm}
