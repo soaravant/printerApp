@@ -149,8 +149,6 @@ class PrinterCollector:
                 'pagesA4Color': job_data.get('pages_a4_color', 0),
                 'pagesA3BW': job_data.get('pages_a3_bw', 0),
                 'pagesA3Color': job_data.get('pages_a3_color', 0),
-                'scans': job_data.get('scans', 0),
-                'copies': job_data.get('copies', 0),
                 'userCode': job_data.get('user_code', 'unknown'),
                 'status': 'completed'
             }
@@ -176,8 +174,6 @@ class PrinterCollector:
                     'pagesA4Color': int(job_elem.findtext('PagesA4Color', '0')),
                     'pagesA3BW': int(job_elem.findtext('PagesA3BW', '0')),
                     'pagesA3Color': int(job_elem.findtext('PagesA3Color', '0')),
-                    'scans': int(job_elem.findtext('Scans', '0')),
-                    'copies': int(job_elem.findtext('Copies', '0')),
                     'userCode': job_elem.findtext('UserCode', 'unknown'),
                     'status': 'completed'
                 }
@@ -222,8 +218,6 @@ class PrinterCollector:
                     'a4Color': 0.15,
                     'a3BW': 0.10,
                     'a3Color': 0.30,
-                    'scan': 0.02,
-                    'copy': 0.03
                 }
             
             # Calculate individual costs
@@ -231,18 +225,14 @@ class PrinterCollector:
             cost_a4_color = job_data['pagesA4Color'] * prices['a4Color']
             cost_a3_bw = job_data['pagesA3BW'] * prices['a3BW']
             cost_a3_color = job_data['pagesA3Color'] * prices['a3Color']
-            cost_scans = job_data['scans'] * prices['scan']
-            cost_copies = job_data['copies'] * prices['copy']
             
-            total_cost = cost_a4_bw + cost_a4_color + cost_a3_bw + cost_a3_color + cost_scans + cost_copies
+            total_cost = cost_a4_bw + cost_a4_color + cost_a3_bw + cost_a3_color
             
             job_data.update({
                 'costA4BW': round(cost_a4_bw, 3),
                 'costA4Color': round(cost_a4_color, 3),
                 'costA3BW': round(cost_a3_bw, 3),
                 'costA3Color': round(cost_a3_color, 3),
-                'costScans': round(cost_scans, 3),
-                'costCopies': round(cost_copies, 3),
                 'totalCost': round(total_cost, 2)
             })
             
@@ -251,7 +241,7 @@ class PrinterCollector:
             # Set default costs to 0
             job_data.update({
                 'costA4BW': 0, 'costA4Color': 0, 'costA3BW': 0,
-                'costA3Color': 0, 'costScans': 0, 'costCopies': 0, 'totalCost': 0
+                'costA3Color': 0, 'totalCost': 0
             })
         
         return job_data

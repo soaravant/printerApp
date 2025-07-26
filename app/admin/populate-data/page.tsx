@@ -47,8 +47,6 @@ export default function PopulateDataPage() {
       a4Color: 0.15,
       a3BW: 0.1,
       a3Color: 0.3,
-      scan: 0.02,
-      copy: 0.03,
     },
     isActive: true,
     createdAt: new Date(),
@@ -69,8 +67,6 @@ export default function PopulateDataPage() {
       const pagesA4Color = Math.floor(Math.random() * 15)
       const pagesA3BW = Math.floor(Math.random() * 5)
       const pagesA3Color = Math.floor(Math.random() * 3)
-      const scans = Math.floor(Math.random() * 8)
-      const copies = Math.floor(Math.random() * 10)
 
       const deviceIndex = Math.floor(Math.random() * printerIPs.length)
 
@@ -78,10 +74,8 @@ export default function PopulateDataPage() {
       const costA4Color = pagesA4Color * priceTable.prices.a4Color
       const costA3BW = pagesA3BW * priceTable.prices.a3BW
       const costA3Color = pagesA3Color * priceTable.prices.a3Color
-      const costScans = scans * priceTable.prices.scan
-      const costCopies = copies * priceTable.prices.copy
 
-      const totalCost = costA4BW + costA4Color + costA3BW + costA3Color + costScans + costCopies
+      const totalCost = costA4BW + costA4Color + costA3BW + costA3Color
 
       jobs.push({
         jobId: `job-${user.uid}-${i}-${Date.now()}`,
@@ -92,8 +86,6 @@ export default function PopulateDataPage() {
         pagesA4Color,
         pagesA3BW,
         pagesA3Color,
-        scans,
-        copies,
         deviceIP: printerIPs[deviceIndex],
         deviceName: printerNames[deviceIndex],
         timestamp: timestamp,
@@ -101,8 +93,6 @@ export default function PopulateDataPage() {
         costA4Color: Number.parseFloat(costA4Color.toFixed(3)),
         costA3BW: Number.parseFloat(costA3BW.toFixed(3)),
         costA3Color: Number.parseFloat(costA3Color.toFixed(3)),
-        costScans: Number.parseFloat(costScans.toFixed(3)),
-        costCopies: Number.parseFloat(costCopies.toFixed(3)),
         totalCost: Number.parseFloat(totalCost.toFixed(2)),
         status: "completed",
       })
@@ -131,8 +121,6 @@ export default function PopulateDataPage() {
           totalA4Color: 0,
           totalA3BW: 0,
           totalA3Color: 0,
-          totalScans: 0,
-          totalCopies: 0,
           totalCost: 0,
           paid: Math.random() > 0.4, // 60% πιθανότητα να είναι πληρωμένο
           paidAmount: 0,
@@ -148,8 +136,6 @@ export default function PopulateDataPage() {
       billing.totalA4Color += job.pagesA4Color
       billing.totalA3BW += job.pagesA3BW
       billing.totalA3Color += job.pagesA3Color
-      billing.totalScans += job.scans
-      billing.totalCopies += job.copies
       billing.totalCost += job.totalCost
     })
 

@@ -8,6 +8,8 @@ export interface User {
   department: string
   email?: string
   createdAt: Date
+  userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" // New field for the role selection
+  responsiblePerson?: string // New field for responsible person
 }
 
 export interface PrintJob {
@@ -19,8 +21,6 @@ export interface PrintJob {
   pagesA4Color: number
   pagesA3BW: number
   pagesA3Color: number
-  scans: number
-  copies: number
   deviceIP: string
   deviceName: string
   timestamp: Date
@@ -28,8 +28,6 @@ export interface PrintJob {
   costA4Color: number
   costA3BW: number
   costA3Color: number
-  costScans: number
-  costCopies: number
   totalCost: number
   status: "completed" | "pending" | "failed"
 }
@@ -58,8 +56,6 @@ export interface PrintBilling {
   totalA4Color: number
   totalA3BW: number
   totalA3Color: number
-  totalScans: number
-  totalCopies: number
   totalCost: number
   paid: boolean
   paidDate?: Date
@@ -68,6 +64,7 @@ export interface PrintBilling {
   dueDate: Date
   generatedAt: Date
   lastUpdated: Date
+  lastPayment?: Date // New field for last payment
 }
 
 export interface LaminationBilling {
@@ -88,6 +85,7 @@ export interface LaminationBilling {
   dueDate: Date
   generatedAt: Date
   lastUpdated: Date
+  lastPayment?: Date // New field for last payment
 }
 
 export interface PriceTable {
@@ -119,6 +117,8 @@ class DummyDatabase {
       "Γραφείο Α", "Γραφείο Β", "Γραφείο Γ", "Γραφείο Δ", "Γραφείο Ε", "Γραφείο ΣΤ", "Γραφείο Ζ", "Γραφείο Η", "Γραφείο Θ", "Γραφείο Ι",
       "Γραφείο Κ", "Γραφείο Λ", "Γραφείο Μ", "Γραφείο Ν", "Γραφείο Ξ", "Γραφείο Ο", "Γραφείο Π", "Γραφείο Ρ", "Γραφείο Σ", "Γραφείο Τ"
     ];
+    const userRoles: ("Άτομο" | "Ομάδα" | "Ναός" | "Τομέας")[] = ["Άτομο", "Ομάδα", "Ναός", "Τομέας"];
+    
     this.users = [
       {
         uid: "admin-1",
@@ -128,17 +128,23 @@ class DummyDatabase {
         department: "Διοίκηση",
         email: "admin@example.com",
         createdAt: new Date("2024-01-01"),
+        userRole: "Άτομο",
       },
       ...Array.from({ length: 20 }).map((_, i) => {
         const num = 400 + i;
+        const userRole = userRoles[i % userRoles.length];
+        const isIndividual = userRole === "Άτομο";
+        
         return {
           uid: `user-${num}`,
           username: `${num}`,
-          role: "user",
+          role: "user" as "user",
           displayName: `Χρήστης ${num}`,
           department: departments[i % departments.length],
           email: `user${num}@example.com`,
           createdAt: new Date(`2024-01-${(i % 28) + 1}`),
+          userRole: userRole,
+          responsiblePerson: isIndividual ? undefined : `Υπεύθυνος ${num}`,
         };
       })
     ];
@@ -153,8 +159,6 @@ class DummyDatabase {
           a4Color: 0.15,
           a3BW: 0.1,
           a3Color: 0.3,
-          scan: 0.02,
-          copy: 0.03,
         },
         isActive: true,
         createdAt: new Date("2024-01-01"),
@@ -200,8 +204,6 @@ class DummyDatabase {
             pagesA4Color: Math.floor(Math.random() * 4),   // 0-3
             pagesA3BW: Math.floor(Math.random() * 3),      // 0-2
             pagesA3Color: Math.floor(Math.random() * 2),   // 0-1
-            scans: Math.floor(Math.random() * 3),          // 0-2
-            copies: Math.floor(Math.random() * 5),         // 0-4
             deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 10)}`,
             deviceName: `Printer-${Math.floor(Math.random() * 3) + 1}`,
             timestamp: jobDate,
@@ -209,8 +211,6 @@ class DummyDatabase {
             costA4Color: 0,
             costA3BW: 0,
             costA3Color: 0,
-            costScans: 0,
-            costCopies: 0,
             totalCost: 0,
             status: "completed",
           };
@@ -220,15 +220,11 @@ class DummyDatabase {
           printJob.costA4Color = printJob.pagesA4Color * (prices.a4Color || 0);
           printJob.costA3BW = printJob.pagesA3BW * (prices.a3BW || 0);
           printJob.costA3Color = printJob.pagesA3Color * (prices.a3Color || 0);
-          printJob.costScans = printJob.scans * (prices.scan || 0);
-          printJob.costCopies = printJob.copies * (prices.copy || 0);
           printJob.totalCost =
             printJob.costA4BW +
             printJob.costA4Color +
             printJob.costA3BW +
-            printJob.costA3Color +
-            printJob.costScans +
-            printJob.costCopies;
+            printJob.costA3Color;
           this.printJobs.push(printJob);
         }
         // 3-8 lamination jobs per user per month
@@ -282,12 +278,20 @@ class DummyDatabase {
           const totalA4Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA4Color, 0)
           const totalA3BW = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3BW, 0)
           const totalA3Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3Color, 0)
-          const totalScans = monthPrintJobs.reduce((sum, j) => sum + j.scans, 0)
-          const totalCopies = monthPrintJobs.reduce((sum, j) => sum + j.copies, 0)
           const totalCost = monthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
 
-          const isPaid = Math.random() > 0.3
+          const isPaid = Math.random() > 0.75
           const paidAmount = isPaid ? totalCost : Math.random() * totalCost
+
+          // Always generate a last payment date
+          // For paid bills: use the paid date
+          // For unpaid bills: use a date when partial payment was made (if any payment was made)
+          const hasPartialPayment = paidAmount > 0
+          const lastPaymentDate = isPaid 
+            ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) // Full payment date
+            : hasPartialPayment 
+              ? new Date(periodDate.getTime() + 10 * 24 * 60 * 60 * 1000) // Partial payment date
+              : new Date(periodDate.getTime() - 30 * 24 * 60 * 60 * 1000) // Previous payment date
 
           const printBilling: PrintBilling = {
             billingId: `print-billing-${userId}-${period}`,
@@ -299,8 +303,6 @@ class DummyDatabase {
             totalA4Color,
             totalA3BW,
             totalA3Color,
-            totalScans,
-            totalCopies,
             totalCost,
             paid: isPaid,
             paidDate: isPaid ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) : undefined,
@@ -309,6 +311,7 @@ class DummyDatabase {
             dueDate: new Date(periodDate.getTime() + 30 * 24 * 60 * 60 * 1000),
             generatedAt: new Date(periodDate.getTime() + 5 * 24 * 60 * 60 * 1000),
             lastUpdated: new Date(),
+            lastPayment: lastPaymentDate,
           }
 
           this.printBilling.push(printBilling)
@@ -330,8 +333,18 @@ class DummyDatabase {
             .reduce((sum, j) => sum + j.quantity, 0)
           const totalCost = monthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
 
-          const isPaid = Math.random() > 0.4
+          const isPaid = Math.random() > 0.75
           const paidAmount = isPaid ? totalCost : Math.random() * totalCost
+
+          // Always generate a last payment date
+          // For paid bills: use the paid date
+          // For unpaid bills: use a date when partial payment was made (if any payment was made)
+          const hasPartialPayment = paidAmount > 0
+          const lastPaymentDate = isPaid 
+            ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) // Full payment date
+            : hasPartialPayment 
+              ? new Date(periodDate.getTime() + 10 * 24 * 60 * 60 * 1000) // Partial payment date
+              : new Date(periodDate.getTime() - 30 * 24 * 60 * 60 * 1000) // Previous payment date
 
           const laminationBilling: LaminationBilling = {
             billingId: `lamination-billing-${userId}-${period}`,
@@ -351,6 +364,7 @@ class DummyDatabase {
             dueDate: new Date(periodDate.getTime() + 30 * 24 * 60 * 60 * 1000),
             generatedAt: new Date(periodDate.getTime() + 5 * 24 * 60 * 60 * 1000),
             lastUpdated: new Date(),
+            lastPayment: lastPaymentDate,
           }
 
           this.laminationBilling.push(laminationBilling)

@@ -3,67 +3,197 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Pagination from "./pagination-helper"
 import { Calendar } from "lucide-react"
+import { SortableTableHeader } from "@/components/ui/sortable-table-header"
+import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
+import { useState, useEffect } from "react"
+import type { LaminationBilling } from "@/lib/dummy-database"
 
-export default function LaminationBillingTable({ data, page, pageSize, onPageChange, userRole }) {
-  const formatPrice = (price) => `€${price.toFixed(2).replace('.', ',')}`
+// Shared column definition for consistent widths
+const LaminationBillingColGroup = ({ userRole }: { userRole: string }) => (
+  <colgroup>
+    <col style={{ width: "10%" }} />
+    {userRole === "admin" && <col style={{ width: "12%" }} />}
+    {userRole === "admin" && <col style={{ width: "10%" }} />}
+    <col style={{ width: "8%" }} />
+    <col style={{ width: "8%" }} />
+    <col style={{ width: "10%" }} />
+    <col style={{ width: "10%" }} />
+    <col style={{ width: "12%" }} />
+    <col style={{ width: "10%" }} />
+    <col style={{ width: "10%" }} />
+    <col style={{ width: "10%" }} />
+    <col style={{ width: "10%" }} />
+  </colgroup>
+)
+
+interface LaminationBillingTableProps {
+  data: LaminationBilling[]
+  page: number
+  pageSize: number
+  onPageChange: (page: number) => void
+  userRole: string
+}
+
+export default function LaminationBillingTable({ data, page, pageSize, onPageChange, userRole }: LaminationBillingTableProps) {
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
+  const [sortedData, setSortedData] = useState(data)
+
+  useEffect(() => {
+    setSortedData(sortData(data, sortConfig))
+  }, [data, sortConfig])
+
+  const handleSort = (key: string) => {
+    const newSortConfig = toggleSort(sortConfig, key)
+    setSortConfig(newSortConfig)
+  }
+
+  const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
+  
   return (
-    <div className="border rounded-lg" style={{ maxHeight: "400px", overflowY: "auto" }}>
-      <Table>
-        <TableHeader className="sticky top-0 bg-white z-10">
+    <div className="border rounded-lg">
+      {/* Fixed (non-scrolling) header */}
+      <Table className="min-w-full table-fixed">
+        <LaminationBillingColGroup userRole={userRole} />
+        <TableHeader className="bg-gray-100">
           <TableRow>
-            <TableHead className="font-medium">Περίοδος</TableHead>
-            {userRole === "admin" && <TableHead>Χρήστης</TableHead>}
-            {userRole === "admin" && <TableHead>Τμήμα</TableHead>}
-            <TableHead>A3</TableHead>
-            <TableHead>A4</TableHead>
-            <TableHead>Κάρτα Μικρή</TableHead>
-            <TableHead>Κάρτα Μεγάλη</TableHead>
-            <TableHead>Συνολικό Κόστος</TableHead>
-            <TableHead>Πληρωμένο</TableHead>
-            <TableHead>Υπόλοιπο</TableHead>
-            <TableHead>Ημ. Εξόφλησης</TableHead>
-            <TableHead>Κατάσταση</TableHead>
+            <SortableTableHeader
+              sortKey="period"
+              currentSort={sortConfig}
+              onSort={handleSort}
+              className="font-medium"
+            >
+              Περίοδος
+            </SortableTableHeader>
+            {userRole === "admin" && (
+              <SortableTableHeader
+                sortKey="userDisplayName"
+                currentSort={sortConfig}
+                onSort={handleSort}
+              >
+                Χρήστης
+              </SortableTableHeader>
+            )}
+            {userRole === "admin" && (
+              <SortableTableHeader
+                sortKey="department"
+                currentSort={sortConfig}
+                onSort={handleSort}
+              >
+                Τμήμα
+              </SortableTableHeader>
+            )}
+            <SortableTableHeader
+              sortKey="totalA3"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              A3
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="totalA4"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              A4
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="totalCardSmall"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Κάρτα Μικρή
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="totalCardLarge"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Κάρτα Μεγάλη
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="totalCost"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Συνολικό Κόστος
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="paidAmount"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Πληρωμένο
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="remainingBalance"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Υπόλοιπο
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="dueDate"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Ημ. Εξόφλησης
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="paid"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Κατάσταση
+            </SortableTableHeader>
           </TableRow>
         </TableHeader>
-        <TableBody>
-          {data.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={userRole === "admin" ? 12 : 10} className="text-center py-8 text-gray-500">
-                Δεν βρέθηκαν αποτελέσματα
-              </TableCell>
-            </TableRow>
-          ) : (
-            data.slice((page-1)*pageSize, page*pageSize).map((billing) => (
-              <TableRow key={billing.billingId}>
-                <TableCell className="font-medium">{billing.period}</TableCell>
-                {userRole === "admin" && <TableCell>{billing.userDisplayName}</TableCell>}
-                {userRole === "admin" && <TableCell>{billing.department}</TableCell>}
-                <TableCell>{billing.totalA3}</TableCell>
-                <TableCell>{billing.totalA4}</TableCell>
-                <TableCell>{billing.totalCardSmall}</TableCell>
-                <TableCell>{billing.totalCardLarge}</TableCell>
-                <TableCell>{formatPrice(billing.totalCost)}</TableCell>
-                <TableCell>{formatPrice(billing.paidAmount)}</TableCell>
-                <TableCell className={billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
-                  {formatPrice(billing.remainingBalance)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    {billing.dueDate.toLocaleDateString("el-GR")}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={billing.paid ? "default" : "destructive"}>
-                    {billing.paid ? "Πληρωμένο" : "Απλήρωτο"}
-                  </Badge>
+      </Table>
+
+      {/* Scrollable body only */}
+      <div className="max-h-[400px] overflow-y-auto">
+        <Table className="min-w-full table-fixed">
+          <LaminationBillingColGroup userRole={userRole} />
+          <TableBody>
+            {sortedData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={userRole === "admin" ? 12 : 10} className="text-center py-8 text-gray-500">
+                  Δεν βρέθηκαν αποτελέσματα
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      <Pagination page={page} total={data.length} pageSize={pageSize} onPageChange={onPageChange} />
+            ) : (
+              sortedData.slice((page-1)*pageSize, page*pageSize).map((billing: LaminationBilling) => (
+                <TableRow key={billing.billingId}>
+                  <TableCell className="font-medium">{billing.period}</TableCell>
+                  {userRole === "admin" && <TableCell>{billing.userDisplayName}</TableCell>}
+                  {userRole === "admin" && <TableCell>{billing.department}</TableCell>}
+                  <TableCell>{billing.totalA3}</TableCell>
+                  <TableCell>{billing.totalA4}</TableCell>
+                  <TableCell>{billing.totalCardSmall}</TableCell>
+                  <TableCell>{billing.totalCardLarge}</TableCell>
+                  <TableCell>{formatPrice(billing.totalCost)}</TableCell>
+                  <TableCell>{formatPrice(billing.paidAmount)}</TableCell>
+                  <TableCell className={billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
+                    {formatPrice(billing.remainingBalance)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      {billing.dueDate.toLocaleDateString("el-GR")}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={billing.paid ? "default" : "destructive"}>
+                      {billing.paid ? "Πληρωμένο" : "Απλήρωτο"}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Pagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
     </div>
   )
 } 

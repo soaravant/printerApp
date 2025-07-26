@@ -2,10 +2,238 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+- **Unhandled Promise Rejection Fix**: Fixed [object Event] error caused by unhandled promise rejections in dynamic imports by adding global error handlers and error boundaries around dynamic components.
+- **Hydration Error Fix**: Fixed React hydration error caused by whitespace text nodes in `<colgroup>` elements by removing comments and extra whitespace between `<col>` tags.
+- **Print Types Simplification**: Removed scans and copies from the print types to keep only the 4 core types shown in the UI images: A4 Black & White (€0.05), A4 Color (€0.15), A3 Black & White (€0.10), and A3 Color (€0.30). Updated all interfaces, components, and data structures accordingly.
+- **Table Sorting Functionality**: Implemented clickable column sorting for all data tables with visual indicators and proper TypeScript support; created reusable sortable table header component and utility functions for consistent sorting behavior across the application.
 - **UI/UX Enhancements**: Improved admin tab styling for clarity; added inline editing for price tables with validation and feedback; implemented a dynamic price range filter with histogram and real-time distribution in admin user management.
 - **Dummy Data Realism**: Adjusted dummy data generation for more realistic values (fewer jobs, lower page counts, and lamination quantities); added a `reset()` method and UI button for regenerating data with confirmation dialog.
 - **Dependency Management**: Added missing `@radix-ui/react-radio-group` for radio buttons; always check for required Radix UI dependencies when adding new shadcn/ui components.
 - **React 19 Compatibility**: Updated Radix UI packages to latest versions to resolve React 19 ref errors; always update Radix UI when upgrading React.
+
+## Print Types Simplification (December 2024)
+
+**Problem**: The system included scans and copies as separate services, but the UI images showed only 4 core print types. The system needed to be simplified to match the visual design.
+
+**Solution**: Removed scans and copies from all data structures and UI components, keeping only the 4 core print types:
+1. **A4 Ασπρόμαυρο** (A4 Black & White) - €0.05
+2. **A4 Έγχρωμο** (A4 Color) - €0.15  
+3. **A3 Ασπρόμαυρο** (A3 Black & White) - €0.10
+4. **A3 Έγχρωμο** (A3 Color) - €0.30
+
+**Files Updated**:
+- `lib/data-store.ts`: Removed scans/copies from PrintJob and PriceTable interfaces
+- `lib/dummy-database.ts`: Updated data structures and sample data generation
+- `components/cost-calculator.tsx`: Removed scans/copies inputs and calculations
+- `components/price-table-manager.tsx`: Updated price table editing interface
+- `app/admin/page.tsx`: Removed scans/copies from admin price editing
+- `app/admin/populate-data/page.tsx`: Updated dummy data generation
+- `python/collect.py`: Updated data collection and cost calculation
+- `components/print-jobs-table.tsx`: Removed scans/copies columns
+- `app/printing/page.tsx`: Updated printing page tables
+- `components/job-table.tsx`: Removed scans column
+- `components/user-dashboard.tsx`: Updated dashboard table
+- `app/dashboard/page.tsx`: Updated export functionality
+
+**Key Changes**:
+- **Data Structures**: Removed `scans`, `copies`, `costScans`, `costCopies` fields from all interfaces
+- **UI Components**: Removed scans/copies columns from all tables and input fields
+- **Cost Calculations**: Updated to only include the 4 print types
+- **Export Functions**: Updated to exclude scans/copies from exported data
+- **Python Service**: Updated data collection to only track the 4 print types
+
+**Benefits**:
+- **Simplified UI**: Cleaner interface focused on core print services
+- **Consistent Pricing**: Matches the visual design shown in the images
+- **Reduced Complexity**: Fewer fields to manage and maintain
+- **Better UX**: Users see only the services that are actually available
+
+**Migration Notes**:
+- Existing data with scans/copies will need to be migrated or cleared
+- The dummy data generation now creates more realistic print job distributions
+- All cost calculations now focus on the 4 core print types only
+
+## Table Sorting Implementation (December 2024)
+
+**Problem**: Users needed the ability to sort table data by clicking on column headers to better organize and analyze the information in print jobs, lamination jobs, and billing tables.
+
+**Solution**: Implemented a comprehensive sorting system with:
+- Reusable `SortableTableHeader` component with visual indicators
+- Type-safe sorting utilities that handle different data types
+- Consistent sorting behavior across all tables
+- Proper handling of computed fields and nested data
+
+**Key Features**:
+- **Visual Indicators**: Chevron icons show sort direction (up/down/double for unsorted)
+- **Click to Sort**: Click any column header to sort by that field
+- **Toggle Direction**: Click again to reverse sort order
+- **Type Safety**: Full TypeScript support with proper interfaces
+- **Data Type Handling**: Automatic handling of strings, numbers, dates, and null values
+- **Greek Locale**: Proper sorting for Greek text using `localeCompare`
+
+**Implementation Components**:
+
+**1. SortableTableHeader Component**:
+```tsx
+// components/ui/sortable-table-header.tsx
+export function SortableTableHeader({ 
+  children, 
+  sortKey, 
+  currentSort, 
+  onSort, 
+  className 
+}: SortableTableHeaderProps) {
+  const isActive = currentSort?.key === sortKey
+  const direction = currentSort?.direction
+
+  return (
+    <TableHead 
+      className={cn(
+        "cursor-pointer select-none hover:bg-gray-50 transition-colors",
+        isActive && "bg-blue-50",
+        className
+      )}
+      onClick={() => onSort(sortKey)}
+    >
+      <div className="flex items-center gap-1">
+        <span>{children}</span>
+        <div className="flex flex-col">
+          {!isActive ? (
+            <ChevronsUpDown className="h-3 w-3 text-gray-400" />
+          ) : direction === 'asc' ? (
+            <ChevronUp className="h-3 w-3 text-blue-600" />
+          ) : (
+            <ChevronDown className="h-3 w-3 text-blue-600" />
+          )}
+        </div>
+      </div>
+    </TableHead>
+  )
+}
+```
+
+**2. Sorting Utilities**:
+```tsx
+// lib/sort-utils.ts
+export function sortData<T>(data: T[], sortConfig: SortConfig | null): T[] {
+  if (!sortConfig) return data
+
+  return [...data].sort((a, b) => {
+    const aValue = getNestedValue(a, sortConfig.key)
+    const bValue = getNestedValue(b, sortConfig.key)
+
+    // Handle null/undefined values
+    if (aValue == null && bValue == null) return 0
+    if (aValue == null) return sortConfig.direction === 'asc' ? -1 : 1
+    if (bValue == null) return sortConfig.direction === 'asc' ? 1 : -1
+
+    // Handle different data types
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue
+    }
+
+    if (aValue instanceof Date && bValue instanceof Date) {
+      return sortConfig.direction === 'asc' 
+        ? aValue.getTime() - bValue.getTime() 
+        : bValue.getTime() - aValue.getTime()
+    }
+
+    // Handle string values with Greek locale
+    const aString = String(aValue).toLowerCase()
+    const bString = String(bValue).toLowerCase()
+    
+    if (sortConfig.direction === 'asc') {
+      return aString.localeCompare(bString, 'el')
+    } else {
+      return bString.localeCompare(aString, 'el')
+    }
+  })
+}
+```
+
+**3. Table Component Integration**:
+```tsx
+// Example: components/print-jobs-table.tsx
+export default function PrintJobsTable({ data, page, pageSize, onPageChange, userRole }: PrintJobsTableProps) {
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
+  const [sortedData, setSortedData] = useState(data)
+
+  useEffect(() => {
+    setSortedData(sortData(data, sortConfig))
+  }, [data, sortConfig])
+
+  const handleSort = (key: string) => {
+    const newSortConfig = toggleSort(sortConfig, key)
+    setSortConfig(newSortConfig)
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <SortableTableHeader
+            sortKey="timestamp"
+            currentSort={sortConfig}
+            onSort={handleSort}
+          >
+            Ημερομηνία
+          </SortableTableHeader>
+          {/* ... other sortable headers */}
+        </TableRow>
+      </TableHeader>
+      {/* ... table body with sortedData */}
+    </Table>
+  )
+}
+```
+
+**Special Cases Handled**:
+
+**1. Computed Fields**: For the print billing table, implemented custom sorting for computed fields like `responsiblePerson`:
+```tsx
+const getSortValue = (billing: PrintBilling, key: string): any => {
+  switch (key) {
+    case 'userRole':
+      const userData = dummyDB.getUserById(billing.uid)
+      return userData?.userRole || ""
+    case 'responsiblePerson':
+      const user = dummyDB.getUserById(billing.uid)
+      return user?.userRole === "Άτομο" 
+        ? user.displayName 
+        : user?.responsiblePerson || ""
+    case 'lastPayment':
+      return billing.lastPayment
+    default:
+      return (billing as any)[key]
+  }
+}
+```
+
+**2. Type Safety**: Added proper TypeScript interfaces for all table components:
+```tsx
+interface PrintJobsTableProps {
+  data: PrintJob[]
+  page: number
+  pageSize: number
+  onPageChange: (page: number) => void
+  userRole: string
+}
+```
+
+**Tables Updated**:
+- Print Jobs Table (`components/print-jobs-table.tsx`)
+- Print Billing Table (`components/print-billing-table.tsx`)
+- Lamination Jobs Table (`components/lamination-jobs-table.tsx`)
+- Lamination Billing Table (`components/lamination-billing-table.tsx`)
+
+**UI/UX Features**:
+- **Hover Effects**: Headers show hover state with background color change
+- **Active State**: Currently sorted column has blue background
+- **Icon States**: Clear visual indicators for sort direction
+- **Responsive**: Works on all screen sizes
+- **Accessibility**: Proper cursor and select-none for better UX
+
+**Result**: All data tables now support intuitive column sorting with visual feedback, making it much easier for users to organize and analyze their data. The implementation is consistent across all tables and handles edge cases like computed fields and different data types.
 
 ## Expanded Dummy Data Generation (December 2024)
 
@@ -389,3 +617,69 @@ const handleResetData = () => {
 - Total debts: €2.00 - €40.00 range
 
 **Lesson Learned**: When generating sample data for testing, always consider realistic usage patterns and reasonable monetary values. Excessive data generation can make the application appear broken or unrealistic to users. 
+
+## Hydration Error Fix (December 2024)
+
+**Problem**: React hydration error occurred due to whitespace text nodes in `<colgroup>` elements. The error message indicated that whitespace text nodes cannot be children of `<colgroup>` elements.
+
+**Error Message**:
+```
+Error: In HTML, whitespace text nodes cannot be a child of <colgroup>. Make sure you don't have any extra whitespace between tags on each line of your source code.
+This will cause a hydration error.
+```
+
+**Root Cause**: The `PrintJobsColGroup` component had comments and line breaks between `<col>` elements, which created text nodes in the DOM. HTML `<colgroup>` elements can only contain `<col>` elements directly.
+
+**Solution**: Removed all comments and extra whitespace between `<col>` elements in the `PrintJobsColGroup` component.
+
+**Before (Problematic)**:
+```tsx
+function PrintJobsColGroup({ userRole }: { userRole: string }) {
+  return (
+    <colgroup>
+      <col className="w-[100px]" /> {/* Date */}
+      {userRole === "admin" && <col className="w-[120px]" />} {/* User */}
+      {userRole === "admin" && <col className="w-[120px]" />} {/* Department */}
+      <col className="w-[120px]" /> {/* Printer */}
+      <col className="w-[80px]" /> {/* A4 BW */}
+      <col className="w-[80px]" /> {/* A4 Color */}
+      <col className="w-[80px]" /> {/* A3 BW */}
+      <col className="w-[80px]" /> {/* A3 Color */}
+      <col className="w-[80px]" /> {/* Cost */}
+      <col className="w-[100px]" /> {/* Status */}
+    </colgroup>
+  )
+}
+```
+
+**After (Fixed)**:
+```tsx
+function PrintJobsColGroup({ userRole }: { userRole: string }) {
+  return (
+    <colgroup>
+      <col className="w-[100px]" />
+      {userRole === "admin" && <col className="w-[120px]" />}
+      {userRole === "admin" && <col className="w-[120px]" />}
+      <col className="w-[120px]" />
+      <col className="w-[80px]" />
+      <col className="w-[80px]" />
+      <col className="w-[80px]" />
+      <col className="w-[80px]" />
+      <col className="w-[80px]" />
+      <col className="w-[100px]" />
+    </colgroup>
+  )
+}
+```
+
+**Key Points**:
+- **HTML Restrictions**: `<colgroup>` elements can only contain `<col>` elements
+- **Whitespace Handling**: Any whitespace between elements creates text nodes
+- **Hydration Mismatch**: Server and client rendering differ when text nodes are present
+- **Solution**: Remove all comments and ensure no whitespace between `<col>` elements
+
+**Prevention**:
+- Always ensure `<colgroup>` contains only `<col>` elements
+- Avoid comments and whitespace between `<col>` tags
+- Use ESLint rules to catch similar issues
+- Test with React Strict Mode to catch hydration issues early 

@@ -43,7 +43,7 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState("")
   const [laminationType, setLaminationType] = useState<"A3" | "A4" | "card_small" | "card_large">("A4")
   const [quantity, setQuantity] = useState("1")
-  const [notes, setNotes] = useState("")
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(false)
   const [showAddUserDialog, setShowAddUserDialog] = useState(false)
   const [newUser, setNewUser] = useState({
@@ -53,6 +53,8 @@ export default function AdminPage() {
     department: "",
     email: "",
     role: "user" as "user" | "admin",
+    userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας",
+    responsiblePerson: "",
   })
 
   // Price editing state
@@ -211,9 +213,8 @@ export default function AdminPage() {
         quantity: Number.parseInt(quantity),
         pricePerUnit,
         totalCost: Number.parseFloat(totalCost.toFixed(2)),
-        timestamp: new Date(),
+        timestamp: new Date(selectedDate),
         status: "completed",
-        notes: notes || undefined,
       }
 
       dummyDB.addLaminationJob(newJob)
@@ -227,7 +228,7 @@ export default function AdminPage() {
       setSelectedUser("")
       setLaminationType("A4")
       setQuantity("1")
-      setNotes("")
+      setSelectedDate(new Date().toISOString().split('T')[0])
     } catch (error) {
       toast({
         title: "Σφάλμα",
@@ -268,6 +269,8 @@ export default function AdminPage() {
         department: newUser.department || "Γενικό",
         email: newUser.email || undefined,
         createdAt: new Date(),
+        userRole: newUser.userRole,
+        responsiblePerson: newUser.userRole === "Άτομο" ? undefined : newUser.responsiblePerson,
       }
 
       const updatedUsers = [...users, userToAdd]
@@ -280,7 +283,7 @@ export default function AdminPage() {
       })
 
       // Reset form and close dialog
-      setNewUser({ username: "", password: "", displayName: "", department: "", email: "", role: "user" })
+      setNewUser({ username: "", password: "", displayName: "", department: "", email: "", role: "user", userRole: "Άτομο", responsiblePerson: "" })
       setShowAddUserDialog(false)
     } catch (error) {
       toast({
@@ -371,8 +374,6 @@ export default function AdminPage() {
         a4Color: printingPrices.a4Color?.toString() || "",
         a3BW: printingPrices.a3BW?.toString() || "",
         a3Color: printingPrices.a3Color?.toString() || "",
-        scan: printingPrices.scan?.toString() || "",
-        copy: printingPrices.copy?.toString() || "",
       }
     }))
   }
@@ -511,15 +512,16 @@ export default function AdminPage() {
               </TabsList>
 
               <TabsContent value="lamination" className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Plus className="h-5 w-5" />
+                <Card className="border-green-200">
+                  <CardHeader className="bg-green-50">
+                    <CardTitle className="flex items-center gap-2 text-green-800">
+                      <CreditCard className="h-5 w-5" />
                       Προσθήκη Χρέους Πλαστικοποιητή
                     </CardTitle>
-                    <CardDescription>Προσθέστε χρέωση πλαστικοποίησης σε χρήστη</CardDescription>
+                    <CardDescription className="text-green-600">Προσθέστε χρέωση πλαστικοποίησης σε χρήστη</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                    {/* Row 1: User, Date */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <Label htmlFor="user">Χρήστης</Label>
@@ -538,6 +540,19 @@ export default function AdminPage() {
                         />
                       </div>
 
+                      <div className="space-y-2">
+                        <Label htmlFor="date">Ημερομηνία</Label>
+                        <Input
+                          id="date"
+                          type="date"
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 2: Type, Quantity */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <Label htmlFor="type">Τύπος Πλαστικοποίησης</Label>
                         <Select value={laminationType} onValueChange={(value: any) => setLaminationType(value)}>
@@ -567,26 +582,17 @@ export default function AdminPage() {
                           onChange={(e) => setQuantity(e.target.value)}
                         />
                       </div>
+                    </div>
 
-                      <div className="space-y-2">
-                        <Label>Συνολικό Κόστος</Label>
-                        <div className="text-2xl font-bold text-green-600">
-                          {formatPrice((laminationPrices[laminationType] || 0) * Number.parseInt(quantity || "0"))}
-                        </div>
+                    {/* Row 3: Total Cost (full width) */}
+                    <div className="space-y-2 text-center">
+                      <Label>Συνολικό Κόστος</Label>
+                      <div className="text-2xl font-bold text-green-600">
+                        {formatPrice((laminationPrices[laminationType] || 0) * Number.parseInt(quantity || "0"))}
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="notes">Σημειώσεις (προαιρετικό)</Label>
-                      <Textarea
-                        id="notes"
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Προσθέστε σημειώσεις για την πλαστικοποίηση..."
-                      />
-                    </div>
-
-                    <Button onClick={handleAddLamination} disabled={loading} className="w-full">
+                    <Button onClick={handleAddLamination} disabled={loading} className="w-full bg-green-600 hover:bg-green-700 text-white">
                       {loading ? "Προσθήκη..." : "Προσθήκη Χρέους Πλαστικοποιητή"}
                     </Button>
                   </CardContent>
@@ -631,7 +637,32 @@ export default function AdminPage() {
                           <Input id="email" type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
                         </div>
                         <div>
-                          <Label htmlFor="role">Ρόλος</Label>
+                          <Label htmlFor="userRole">Ρόλος</Label>
+                          <Select value={newUser.userRole} onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" })}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Άτομο">Άτομο</SelectItem>
+                              <SelectItem value="Ομάδα">Ομάδα</SelectItem>
+                              <SelectItem value="Ναός">Ναός</SelectItem>
+                              <SelectItem value="Τομέας">Τομέας</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {newUser.userRole !== "Άτομο" && (
+                          <div>
+                            <Label htmlFor="responsiblePerson">Υπεύθυνος</Label>
+                            <Input 
+                              id="responsiblePerson" 
+                              value={newUser.responsiblePerson} 
+                              onChange={e => setNewUser({ ...newUser, responsiblePerson: e.target.value })} 
+                              placeholder="Εισάγετε το όνομα του υπευθύνου"
+                            />
+                          </div>
+                        )}
+                        <div>
+                          <Label htmlFor="role">Ρόλος Συστήματος</Label>
                           <Select value={newUser.role} onValueChange={role => setNewUser({ ...newUser, role: role as "user" | "admin" })}>
                             <SelectTrigger>
                               <SelectValue />
@@ -686,7 +717,7 @@ export default function AdminPage() {
                           </Button>
                         ) : (
                           <div className="flex gap-2">
-                            <Button onClick={savePrintingPrices} size="sm" className="bg-green-600 hover:bg-green-700">
+                            <Button onClick={savePrintingPrices} size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black">
                               <Save className="h-4 w-4 mr-2" />
                               Αποθήκευση
                             </Button>
@@ -699,7 +730,7 @@ export default function AdminPage() {
                       </div>
                     </CardHeader>
                     <CardContent className="pt-6">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
                           <h3 className="font-medium text-blue-800">A4 Ασπρόμαυρο</h3>
                           {isEditingPrinting ? (
@@ -784,48 +815,6 @@ export default function AdminPage() {
                             <p className="text-2xl font-bold text-blue-600">{formatPrice(printingPrices.a3Color)}</p>
                           )}
                         </div>
-                        <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
-                          <h3 className="font-medium text-blue-800">Σάρωση</h3>
-                          {isEditingPrinting ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-blue-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.001"
-                                min="0"
-                                value={editingPrices.printing.scan || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  printing: { ...prev.printing, scan: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-blue-600">{formatPrice(printingPrices.scan)}</p>
-                          )}
-                        </div>
-                        <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
-                          <h3 className="font-medium text-blue-800">Φωτοαντίγραφο</h3>
-                          {isEditingPrinting ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-blue-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.001"
-                                min="0"
-                                value={editingPrices.printing.copy || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  printing: { ...prev.printing, copy: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-blue-600">{formatPrice(printingPrices.copy)}</p>
-                          )}
-                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -850,7 +839,7 @@ export default function AdminPage() {
                           </Button>
                         ) : (
                           <div className="flex gap-2">
-                            <Button onClick={saveLaminationPrices} size="sm" className="bg-green-600 hover:bg-green-700">
+                            <Button onClick={saveLaminationPrices} size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black">
                               <Save className="h-4 w-4 mr-2" />
                               Αποθήκευση
                             </Button>

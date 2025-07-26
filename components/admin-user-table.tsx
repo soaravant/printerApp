@@ -53,7 +53,7 @@ export function AdminUserTable() {
 
   return (
     <Table>
-      <TableHeader>
+              <TableHeader className="bg-gray-100">
         <TableRow>
           <TableHead>Name</TableHead>
           <TableHead>Username</TableHead>

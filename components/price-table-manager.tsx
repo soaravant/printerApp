@@ -32,8 +32,6 @@ export function PriceTableManager() {
         a4Color: 0.15,
         a3BW: 0.1,
         a3Color: 0.3,
-        scan: 0.02,
-        copy: 0.03,
       },
       isActive: false,
       createdAt: new Date(),
@@ -131,8 +129,6 @@ export function PriceTableManager() {
                   <TableHead>A4 Έγχρωμο</TableHead>
                   <TableHead>A3 Α/Μ</TableHead>
                   <TableHead>A3 Έγχρωμο</TableHead>
-                  <TableHead>Σάρωση</TableHead>
-                  <TableHead>Φωτοαντίγραφο</TableHead>
                   <TableHead>Κατάσταση</TableHead>
                   <TableHead>Ενέργειες</TableHead>
                 </TableRow>
@@ -145,8 +141,6 @@ export function PriceTableManager() {
                     <TableCell>{formatPrice(table.prices.a4Color)}</TableCell>
                     <TableCell>{formatPrice(table.prices.a3BW)}</TableCell>
                     <TableCell>{formatPrice(table.prices.a3Color)}</TableCell>
-                    <TableCell>{formatPrice(table.prices.scan)}</TableCell>
-                    <TableCell>{formatPrice(table.prices.copy)}</TableCell>
                     <TableCell>
                       <Badge variant={table.isActive ? "default" : "secondary"}>
                         {table.isActive ? "Ενεργός" : "Ανενεργός"}
@@ -249,38 +243,6 @@ export function PriceTableManager() {
                     setEditingTable({
                       ...editingTable,
                       prices: { ...editingTable.prices, a3Color: Number.parseFloat(e.target.value) },
-                    })
-                  }
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="scan">Σάρωση (€)</Label>
-                <Input
-                  id="scan"
-                  type="number"
-                  step="0.001"
-                  value={editingTable.prices.scan}
-                  onChange={(e) =>
-                    setEditingTable({
-                      ...editingTable,
-                      prices: { ...editingTable.prices, scan: Number.parseFloat(e.target.value) },
-                    })
-                  }
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="copy">Φωτοαντίγραφο (€)</Label>
-                <Input
-                  id="copy"
-                  type="number"
-                  step="0.001"
-                  value={editingTable.prices.copy}
-                  onChange={(e) =>
-                    setEditingTable({
-                      ...editingTable,
-                      prices: { ...editingTable.prices, copy: Number.parseFloat(e.target.value) },
                     })
                   }
                 />

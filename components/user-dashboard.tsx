@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuth } from "@/lib/simple-auth-context"
+import { useAuth } from "@/lib/auth-context"
 import { dataStore } from "@/lib/data-store"
 import { DashboardStats } from "@/components/dashboard-stats"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -63,7 +63,7 @@ export function UserDashboard() {
                 </div>
               ) : (
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-gray-100">
                     <TableRow>
                       <TableHead>Περίοδος</TableHead>
                       <TableHead>Συνολικό Κόστος</TableHead>
@@ -115,7 +115,7 @@ export function UserDashboard() {
                 </div>
               ) : (
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-gray-100">
                     <TableRow>
                       <TableHead>Ημερομηνία</TableHead>
                       <TableHead>Εκτυπωτής</TableHead>
@@ -123,7 +123,6 @@ export function UserDashboard() {
                       <TableHead>A4 Έγχρωμο</TableHead>
                       <TableHead>A3 Α/Μ</TableHead>
                       <TableHead>A3 Έγχρωμο</TableHead>
-                      <TableHead>Σαρώσεις</TableHead>
                       <TableHead>Κόστος</TableHead>
                       <TableHead>Κατάσταση</TableHead>
                     </TableRow>
@@ -139,7 +138,6 @@ export function UserDashboard() {
                         <TableCell>{job.pagesA4Color || 0}</TableCell>
                         <TableCell>{job.pagesA3BW || 0}</TableCell>
                         <TableCell>{job.pagesA3Color || 0}</TableCell>
-                        <TableCell>{job.scans || 0}</TableCell>
                         <TableCell>{formatPrice(job.totalCost)}</TableCell>
                         <TableCell>
                           <Badge variant={job.status === "completed" ? "default" : "secondary"}>

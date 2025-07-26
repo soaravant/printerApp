@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { dataStore } from "@/lib/data-store"
-import { useAuth } from "@/lib/simple-auth-context"
+import { useAuth } from "@/lib/auth-context"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import type { PrintJob } from "@/lib/data-store"
@@ -36,7 +36,7 @@ export function JobTable() {
 
   return (
     <Table>
-      <TableHeader>
+              <TableHeader className="bg-gray-100">
         <TableRow>
           <TableHead>Date</TableHead>
           <TableHead>Printer</TableHead>
@@ -44,7 +44,6 @@ export function JobTable() {
           <TableHead>A4 Color</TableHead>
           <TableHead>A3 B&W</TableHead>
           <TableHead>A3 Color</TableHead>
-          <TableHead>Scans</TableHead>
           <TableHead>Cost</TableHead>
         </TableRow>
       </TableHeader>
@@ -59,7 +58,6 @@ export function JobTable() {
             <TableCell>{job.pagesA4Color || 0}</TableCell>
             <TableCell>{job.pagesA3BW || 0}</TableCell>
             <TableCell>{job.pagesA3Color || 0}</TableCell>
-            <TableCell>{job.scans || 0}</TableCell>
             <TableCell>€{job.totalCost.toFixed(2)}</TableCell>
           </TableRow>
         ))}

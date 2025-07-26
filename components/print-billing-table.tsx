@@ -3,69 +3,197 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Pagination from "./pagination-helper"
 import { Calendar } from "lucide-react"
+import type { PrintBilling, User } from "@/lib/dummy-database"
+import { dummyDB } from "@/lib/dummy-database"
+import { SortableTableHeader } from "@/components/ui/sortable-table-header"
+import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
+import { useState, useEffect } from "react"
 
-export default function PrintBillingTable({ data, page, pageSize, onPageChange, userRole }) {
-  const formatPrice = (price) => `€${price.toFixed(2).replace('.', ',')}`
+// Shared column definition for consistent widths
+const BillingColGroup = () => (
+  <colgroup>
+    <col style={{ width: "15%" }} />
+    <col style={{ width: "25%" }} />
+    <col style={{ width: "25%" }} />
+    <col style={{ width: "20%" }} />
+    <col style={{ width: "15%" }} />
+  </colgroup>
+)
+
+interface PrintBillingTableProps {
+  data: PrintBilling[]
+  page: number
+  pageSize: number
+  onPageChange: (page: number) => void
+  userRole: string
+}
+
+export default function PrintBillingTable({ data, page, pageSize, onPageChange, userRole }: PrintBillingTableProps) {
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
+  const [sortedData, setSortedData] = useState(data)
+
+  useEffect(() => {
+    if (!sortConfig) {
+      setSortedData(data)
+      return
+    }
+
+    // Custom sort for print billing data
+    const sorted = [...data].sort((a, b) => {
+      const aValue = getSortValue(a, sortConfig.key)
+      const bValue = getSortValue(b, sortConfig.key)
+
+      // Handle null/undefined values
+      if (aValue == null && bValue == null) return 0
+      if (aValue == null) return sortConfig.direction === 'asc' ? -1 : 1
+      if (bValue == null) return sortConfig.direction === 'asc' ? 1 : -1
+
+      // Handle different data types
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue
+      }
+
+      if (aValue instanceof Date && bValue instanceof Date) {
+        return sortConfig.direction === 'asc' 
+          ? aValue.getTime() - bValue.getTime() 
+          : bValue.getTime() - aValue.getTime()
+      }
+
+      // Handle string values
+      const aString = String(aValue).toLowerCase()
+      const bString = String(bValue).toLowerCase()
+      
+      if (sortConfig.direction === 'asc') {
+        return aString.localeCompare(bString, 'el')
+      } else {
+        return bString.localeCompare(aString, 'el')
+      }
+    })
+
+    setSortedData(sorted)
+  }, [data, sortConfig])
+
+  const getSortValue = (billing: PrintBilling, key: string): any => {
+    switch (key) {
+      case 'userRole':
+        const userData = dummyDB.getUserById(billing.uid)
+        return userData?.userRole || ""
+      case 'responsiblePerson':
+        const user = dummyDB.getUserById(billing.uid)
+        return user?.userRole === "Άτομο" 
+          ? user.displayName 
+          : user?.responsiblePerson || ""
+      case 'lastPayment':
+        return billing.lastPayment
+      default:
+        return (billing as any)[key]
+    }
+  }
+
+  const handleSort = (key: string) => {
+    const newSortConfig = toggleSort(sortConfig, key)
+    setSortConfig(newSortConfig)
+  }
+
+  const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
+  
+  // Helper function to get user data for each billing record
+  const getUserData = (uid: string): User | undefined => {
+    return dummyDB.getUserById(uid)
+  }
+  
   return (
-    <div className="border rounded-lg" style={{ maxHeight: "400px", overflowY: "auto" }}>
-      <Table>
-        <TableHeader className="sticky top-0 bg-white z-10">
+    <div className="border rounded-lg">
+      {/* Fixed (non-scrolling) header */}
+      <Table className="min-w-full table-fixed">
+        <BillingColGroup />
+        <TableHeader className="bg-gray-100">
           <TableRow>
-            <TableHead className="font-medium">Περίοδος</TableHead>
-            {userRole === "admin" && <TableHead>Χρήστης</TableHead>}
-            {userRole === "admin" && <TableHead>Τμήμα</TableHead>}
-            <TableHead>A4 Α/Μ</TableHead>
-            <TableHead>A4 Έγχρωμο</TableHead>
-            <TableHead>A3 Α/Μ</TableHead>
-            <TableHead>A3 Έγχρωμο</TableHead>
-            <TableHead>Σαρώσεις</TableHead>
-            <TableHead>Συνολικό Κόστος</TableHead>
-            <TableHead>Πληρωμένο</TableHead>
-            <TableHead>Υπόλοιπο</TableHead>
-            <TableHead>Ημ. Εξόφλησης</TableHead>
-            <TableHead>Κατάσταση</TableHead>
+            <SortableTableHeader
+              sortKey="userRole"
+              currentSort={sortConfig}
+              onSort={handleSort}
+              className="font-medium"
+            >
+              Ρόλος
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="userDisplayName"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Όνομα
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="responsiblePerson"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Υπεύθυνος
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="remainingBalance"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Συνολικό Χρέος
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="lastPayment"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Τελευταία Εξόφληση
+            </SortableTableHeader>
           </TableRow>
         </TableHeader>
-        <TableBody>
-          {data.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={userRole === "admin" ? 13 : 11} className="text-center py-8 text-gray-500">
-                Δεν βρέθηκαν αποτελέσματα
-              </TableCell>
-            </TableRow>
-          ) : (
-            data.slice((page-1)*pageSize, page*pageSize).map((billing) => (
-              <TableRow key={billing.billingId}>
-                <TableCell className="font-medium">{billing.period}</TableCell>
-                {userRole === "admin" && <TableCell>{billing.userDisplayName}</TableCell>}
-                {userRole === "admin" && <TableCell>{billing.department}</TableCell>}
-                <TableCell>{billing.totalA4BW}</TableCell>
-                <TableCell>{billing.totalA4Color}</TableCell>
-                <TableCell>{billing.totalA3BW}</TableCell>
-                <TableCell>{billing.totalA3Color}</TableCell>
-                <TableCell>{billing.totalScans}</TableCell>
-                <TableCell>{formatPrice(billing.totalCost)}</TableCell>
-                <TableCell>{formatPrice(billing.paidAmount)}</TableCell>
-                <TableCell className={billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
-                  {formatPrice(billing.remainingBalance)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    {billing.dueDate.toLocaleDateString("el-GR")}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={billing.paid ? "default" : "destructive"}>
-                    {billing.paid ? "Πληρωμένο" : "Απλήρωτο"}
-                  </Badge>
+      </Table>
+
+      {/* Scrollable body only */}
+      <div className="max-h-[400px] overflow-y-auto">
+        <Table className="min-w-full table-fixed">
+          <BillingColGroup />
+          <TableBody>
+            {sortedData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                  Δεν βρέθηκαν αποτελέσματα
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      <Pagination page={page} total={data.length} pageSize={pageSize} onPageChange={onPageChange} />
+            ) : (
+              sortedData.slice((page-1)*pageSize, page*pageSize).map((billing: PrintBilling) => {
+                const userData = getUserData(billing.uid)
+                const responsiblePerson = userData?.userRole === "Άτομο" 
+                  ? userData.displayName 
+                  : userData?.responsiblePerson || "-"
+                
+                return (
+                  <TableRow key={billing.billingId}>
+                    <TableCell className="font-medium">{userData?.userRole || "-"}</TableCell>
+                    <TableCell>{billing.userDisplayName}</TableCell>
+                    <TableCell>{responsiblePerson}</TableCell>
+                    <TableCell className={billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
+                      {formatPrice(billing.remainingBalance)}
+                    </TableCell>
+                    <TableCell>
+                      {billing.lastPayment ? (
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {billing.lastPayment.toLocaleDateString("el-GR")}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">-</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Pagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
     </div>
   )
 } 

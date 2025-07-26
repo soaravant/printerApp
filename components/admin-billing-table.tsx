@@ -60,7 +60,7 @@ export function AdminBillingTable() {
 
   return (
     <Table>
-      <TableHeader>
+              <TableHeader className="bg-gray-100">
         <TableRow>
           <TableHead>Period</TableHead>
           <TableHead>User</TableHead>

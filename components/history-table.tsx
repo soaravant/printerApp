@@ -29,6 +29,15 @@ export interface ColumnConfig {
   className?: string
 }
 
+// Shared column definition for consistent widths
+const HistoryColGroup = ({ columns }: { columns: ColumnConfig[] }) => (
+  <colgroup>
+    {columns.map((_, index) => (
+      <col key={index} style={{ width: `${100 / columns.length}%` }} />
+    ))}
+  </colgroup>
+)
+
 interface HistoryTableProps {
   data: any[]
   columns: ColumnConfig[]
@@ -73,7 +82,7 @@ export function HistoryTable({
     // Date range filter
     if (filterConfig.dateField && (dateFrom || dateTo)) {
       filtered = filtered.filter((item) => {
-        const itemDate = new Date(getNestedValue(item, filterConfig.dateField))
+        const itemDate = new Date(getNestedValue(item, filterConfig.dateField!))
         const fromDate = dateFrom ? new Date(dateFrom) : null
         const toDate = dateTo ? new Date(dateTo) : null
 
@@ -86,7 +95,7 @@ export function HistoryTable({
     // Status filter
     if (filterConfig.statusField && statusFilter !== "all") {
       filtered = filtered.filter((item) => {
-        const status = getNestedValue(item, filterConfig.statusField)
+        const status = getNestedValue(item, filterConfig.statusField!)
         return (
           status === statusFilter ||
           (statusFilter === "paid" && status === true) ||
@@ -98,12 +107,19 @@ export function HistoryTable({
     // Custom filters
     Object.entries(customFilters).forEach(([field, value]) => {
       if (value !== "all" && value !== "") {
-        filtered = filtered.filter((item) => getNestedValue(item, field) === value)
+        filtered = filtered.filter((item) => {
+          const itemValue = getNestedValue(item, field)
+          return itemValue === value
+        })
       }
     })
 
     setFilteredData(filtered)
   }
+
+  useEffect(() => {
+    applyFilters()
+  }, [searchTerm, dateFrom, dateTo, statusFilter, customFilters, data])
 
   const clearFilters = () => {
     setSearchTerm("")
@@ -112,11 +128,6 @@ export function HistoryTable({
     setStatusFilter("all")
     setCustomFilters({})
   }
-
-  // Apply filters whenever any filter changes
-  useEffect(() => {
-    applyFilters()
-  }, [searchTerm, dateFrom, dateTo, statusFilter, customFilters, data])
 
   return (
     <Card>
@@ -127,9 +138,8 @@ export function HistoryTable({
         </CardTitle>
         {description && <p className="text-sm text-gray-600">{description}</p>}
       </CardHeader>
-
       <CardContent className="space-y-4">
-        {/* Always visible filters */}
+        {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
           {/* Search */}
           <div className="space-y-2">
@@ -215,10 +225,12 @@ export function HistoryTable({
           Εμφάνιση {filteredData.length} από {data.length} αποτελέσματα
         </div>
 
-        {/* Scrollable Table */}
-        <div className="border rounded-lg" style={{ maxHeight, overflowY: "auto" }}>
-          <Table>
-            <TableHeader className="sticky top-0 bg-white z-10">
+        {/* Fixed header and scrollable body */}
+        <div className="border rounded-lg">
+          {/* Fixed (non-scrolling) header */}
+          <Table className="min-w-full table-fixed">
+            <HistoryColGroup columns={columns} />
+            <TableHeader className="bg-gray-100">
               <TableRow>
                 {columns.map((column) => (
                   <TableHead key={column.key} className={column.className}>
@@ -227,28 +239,35 @@ export function HistoryTable({
                 ))}
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {filteredData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="text-center py-8 text-gray-500">
-                    Δεν βρέθηκαν αποτελέσματα
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredData.map((row, index) => (
-                  <TableRow key={index}>
-                    {columns.map((column) => (
-                      <TableCell key={column.key} className={column.className}>
-                        {column.render
-                          ? column.render(getNestedValue(row, column.key), row)
-                          : getNestedValue(row, column.key)}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
           </Table>
+
+          {/* Scrollable body only */}
+          <div style={{ maxHeight, overflowY: "auto" }}>
+            <Table className="min-w-full table-fixed">
+              <HistoryColGroup columns={columns} />
+              <TableBody>
+                {filteredData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="text-center py-8 text-gray-500">
+                      Δεν βρέθηκαν αποτελέσματα
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredData.map((row, index) => (
+                    <TableRow key={index}>
+                      {columns.map((column) => (
+                        <TableCell key={column.key} className={column.className}>
+                          {column.render
+                            ? column.render(getNestedValue(row, column.key), row)
+                            : getNestedValue(row, column.key)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </CardContent>
     </Card>

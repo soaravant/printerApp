@@ -15,8 +15,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import dynamic from "next/dynamic"
 import { useState, useEffect } from "react"
-import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download, RotateCcw, Filter } from "lucide-react"
+import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download, RotateCcw, Filter, FileText, BarChart3 } from "lucide-react"
 import * as XLSX from "xlsx-js-style"
+import React from "react"
+
+// Error boundary component for dynamic imports
+function ErrorBoundary({ children, fallback }: { children: React.ReactNode; fallback: React.ReactNode }) {
+  return (
+    <React.Suspense fallback={fallback}>
+      {children}
+    </React.Suspense>
+  )
+}
 
 // Dynamic import for UsageChart (must be at module scope)
 const UsageChart = dynamic(() => import("@/components/usage-chart"), {
@@ -261,20 +271,49 @@ export default function DashboardPage() {
     data: any[],
     filename: string,
     columns: { key: string, label: string }[],
-    headerColor: string
+    headerColor: string,
+    title?: string
   ) => {
     // Build AOA (array of arrays)
-    const aoa = [
-      columns.map(col => col.label),
-      ...data.map(row => columns.map(col => row[col.key] ?? ""))
-    ]
+    const aoa = title 
+      ? [
+          [title], // Title row
+          columns.map(col => col.label), // Header row
+          ...data.map(row => columns.map(col => row[col.key] ?? "")) // Data rows
+        ]
+      : [
+          columns.map(col => col.label), // Header row
+          ...data.map(row => columns.map(col => row[col.key] ?? "")) // Data rows
+        ]
 
     const ws = XLSX.utils.aoa_to_sheet(aoa)
 
+    // Style title row if present
+    if (title) {
+      const titleCellAddr = XLSX.utils.encode_cell({ r: 0, c: 0 })
+      const titleCell = ws[titleCellAddr] ?? (ws[titleCellAddr] = { v: title })
+      titleCell.s = {
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 16 },
+        fill: { patternType: "solid", fgColor: { rgb: headerColor } },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: {
+          top:    { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left:   { style: "thin", color: { rgb: "000000" } },
+          right:  { style: "thin", color: { rgb: "000000" } }
+        }
+      }
+      
+      // Merge title cell across all columns
+      if (!ws['!merges']) ws['!merges'] = []
+      ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } })
+    }
+
     // Style header row
     const range = XLSX.utils.decode_range(ws['!ref']!)
+    const headerRowIndex = title ? 1 : 0
     for (let c = range.s.c; c <= range.e.c; c++) {
-      const cellAddr = XLSX.utils.encode_cell({ r: 0, c })
+      const cellAddr = XLSX.utils.encode_cell({ r: headerRowIndex, c })
       const cell = ws[cellAddr] ?? (ws[cellAddr] = { v: columns[c].label })
       cell.s = {
         font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
@@ -299,8 +338,11 @@ export default function DashboardPage() {
     }))
     ws['!cols'] = colWidths
 
-    // Row height for header
-    ws['!rows'] = [{ hpt: 25 }]
+    // Row heights for title and header
+    const rowHeights = title 
+      ? [{ hpt: 35 }, { hpt: 25 }] // Title row taller, header row normal
+      : [{ hpt: 25 }] // Just header row
+    ws['!rows'] = rowHeights
 
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
@@ -393,56 +435,34 @@ export default function DashboardPage() {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {user.role === "admin" ? "Συνολικά Οφειλόμενα (Όλοι)" : "Συνολικά Οφειλόμενα"}
-                  </CardTitle>
+                  <CardTitle className="text-sm font-medium">Σύνολο Οφειλών</CardTitle>
                   <Receipt className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">{formatPrice(totalUnpaid)}</div>
-                  <p className="text-xs text-muted-foreground">Εκτυπώσεις + Πλαστικοποιήσεις</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Οφειλές Εκτυπώσεων</CardTitle>
+                  <CardTitle className="text-sm font-medium">Οφειλές ΤΟ. ΦΩ.</CardTitle>
                   <Printer className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
-                  <p className="text-xs text-muted-foreground">{relevantPrintJobs.length} συνολικές εκτυπώσεις</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Οφειλές Πλαστικοποιήσεων</CardTitle>
+                  <CardTitle className="text-sm font-medium">Οφειλές ΠΛΑ. ΤΟ.</CardTitle>
                   <CreditCard className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">{formatPrice(laminationUnpaid)}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {relevantLaminationJobs.length} συνολικές πλαστικοποιήσεις
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Τρέχων Μήνας</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {formatPrice(currentMonthPrintCost + currentMonthLaminationCost)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {currentMonthPrintJobs.length + currentMonthLaminationJobs.length} εργασίες
-                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -567,274 +587,257 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
+            {/* Print Billing Table - Outside Tabs */}
+            <div className="bg-yellow-50 rounded-lg border border-yellow-200 shadow-sm mb-8">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <BarChart3 className="h-6 w-6 text-yellow-700" />
+                      <div>
+                        <h3 className="text-lg font-semibold text-yellow-900">Συγκεντρωτικός Χρεωστικός Πίνακας</h3>
+                        <p className="text-sm text-yellow-700">Συγκεντρωμένα δεδομένα χρεώσεων και πληρωμών</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() =>
+                                                    exportTableXLSX(
+                              filteredPrintBilling.map((b) => {
+                                const userData = dummyDB.getUserById(b.uid)
+                                const responsiblePerson = userData?.userRole === "Άτομο" 
+                                  ? userData.displayName 
+                                  : userData?.responsiblePerson || "-"
+                                
+                                return {
+                                  userRole: userData?.userRole || "-",
+                                  userDisplayName: b.userDisplayName,
+                                  responsiblePerson: responsiblePerson,
+                                  remainingBalance: formatPrice(b.remainingBalance),
+                                  lastPayment: b.lastPayment ? b.lastPayment.toLocaleDateString("el-GR") : "-",
+                                }
+                              }),
+                              "print_billing",
+                              [
+                                { key: "userRole", label: "Ρόλος" },
+                                { key: "userDisplayName", label: "Όνομα" },
+                                { key: "responsiblePerson", label: "Υπεύθυνος" },
+                                { key: "remainingBalance", label: "Συνολικό Χρέος" },
+                                { key: "lastPayment", label: "Τελευταία Εξόφληση" }
+                              ],
+                              "EAB308",
+                              "Συγκεντρωτικός Χρεωστικός Πίνακας"
+                            )
+                      }
+                      variant="outline"
+                      size="sm"
+                      className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Εξαγωγή XLSX
+                    </Button>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <PrintBillingTable
+                    data={filteredPrintBilling}
+                    page={printBillingPage}
+                    pageSize={PAGE_SIZE}
+                    onPageChange={setPrintBillingPage}
+                    userRole={user.role}
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Tabs for Print and Lamination */}
             <Tabs defaultValue="printing" className="w-full mb-8">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-2 h-16 p-1">
                 <TabsTrigger
                   value="printing"
-                  className="flex items-center gap-2 data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700"
+                  className="flex items-center gap-3 py-4 px-6 text-base font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700"
                 >
-                  <Printer className="h-4 w-4" />
+                  <Printer className="h-6 w-6" />
                   Εκτυπώσεις
                 </TabsTrigger>
                 <TabsTrigger
                   value="lamination"
-                  className="flex items-center gap-2 data-[state=active]:bg-green-100 data-[state=active]:text-green-700"
+                  className="flex items-center gap-3 py-4 px-6 text-base font-medium data-[state=active]:bg-green-100 data-[state=active]:text-green-700"
                 >
-                  <CreditCard className="h-4 w-4" />
+                  <CreditCard className="h-6 w-6" />
                   Πλαστικοποιήσεις
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="printing" className="mt-6">
-                <div className="bg-blue-50 p-6 rounded-lg space-y-6">
-                  {/* Print Billing Table */}
-                  <Card>
-                    <CardHeader>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <CardTitle>Χρεώσεις Εκτυπώσεων</CardTitle>
-                          <p className="text-sm text-gray-600">Μηνιαίες χρεώσεις και κατάσταση πληρωμών</p>
-                        </div>
-                        <Button
-                          onClick={() =>
-                            exportTableXLSX(
-                              filteredPrintBilling.map((b) => ({
-                                period: b.period,
-                                userDisplayName: b.userDisplayName,
-                                department: b.department,
-                                totalA4BW: b.totalA4BW,
-                                totalA4Color: b.totalA4Color,
-                                totalA3BW: b.totalA3BW,
-                                totalA3Color: b.totalA3Color,
-                                totalScans: b.totalScans,
-                                totalCost: formatPrice(b.totalCost),
-                                paidAmount: formatPrice(b.paidAmount),
-                                remainingBalance: formatPrice(b.remainingBalance),
-                                dueDate: b.dueDate.toLocaleDateString("el-GR"),
-                                status: b.paid ? "Πληρωμένο" : "Απλήρωτο",
-                              })),
-                              "print_billing",
-                              [
-                                { key: "period", label: "Περίοδος" },
-                                { key: "userDisplayName", label: "Χρήστης" },
-                                { key: "department", label: "Τμήμα" },
-                                { key: "totalA4BW", label: "A4 Ασπρόμαυρες" },
-                                { key: "totalA4Color", label: "A4 Έγχρωμες" },
-                                { key: "totalA3BW", label: "A3 Ασπρόμαυρες" },
-                                { key: "totalA3Color", label: "A3 Έγχρωμες" },
-                                { key: "totalScans", label: "Σαρώσεις" },
-                                { key: "totalCost", label: "Σύνολο Κόστους" },
-                                { key: "paidAmount", label: "Πληρωμένο Ποσό" },
-                                { key: "remainingBalance", label: "Υπόλοιπο" },
-                                { key: "dueDate", label: "Ημ/νία Λήξης" },
-                                { key: "status", label: "Κατάσταση" }
-                              ],
-                              "4472C4"
-                            )
-                          }
-                          variant="outline"
-                          size="sm"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Εξαγωγή XLSX
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <PrintBillingTable
-                        data={filteredPrintBilling}
-                        page={printBillingPage}
-                        pageSize={PAGE_SIZE}
-                        onPageChange={setPrintBillingPage}
-                        userRole={user.role}
-                      />
-                    </CardContent>
-                  </Card>
-
+              <TabsContent value="printing" className="mt-8">
+                <div className="bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
                   {/* Print Jobs Table */}
-                  <Card>
-                    <CardHeader>
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
                       <div className="flex justify-between items-center">
-                        <div>
-                          <CardTitle>Ιστορικό Εκτυπώσεων</CardTitle>
-                          <p className="text-sm text-gray-600">Λεπτομερές ιστορικό όλων των εκτυπώσεων</p>
+                        <div className="flex items-center gap-3">
+                          <Printer className="h-6 w-6 text-blue-700" />
+                          <div>
+                            <h3 className="text-lg font-semibold text-blue-900">Ιστορικό Εκτυπώσεων</h3>
+                            <p className="text-sm text-blue-700">Λεπτομερές ιστορικό όλων των εκτυπώσεων</p>
+                          </div>
                         </div>
                         <Button
-                          onClick={() =>
+                          onClick={() => {
+                            // Helper function to expand a print job into individual rows
+                            const expandPrintJob = (job: any) => {
+                              const rows = []
+                              
+                              if (job.pagesA4BW > 0) {
+                                rows.push({
+                                  timestamp: job.timestamp.toLocaleString("el-GR"),
+                                  uid: job.uid,
+                                  userDisplayName: job.userDisplayName,
+                                  deviceName: job.deviceName,
+                                  printType: "A4 Ασπρόμαυρο",
+                                  quantity: job.pagesA4BW,
+                                  cost: formatPrice(job.pagesA4BW * 0.05)
+                                })
+                              }
+                              
+                              if (job.pagesA4Color > 0) {
+                                rows.push({
+                                  timestamp: job.timestamp.toLocaleString("el-GR"),
+                                  uid: job.uid,
+                                  userDisplayName: job.userDisplayName,
+                                  deviceName: job.deviceName,
+                                  printType: "A4 Έγχρωμο",
+                                  quantity: job.pagesA4Color,
+                                  cost: formatPrice(job.pagesA4Color * 0.20)
+                                })
+                              }
+                              
+                              if (job.pagesA3BW > 0) {
+                                rows.push({
+                                  timestamp: job.timestamp.toLocaleString("el-GR"),
+                                  uid: job.uid,
+                                  userDisplayName: job.userDisplayName,
+                                  deviceName: job.deviceName,
+                                  printType: "A3 Ασπρόμαυρο",
+                                  quantity: job.pagesA3BW,
+                                  cost: formatPrice(job.pagesA3BW * 0.10)
+                                })
+                              }
+                              
+                              if (job.pagesA3Color > 0) {
+                                rows.push({
+                                  timestamp: job.timestamp.toLocaleString("el-GR"),
+                                  uid: job.uid,
+                                  userDisplayName: job.userDisplayName,
+                                  deviceName: job.deviceName,
+                                  printType: "A3 Έγχρωμο",
+                                  quantity: job.pagesA3Color,
+                                  cost: formatPrice(job.pagesA3Color * 0.40)
+                                })
+                              }
+                              
+                              return rows
+                            }
+
+                            const expandedData = filteredPrintJobs.flatMap(expandPrintJob)
+                            
                             exportTableXLSX(
-                              filteredPrintJobs.map((j) => ({
-                                timestamp: j.timestamp.toLocaleDateString("el-GR"),
-                                userDisplayName: j.userDisplayName,
-                                department: j.department,
-                                deviceName: j.deviceName,
-                                pagesA4BW: j.pagesA4BW,
-                                pagesA4Color: j.pagesA4Color,
-                                pagesA3BW: j.pagesA3BW,
-                                pagesA3Color: j.pagesA3Color,
-                                scans: j.scans,
-                                copies: j.copies,
-                                totalCost: formatPrice(j.totalCost),
-                                status: j.status === "completed" ? "Ολοκληρώθηκε" : j.status,
-                              })),
+                              expandedData,
                               "print_jobs",
                               [
-                                { key: "timestamp", label: "Ημερομηνία" },
-                                { key: "userDisplayName", label: "Χρήστης" },
-                                { key: "department", label: "Τμήμα" },
+                                { key: "timestamp", label: "Ημερομηνία/Ώρα" },
+                                { key: "uid", label: "Χρήστης (ID)" },
+                                { key: "userDisplayName", label: "Όνομα" },
                                 { key: "deviceName", label: "Εκτυπωτής" },
-                                { key: "pagesA4BW", label: "A4 Ασπρόμαυρες" },
-                                { key: "pagesA4Color", label: "A4 Έγχρωμες" },
-                                { key: "pagesA3BW", label: "A3 Ασπρόμαυρες" },
-                                { key: "pagesA3Color", label: "A3 Έγχρωμες" },
-                                { key: "scans", label: "Σαρώσεις" },
-                                { key: "copies", label: "Αντίγραφα" },
-                                { key: "totalCost", label: "Σύνολο Κόστους" },
-                                { key: "status", label: "Κατάσταση" }
+                                { key: "printType", label: "Είδος Εκτύπωσης" },
+                                { key: "quantity", label: "Ποσότητα" },
+                                { key: "cost", label: "Κόστος" }
                               ],
-                              "4472C4"
+                              "4472C4",
+                              "Ιστορικό Εκτυπώσεων"
                             )
-                          }
+                          }}
                           variant="outline"
                           size="sm"
+                          className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50"
                         >
                           <Download className="h-4 w-4 mr-2" />
                           Εξαγωγή XLSX
                         </Button>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <PrintJobsTable
-                        data={filteredPrintJobs}
-                        page={printJobsPage}
-                        pageSize={PAGE_SIZE}
-                        onPageChange={setPrintJobsPage}
-                        userRole={user.role}
-                      />
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <div className="p-6">
+                      <ErrorBoundary fallback={<div>Φόρτωση εκτυπώσεων...</div>}>
+                        <PrintJobsTable
+                          data={filteredPrintJobs}
+                          page={printJobsPage}
+                          pageSize={PAGE_SIZE}
+                          onPageChange={setPrintJobsPage}
+                          userRole={user.role}
+                        />
+                      </ErrorBoundary>
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
 
-              <TabsContent value="lamination" className="mt-6">
-                <div className="bg-green-50 p-6 rounded-lg space-y-6">
-                  {/* Lamination Billing Table */}
-                  <Card>
-                    <CardHeader>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <CardTitle>Χρεώσεις Πλαστικοποιήσεων</CardTitle>
-                          <p className="text-sm text-gray-600">Μηνιαίες χρεώσεις και κατάσταση πληρωμών</p>
-                        </div>
-                        <Button
-                          onClick={() =>
-                            exportTableXLSX(
-                              filteredLaminationBilling.map((b) => ({
-                                period: b.period,
-                                userDisplayName: b.userDisplayName,
-                                department: b.department,
-                                totalA3: b.totalA3,
-                                totalA4: b.totalA4,
-                                totalCardSmall: b.totalCardSmall,
-                                totalCardLarge: b.totalCardLarge,
-                                totalCost: formatPrice(b.totalCost),
-                                paidAmount: formatPrice(b.paidAmount),
-                                remainingBalance: formatPrice(b.remainingBalance),
-                                dueDate: b.dueDate.toLocaleDateString("el-GR"),
-                                status: b.paid ? "Πληρωμένο" : "Απλήρωτο",
-                              })),
-                              "lamination_billing",
-                              [
-                                { key: "period", label: "Περίοδος" },
-                                { key: "userDisplayName", label: "Χρήστης" },
-                                { key: "department", label: "Τμήμα" },
-                                { key: "totalA3", label: "A3" },
-                                { key: "totalA4", label: "A4" },
-                                { key: "totalCardSmall", label: "Κάρτα Μικρή" },
-                                { key: "totalCardLarge", label: "Κάρτα Μεγάλη" },
-                                { key: "totalCost", label: "Σύνολο Κόστους" },
-                                { key: "paidAmount", label: "Πληρωμένο Ποσό" },
-                                { key: "remainingBalance", label: "Υπόλοιπο" },
-                                { key: "dueDate", label: "Ημ/νία Λήξης" },
-                                { key: "status", label: "Κατάσταση" }
-                              ],
-                              "22C55E"
-                            )
-                          }
-                          variant="outline"
-                          size="sm"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Εξαγωγή XLSX
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <LaminationBillingTable
-                        data={filteredLaminationBilling}
-                        page={laminationBillingPage}
-                        pageSize={PAGE_SIZE}
-                        onPageChange={setLaminationBillingPage}
-                        userRole={user.role}
-                      />
-                    </CardContent>
-                  </Card>
-
+              <TabsContent value="lamination" className="mt-8">
+                <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm">
                   {/* Lamination Jobs Table */}
-                  <Card>
-                    <CardHeader>
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="bg-green-100 px-6 py-4 border-b border-green-200">
                       <div className="flex justify-between items-center">
-                        <div>
-                          <CardTitle>Ιστορικό Πλαστικοποιήσεων</CardTitle>
-                          <p className="text-sm text-gray-600">Λεπτομερές ιστορικό όλων των πλαστικοποιήσεων</p>
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-6 w-6 text-green-700" />
+                          <div>
+                            <h3 className="text-lg font-semibold text-green-900">Ιστορικό Πλαστικοποιήσεων</h3>
+                            <p className="text-sm text-green-700">Λεπτομερές ιστορικό όλων των πλαστικοποιήσεων</p>
+                          </div>
                         </div>
                         <Button
                           onClick={() =>
                             exportTableXLSX(
                               filteredLaminationJobs.map((j) => ({
                                 timestamp: j.timestamp.toLocaleDateString("el-GR"),
+                                uid: j.uid,
                                 userDisplayName: j.userDisplayName,
-                                department: j.department,
                                 type: getLaminationTypeLabel(j.type),
                                 quantity: j.quantity,
-                                pricePerUnit: j.pricePerUnit.toFixed(2),
                                 totalCost: formatPrice(j.totalCost),
-                                status: j.status === "completed" ? "Ολοκληρώθηκε" : j.status,
-                                notes: j.notes || "-",
                               })),
                               "lamination_jobs",
                               [
                                 { key: "timestamp", label: "Ημερομηνία" },
-                                { key: "userDisplayName", label: "Χρήστης" },
-                                { key: "department", label: "Τμήμα" },
-                                { key: "type", label: "Τύπος" },
+                                { key: "uid", label: "Χρήστης (ID)" },
+                                { key: "userDisplayName", label: "Όνομα" },
+                                { key: "type", label: "Είδος" },
                                 { key: "quantity", label: "Ποσότητα" },
-                                { key: "pricePerUnit", label: "Τιμή ανά μονάδα" },
-                                { key: "totalCost", label: "Σύνολο Κόστους" },
-                                { key: "status", label: "Κατάσταση" },
-                                { key: "notes", label: "Σημειώσεις" }
+                                { key: "totalCost", label: "Κόστος" }
                               ],
-                              "22C55E"
+                              "22C55E",
+                              "Ιστορικό Πλαστικοποιήσεων"
                             )
                           }
                           variant="outline"
                           size="sm"
+                          className="bg-white border-green-300 text-green-700 hover:bg-green-50"
                         >
                           <Download className="h-4 w-4 mr-2" />
                           Εξαγωγή XLSX
                         </Button>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <LaminationJobsTable
-                        data={filteredLaminationJobs}
-                        page={laminationJobsPage}
-                        pageSize={PAGE_SIZE}
-                        onPageChange={setLaminationJobsPage}
-                        userRole={user.role}
-                      />
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <div className="p-6">
+                      <ErrorBoundary fallback={<div>Φόρτωση πλαστικοποιήσεων...</div>}>
+                        <LaminationJobsTable
+                          data={filteredLaminationJobs}
+                          page={laminationJobsPage}
+                          pageSize={PAGE_SIZE}
+                          onPageChange={setLaminationJobsPage}
+                          userRole={user.role}
+                        />
+                      </ErrorBoundary>
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>

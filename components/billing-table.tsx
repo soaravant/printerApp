@@ -38,7 +38,7 @@ export function BillingTable() {
 
   return (
     <Table>
-      <TableHeader>
+              <TableHeader className="bg-gray-100">
         <TableRow>
           <TableHead>Period</TableHead>
           <TableHead>Total Cost</TableHead>

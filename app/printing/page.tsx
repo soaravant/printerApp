@@ -145,11 +145,10 @@ export default function PrintingPage() {
                             <TableHead>A4 Έγχρωμο</TableHead>
                             <TableHead>A3 Α/Μ</TableHead>
                             <TableHead>A3 Έγχρωμο</TableHead>
-                            <TableHead>Σαρώσεις</TableHead>
                             <TableHead>Συνολικό Κόστος</TableHead>
                             <TableHead>Πληρωμένο</TableHead>
                             <TableHead>Υπόλοιπο</TableHead>
-                            <TableHead>Ημ. Εξόφλησης</TableHead>
+                            <TableHead>Ημ/νία Λήξης</TableHead>
                             <TableHead>Κατάσταση</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -161,7 +160,6 @@ export default function PrintingPage() {
                               <TableCell>{billing.totalA4Color}</TableCell>
                               <TableCell>{billing.totalA3BW}</TableCell>
                               <TableCell>{billing.totalA3Color}</TableCell>
-                              <TableCell>{billing.totalScans}</TableCell>
                               <TableCell>{formatPrice(billing.totalCost)}</TableCell>
                               <TableCell>{formatPrice(billing.paidAmount)}</TableCell>
                               <TableCell className={billing.remainingBalance > 0 ? "text-red-600 font-semibold" : ""}>
@@ -210,8 +208,6 @@ export default function PrintingPage() {
                             <TableHead>A4 Έγχρωμο</TableHead>
                             <TableHead>A3 Α/Μ</TableHead>
                             <TableHead>A3 Έγχρωμο</TableHead>
-                            <TableHead>Σαρώσεις</TableHead>
-                            <TableHead>Φωτοαντίγραφα</TableHead>
                             <TableHead>Κόστος</TableHead>
                             <TableHead>Κατάσταση</TableHead>
                           </TableRow>
@@ -227,8 +223,6 @@ export default function PrintingPage() {
                               <TableCell>{job.pagesA4Color}</TableCell>
                               <TableCell>{job.pagesA3BW}</TableCell>
                               <TableCell>{job.pagesA3Color}</TableCell>
-                              <TableCell>{job.scans}</TableCell>
-                              <TableCell>{job.copies}</TableCell>
                               <TableCell>{formatPrice(job.totalCost)}</TableCell>
                               <TableCell>
                                 <Badge variant={job.status === "completed" ? "default" : "secondary"}>

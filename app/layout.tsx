@@ -18,6 +18,14 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Add global error handler for unhandled promise rejections
+  if (typeof window !== "undefined") {
+    window.addEventListener("unhandledrejection", (event) => {
+      console.error("Unhandled promise rejection:", event.reason)
+      event.preventDefault()
+    })
+  }
+
   return (
     <html lang="el">
       <body className={inter.className}>

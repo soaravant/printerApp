@@ -12,8 +12,6 @@ interface CostBreakdown {
   a4Color: number
   a3BW: number
   a3Color: number
-  scans: number
-  copies: number
   total: number
 }
 
@@ -23,8 +21,6 @@ export function CostCalculator() {
     a4Color: 0,
     a3BW: 0,
     a3Color: 0,
-    scans: 0,
-    copies: 0,
   })
 
   // Default pricing (should come from database in production)
@@ -33,8 +29,6 @@ export function CostCalculator() {
     a4Color: 0.15,
     a3BW: 0.1,
     a3Color: 0.3,
-    scan: 0.02,
-    copy: 0.03,
   }
 
   const formatPrice = (price: number) => `€${price.toFixed(3).replace('.', ',')}`
@@ -45,15 +39,11 @@ export function CostCalculator() {
       a4Color: quantities.a4Color * prices.a4Color,
       a3BW: quantities.a3BW * prices.a3BW,
       a3Color: quantities.a3Color * prices.a3Color,
-      scans: quantities.scans * prices.scan,
-      copies: quantities.copies * prices.copy,
       total:
         quantities.a4BW * prices.a4BW +
         quantities.a4Color * prices.a4Color +
         quantities.a3BW * prices.a3BW +
-        quantities.a3Color * prices.a3Color +
-        quantities.scans * prices.scan +
-        quantities.copies * prices.copy,
+        quantities.a3Color * prices.a3Color,
     }
   }
 
@@ -70,8 +60,6 @@ export function CostCalculator() {
       a4Color: 0,
       a3BW: 0,
       a3Color: 0,
-      scans: 0,
-      copies: 0,
     })
   }
 
@@ -146,36 +134,6 @@ export function CostCalculator() {
               <span className="text-sm text-gray-500">{formatPrice(prices.a3Color)}</span>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="scans">Scans</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="scans"
-                type="number"
-                min="0"
-                value={quantities.scans || ""}
-                onChange={(e) => handleQuantityChange("scans", e.target.value)}
-                placeholder="0"
-              />
-              <span className="text-sm text-gray-500">{formatPrice(prices.scan)}</span>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="copies">Copies</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="copies"
-                type="number"
-                min="0"
-                value={quantities.copies || ""}
-                onChange={(e) => handleQuantityChange("copies", e.target.value)}
-                placeholder="0"
-              />
-              <span className="text-sm text-gray-500">{formatPrice(prices.copy)}</span>
-            </div>
-          </div>
         </div>
 
         {/* Cost Breakdown */}
@@ -207,18 +165,6 @@ export function CostCalculator() {
               <div className="flex justify-between">
                 <span>A3 Color ({quantities.a3Color} pages)</span>
                 <span>{formatPrice(costs.a3Color)}</span>
-              </div>
-            )}
-            {costs.scans > 0 && (
-              <div className="flex justify-between">
-                <span>Scans ({quantities.scans})</span>
-                <span>{formatPrice(costs.scans)}</span>
-              </div>
-            )}
-            {costs.copies > 0 && (
-              <div className="flex justify-between">
-                <span>Copies ({quantities.copies})</span>
-                <span>{formatPrice(costs.copies)}</span>
               </div>
             )}
             <div className="border-t pt-2 flex justify-between font-semibold">
