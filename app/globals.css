@@ -66,4 +66,56 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Greek date input formatting */
+  input[type="date"][lang="el-GR"],
+  .greek-date-input {
+    direction: ltr;
+  }
+  
+  input[type="date"][lang="el-GR"]::-webkit-calendar-picker-indicator,
+  .greek-date-input::-webkit-calendar-picker-indicator {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+  
+  /* Force Greek date format display */
+  input[type="date"][lang="el-GR"]::-webkit-datetime-edit,
+  .greek-date-input::-webkit-datetime-edit {
+    direction: ltr;
+  }
+  
+  input[type="date"][lang="el-GR"]::-webkit-datetime-edit-fields-wrapper,
+  .greek-date-input::-webkit-datetime-edit-fields-wrapper {
+    direction: ltr;
+  }
+  
+  input[type="date"][lang="el-GR"]::-webkit-datetime-edit-text,
+  .greek-date-input::-webkit-datetime-edit-text {
+    direction: ltr;
+  }
+  
+  input[type="date"][lang="el-GR"]::-webkit-datetime-edit-month-field,
+  input[type="date"][lang="el-GR"]::-webkit-datetime-edit-day-field,
+  input[type="date"][lang="el-GR"]::-webkit-datetime-edit-year-field,
+  .greek-date-input::-webkit-datetime-edit-month-field,
+  .greek-date-input::-webkit-datetime-edit-day-field,
+  .greek-date-input::-webkit-datetime-edit-year-field {
+    direction: ltr;
+  }
+  
+  /* Custom placeholder for Greek format */
+  input[type="date"][lang="el-GR"]:not([value])::before,
+  .greek-date-input:not([value])::before {
+    content: "ηη/μμ/εεεε";
+    color: #9ca3af;
+    position: absolute;
+    pointer-events: none;
+  }
+  
+  input[type="date"][lang="el-GR"]:focus::before,
+  input[type="date"][lang="el-GR"]:valid::before,
+  .greek-date-input:focus::before,
+  .greek-date-input:valid::before {
+    display: none;
+  }
 }

@@ -50,7 +50,7 @@ export function JobTable() {
       <TableBody>
         {jobs.map((job) => (
           <TableRow key={job.jobId}>
-            <TableCell>{new Date(job.timestamp).toLocaleDateString()}</TableCell>
+            <TableCell>{new Date(job.timestamp).toLocaleDateString("el-GR")}</TableCell>
             <TableCell>
               <Badge variant="outline">{job.deviceName || job.deviceIP}</Badge>
             </TableCell>

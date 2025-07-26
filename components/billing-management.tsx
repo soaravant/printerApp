@@ -107,7 +107,7 @@ export function BillingManagement() {
         billing.paid ? "Yes" : "No",
         billing.paidAmount.toFixed(2),
         billing.remainingBalance.toFixed(2),
-        billing.dueDate.toLocaleDateString(),
+        billing.dueDate.toLocaleDateString("el-GR"),
       ])
     ]
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)

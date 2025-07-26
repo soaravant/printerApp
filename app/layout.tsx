@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
+import { RefreshProvider } from "@/lib/refresh-context"
 import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -30,8 +31,10 @@ export default function RootLayout({
     <html lang="el">
       <body className={inter.className}>
         <AuthProvider>
-          {children}
-          <Toaster />
+          <RefreshProvider>
+            {children}
+            <Toaster />
+          </RefreshProvider>
         </AuthProvider>
       </body>
     </html>

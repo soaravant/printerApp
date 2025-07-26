@@ -3,6 +3,7 @@
 import { ProtectedRoute } from "@/components/protected-route"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { useRefresh } from "@/lib/refresh-context"
 import { dummyDB } from "@/lib/dummy-database"
 import type { PrintJob, LaminationJob, PrintBilling, LaminationBilling, User } from "@/lib/dummy-database"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import dynamic from "next/dynamic"
 import { useState, useEffect } from "react"
 import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download, RotateCcw, Filter, FileText, BarChart3 } from "lucide-react"
@@ -65,6 +67,7 @@ function Pagination({ page, total, pageSize, onPageChange }: { page: number; tot
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const { refreshTrigger } = useRefresh()
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([])
   const [laminationJobs, setLaminationJobs] = useState<LaminationJob[]>([])
   const [printBilling, setPrintBilling] = useState<PrintBilling[]>([])
@@ -121,7 +124,7 @@ export default function DashboardPage() {
       setPrintBilling(pBilling)
       setLaminationBilling(lBilling)
     }
-  }, [user])
+  }, [user, refreshTrigger]) // Add refreshTrigger to dependencies
 
   // Apply unified filters
   useEffect(() => {
@@ -427,44 +430,72 @@ export default function DashboardPage() {
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">Πίνακας Ελέγχου</h1>
-              <p className="text-gray-600">
-                Καλώς ήρθατε, {user.displayName}
-                {user.role === "admin" && " - Προβολή όλων των δεδομένων"}
-              </p>
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Πίνακας Ελέγχου</h1>
+                  <p className="text-gray-600">
+                    Καλώς ήρθατε, {user.displayName}
+                    {user.role === "admin" && " - Προβολή όλων των δεδομένων"}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => window.location.reload()}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Ανανέωση
+                </Button>
+              </div>
             </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Σύνολο Οφειλών</CardTitle>
-                  <Receipt className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{formatPrice(totalUnpaid)}</div>
-                </CardContent>
-              </Card>
+              {/* Total Debts Card - Yellow Theme */}
+              <div className="bg-yellow-50 rounded-lg border border-yellow-200 shadow-sm h-full">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
+                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                    <div className="flex items-center gap-3">
+                      <Receipt className="h-8 w-8 text-yellow-700" />
+                      <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Οφειλών</h3>
+                    </div>
+                  </div>
+                  <div className="p-6 flex-1 flex items-center">
+                    <div className="text-3xl font-bold text-red-600">{formatPrice(totalUnpaid)}</div>
+                  </div>
+                </div>
+              </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Οφειλές ΤΟ. ΦΩ.</CardTitle>
-                  <Printer className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
-                </CardContent>
-              </Card>
+              {/* Print Debts Card - Blue Theme */}
+              <div className="bg-blue-50 rounded-lg border border-blue-200 shadow-sm h-full">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
+                  <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
+                    <div className="flex items-center gap-3">
+                      <Printer className="h-6 w-6 text-blue-700" />
+                      <h3 className="text-lg font-semibold text-blue-900">Οφειλές ΤΟ. ΦΩ.</h3>
+                    </div>
+                  </div>
+                  <div className="p-6 flex-1 flex items-center">
+                    <div className="text-3xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
+                  </div>
+                </div>
+              </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Οφειλές ΠΛΑ. ΤΟ.</CardTitle>
-                  <CreditCard className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{formatPrice(laminationUnpaid)}</div>
-                </CardContent>
-              </Card>
+              {/* Lamination Debts Card - Green Theme */}
+              <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm h-full">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
+                  <div className="bg-green-100 px-6 py-4 border-b border-green-200">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="h-6 w-6 text-green-700" />
+                      <h3 className="text-lg font-semibold text-green-900">Οφειλές ΠΛΑ. ΤΟ.</h3>
+                    </div>
+                  </div>
+                  <div className="p-6 flex-1 flex items-center">
+                    <div className="text-3xl font-bold text-green-600">{formatPrice(laminationUnpaid)}</div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Unified Filters */}
@@ -533,12 +564,20 @@ export default function DashboardPage() {
 
                     {/* Row 2: Date From (col 1), Date To (col 2), Type (col 3), User (col 4, admin only) */}
                     <div className="flex flex-col justify-end">
-                      <Label htmlFor="dateFrom">Από Ημερομηνία</Label>
-                      <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                      <GreekDatePicker
+                        id="dateFrom"
+                        label="Από Ημερομηνία"
+                        value={dateFrom}
+                        onChange={setDateFrom}
+                      />
                     </div>
                     <div className="flex flex-col justify-end">
-                      <Label htmlFor="dateTo">Έως Ημερομηνία</Label>
-                      <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                      <GreekDatePicker
+                        id="dateTo"
+                        label="Έως Ημερομηνία"
+                        value={dateTo}
+                        onChange={setDateTo}
+                      />
                     </div>
                     <div className="flex flex-col justify-end">
                       <Label htmlFor="type">Τύπος Πλαστικοποίησης</Label>
@@ -657,14 +696,14 @@ export default function DashboardPage() {
                   className="flex items-center gap-3 py-4 px-6 text-base font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700"
                 >
                   <Printer className="h-6 w-6" />
-                  Εκτυπώσεις
+                  ΤΟ. ΦΩ.
                 </TabsTrigger>
                 <TabsTrigger
                   value="lamination"
                   className="flex items-center gap-3 py-4 px-6 text-base font-medium data-[state=active]:bg-green-100 data-[state=active]:text-green-700"
                 >
                   <CreditCard className="h-6 w-6" />
-                  Πλαστικοποιήσεις
+                  ΠΛΑ. ΤΟ.
                 </TabsTrigger>
               </TabsList>
 
@@ -790,7 +829,7 @@ export default function DashboardPage() {
                           <CreditCard className="h-6 w-6 text-green-700" />
                           <div>
                             <h3 className="text-lg font-semibold text-green-900">Ιστορικό Πλαστικοποιήσεων</h3>
-                            <p className="text-sm text-green-700">Λεπτομερές ιστορικό όλων των πλαστικοποιήσεων</p>
+                            <p className="text-sm text-green-700">Ιστορικό καταχωρημένων πλαστικοποιήσεων</p>
                           </div>
                         </div>
                         <Button

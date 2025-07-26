@@ -156,7 +156,13 @@ export function HistoryTable({
           {filterConfig.dateField && (
             <div className="space-y-2">
               <Label htmlFor="dateFrom">Από Ημερομηνία</Label>
-              <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              <Input 
+                id="dateFrom" 
+                type="date" 
+                value={dateFrom} 
+                onChange={(e) => setDateFrom(e.target.value)}
+                lang="el-GR"
+              />
             </div>
           )}
 
@@ -164,7 +170,13 @@ export function HistoryTable({
           {filterConfig.dateField && (
             <div className="space-y-2">
               <Label htmlFor="dateTo">Έως Ημερομηνία</Label>
-              <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              <Input 
+                id="dateTo" 
+                type="date" 
+                value={dateTo} 
+                onChange={(e) => setDateTo(e.target.value)}
+                lang="el-GR"
+              />
             </div>
           )}
 

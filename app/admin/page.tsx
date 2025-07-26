@@ -3,6 +3,7 @@
 import { ProtectedRoute } from "@/components/protected-route"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { useRefresh } from "@/lib/refresh-context"
 import { dummyDB } from "@/lib/dummy-database"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -24,8 +25,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { SearchableSelect } from "@/components/searchable-select"
+import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { useState, useEffect } from "react"
-import { Plus, CreditCard, Users, Settings, User, Building, Printer, Search, Download, Edit, Save, X, ArrowRight } from "lucide-react"
+import { Plus, CreditCard, Users, Settings, User, Building, Printer, Search, Download, Edit, Save, X, ArrowRight, RotateCcw } from "lucide-react"
 import type { User as UserType, LaminationJob, PriceTable } from "@/lib/dummy-database"
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import * as XLSX from "xlsx"
@@ -33,6 +35,7 @@ import * as XLSX from "xlsx"
 export default function AdminPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const { triggerRefresh } = useRefresh()
   const [users, setUsers] = useState<UserType[]>([])
   const [filteredUsers, setFilteredUsers] = useState<UserType[]>([])
   const [usersTabSearchTerm, setUsersTabSearchTerm] = useState("")
@@ -189,8 +192,8 @@ export default function AdminPage() {
   const handleAddLamination = async () => {
     if (!selectedUser || !quantity) {
       toast({
-        title: "Σφάλμα",
-        description: "Παρακαλώ συμπληρώστε όλα τα απαιτούμενα πεδία",
+        title: "Σφάλμα Επικύρωσης",
+        description: "Παρακαλώ επιλέξτε χρήστη και συμπληρώστε την ποσότητα",
         variant: "destructive",
       })
       return
@@ -222,17 +225,17 @@ export default function AdminPage() {
       toast({
         title: "Επιτυχία",
         description: `Προστέθηκε πλαστικοποίηση για τον χρήστη ${selectedUserData.displayName}`,
+        variant: "success",
       })
 
-      // Reset form
-      setSelectedUser("")
-      setLaminationType("A4")
-      setQuantity("1")
-      setSelectedDate(new Date().toISOString().split('T')[0])
+      // Trigger refresh to update dashboard
+      triggerRefresh()
+
+      // Don't reset any form fields - they persist for convenience
     } catch (error) {
       toast({
-        title: "Σφάλμα",
-        description: "Αποτυχία προσθήκης πλαστικοποίησης",
+        title: "Σφάλμα Συστήματος",
+        description: "Αποτυχία προσθήκης πλαστικοποίησης. Παρακαλώ δοκιμάστε ξανά.",
         variant: "destructive",
       })
     } finally {
@@ -243,8 +246,8 @@ export default function AdminPage() {
   const handleAddUser = async () => {
     if (!newUser.username || !newUser.password || !newUser.displayName) {
       toast({
-        title: "Σφάλμα",
-        description: "Παρακαλώ συμπληρώστε όλα τα απαιτούμενα πεδία",
+        title: "Σφάλμα Επικύρωσης",
+        description: "Παρακαλώ συμπληρώστε username, password και όνομα",
         variant: "destructive",
       })
       return
@@ -253,8 +256,8 @@ export default function AdminPage() {
     // Check if username already exists
     if (users.find((u) => u.username === newUser.username)) {
       toast({
-        title: "Σφάλμα",
-        description: "Το Username υπάρχει ήδη",
+        title: "Σφάλμα Διπλότυπου",
+        description: "Το Username υπάρχει ήδη. Παρακαλώ επιλέξτε διαφορετικό username",
         variant: "destructive",
       })
       return
@@ -280,6 +283,7 @@ export default function AdminPage() {
       toast({
         title: "Επιτυχία",
         description: `Ο χρήστης ${newUser.displayName} προστέθηκε επιτυχώς`,
+        variant: "success",
       })
 
       // Reset form and close dialog
@@ -409,11 +413,12 @@ export default function AdminPage() {
       toast({
         title: "Επιτυχία",
         description: "Οι τιμές εκτυπώσεων ενημερώθηκαν επιτυχώς",
+        variant: "success",
       })
     } catch (error) {
       toast({
-        title: "Σφάλμα",
-        description: error instanceof Error ? error.message : "Αποτυχία ενημέρωσης τιμών",
+        title: "Σφάλμα Επικύρωσης Τιμών",
+        description: error instanceof Error ? error.message : "Αποτυχία ενημέρωσης τιμών εκτυπώσεων",
         variant: "destructive",
       })
     }
@@ -437,11 +442,12 @@ export default function AdminPage() {
       toast({
         title: "Επιτυχία",
         description: "Οι τιμές πλαστικοποιήσεων ενημερώθηκαν επιτυχώς",
+        variant: "success",
       })
     } catch (error) {
       toast({
-        title: "Σφάλμα",
-        description: error instanceof Error ? error.message : "Αποτυχία ενημέρωσης τιμών",
+        title: "Σφάλμα Επικύρωσης Τιμών",
+        description: error instanceof Error ? error.message : "Αποτυχία ενημέρωσης τιμών πλαστικοποιήσεων",
         variant: "destructive",
       })
     }
@@ -466,8 +472,34 @@ export default function AdminPage() {
       toast({
         title: "Επιτυχία",
         description: "Τα δεδομένα επαναφέρθηκαν επιτυχώς",
+        variant: "success",
       })
     }
+  }
+
+  const handleResetLaminationForm = () => {
+    setSelectedUser("")
+    setLaminationType("A4")
+    setQuantity("1")
+    setSelectedDate(new Date().toISOString().split('T')[0])
+  }
+
+  const handleTestToasts = () => {
+    // Show success toast
+    toast({
+      title: "Επιτυχία",
+      description: "Η πλαστικοποίηση προστέθηκε επιτυχώς για τον χρήστη Χρήστης 400",
+      variant: "success",
+    })
+
+    // Show failure toast after a short delay
+    setTimeout(() => {
+      toast({
+        title: "Σφάλμα Επικύρωσης",
+        description: "Παρακαλώ συμπληρώστε όλα τα απαιτούμενα πεδία πριν συνεχίσετε",
+        variant: "destructive",
+      })
+    }, 500)
   }
 
   return (
@@ -487,38 +519,60 @@ export default function AdminPage() {
             </div>
 
             <Tabs defaultValue="users" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-white mb-6">
+              <TabsList className="grid w-full grid-cols-3 bg-white mb-8 p-2 h-16">
                 <TabsTrigger 
                   value="users" 
-                  className="flex items-center gap-2 border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:text-blue-700 data-[state=active]:bg-transparent hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:text-blue-700 data-[state=active]:bg-transparent hover:bg-blue-50 hover:text-blue-700 transition-colors text-base font-medium py-3"
                 >
-                  <Users className="h-4 w-4" />
+                  <Users className="h-5 w-5" />
                   Χρήστες
                 </TabsTrigger>
                 <TabsTrigger 
                   value="lamination" 
-                  className="flex items-center gap-2 border-b-2 border-transparent data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:bg-transparent hover:bg-green-50 hover:text-green-700 transition-colors"
+                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:bg-transparent hover:bg-green-50 hover:text-green-700 transition-colors text-base font-medium py-3"
                 >
-                  <CreditCard className="h-4 w-4" />
+                  <CreditCard className="h-5 w-5" />
                   Πλαστικοποιήσεις
                 </TabsTrigger>
                 <TabsTrigger 
                   value="settings" 
-                  className="flex items-center gap-2 border-b-2 border-transparent data-[state=active]:border-yellow-500 data-[state=active]:text-yellow-700 data-[state=active]:bg-transparent hover:bg-yellow-50 hover:text-yellow-700 transition-colors"
+                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-yellow-500 data-[state=active]:text-yellow-700 data-[state=active]:bg-transparent hover:bg-yellow-50 hover:text-yellow-700 transition-colors text-base font-medium py-3"
                 >
-                  <Settings className="h-4 w-4" />
+                  <Settings className="h-5 w-5" />
                   Τιμές
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="lamination" className="mt-6">
+              <TabsContent value="lamination" className="mt-8">
                 <Card className="border-green-200">
                   <CardHeader className="bg-green-50">
-                    <CardTitle className="flex items-center gap-2 text-green-800">
-                      <CreditCard className="h-5 w-5" />
-                      Προσθήκη Χρέους Πλαστικοποιητή
-                    </CardTitle>
-                    <CardDescription className="text-green-600">Προσθέστε χρέωση πλαστικοποίησης σε χρήστη</CardDescription>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="flex items-center gap-2 text-green-800">
+                          <CreditCard className="h-5 w-5" />
+                          Προσθήκη Χρέους Πλαστικοποιητή
+                        </CardTitle>
+                        <CardDescription className="text-green-600">Προσθέστε χρέωση πλαστικοποίησης σε χρήστη</CardDescription>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          aria-label="Δοκιμή Toast"
+                          className="px-4 py-2 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition flex items-center justify-center hidden"
+                          onClick={handleTestToasts}
+                        >
+                          <span className="text-gray-700 text-xs font-bold">TEST</span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Επαναφορά φόρμας"
+                          className="w-10 h-10 rounded-full border border-green-300 bg-white hover:bg-green-50 transition flex items-center justify-center"
+                          onClick={handleResetLaminationForm}
+                        >
+                          <RotateCcw className="h-4 w-4 text-green-600" />
+                        </button>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {/* Row 1: User, Date */}
@@ -541,12 +595,11 @@ export default function AdminPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="date">Ημερομηνία</Label>
-                        <Input
+                        <GreekDatePicker
                           id="date"
-                          type="date"
+                          label="Ημερομηνία"
                           value={selectedDate}
-                          onChange={(e) => setSelectedDate(e.target.value)}
+                          onChange={setSelectedDate}
                         />
                       </div>
                     </div>
@@ -599,7 +652,7 @@ export default function AdminPage() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="users" className="mt-6">
+              <TabsContent value="users" className="mt-8">
                 <div className="flex justify-start mb-4">
                   <Dialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog}>
                     <DialogTrigger asChild>
@@ -695,7 +748,7 @@ export default function AdminPage() {
                 />
               </TabsContent>
 
-              <TabsContent value="settings" className="mt-6">
+              <TabsContent value="settings" className="mt-8">
                 <div className="space-y-6">
                   {/* Printing Prices */}
                   <Card className="border-blue-200">

@@ -84,37 +84,43 @@ export function SearchableSelect({
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
-      <Button
-        type="button"
-        variant="outline"
+      <div
         className={cn(
-          "w-full justify-between",
-          !selectedOption && "text-muted-foreground"
+          "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          !selectedOption && "text-muted-foreground",
+          disabled && "cursor-not-allowed opacity-50"
         )}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            if (!disabled) {
+              setIsOpen(!isOpen)
+            }
+          }
+        }}
       >
         <span className="truncate">
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <div className="flex items-center gap-1">
           {selectedOption && (
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
-              className="h-4 w-4 p-0 hover:bg-transparent"
+              className="h-4 w-4 p-0 hover:bg-transparent flex items-center justify-center"
               onClick={(e) => {
                 e.stopPropagation()
                 handleClear()
               }}
             >
               <X className="h-3 w-3" />
-            </Button>
+            </button>
           )}
           <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
         </div>
-      </Button>
+      </div>
 
       {isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-hidden">
