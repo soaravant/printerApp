@@ -15,11 +15,16 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
+import { Slider } from "@/components/ui/slider"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import dynamic from "next/dynamic"
 import { useState, useEffect } from "react"
 import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download, RotateCcw, Filter, FileText, BarChart3 } from "lucide-react"
 import * as XLSX from "xlsx-js-style"
 import React from "react"
+import { BillingFilters } from "@/components/billing-filters"
+import { PrintFilters } from "@/components/print-filters"
+import { LaminationFilters } from "@/components/lamination-filters"
 
 // Error boundary component for dynamic imports
 function ErrorBoundary({ children, fallback }: { children: React.ReactNode; fallback: React.ReactNode }) {
@@ -79,6 +84,20 @@ export default function DashboardPage() {
   const [deviceFilter, setDeviceFilter] = useState("all") // For printer device
   const [userFilter, setUserFilter] = useState("all") // For admin to filter by user
 
+  // Tab-specific filtering states
+  const [activeTab, setActiveTab] = useState("printing")
+  const [printTypeFilter, setPrintTypeFilter] = useState("all") // For print type (A4 BW, A4 Color, etc.)
+  const [machineFilter, setMachineFilter] = useState("all") // For lamination machine (Πλαστικοποίηση, Βιβλιοδεσία)
+  const [laminationTypeFilter, setLaminationTypeFilter] = useState("all") // For lamination type based on machine
+
+  // Billing table specific filters (copied from admin page)
+  const [billingSearchTerm, setBillingSearchTerm] = useState("")
+  const [billingDebtFilter, setBillingDebtFilter] = useState("all") // all, print, lamination, both
+  const [billingAmountFilter, setBillingAmountFilter] = useState("all") // all, under10, 10to50, over50
+  const [billingPriceRange, setBillingPriceRange] = useState<[number, number]>([0, 100])
+  const [billingPriceRangeInputs, setBillingPriceRangeInputs] = useState<[string, string]>(["0", "100"])
+  const [billingRoleFilter, setBillingRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Ναός, Τομέας
+
   // Filtered data states
   const [filteredPrintBilling, setFilteredPrintBilling] = useState<PrintBilling[]>([])
   const [filteredPrintJobs, setFilteredPrintJobs] = useState<PrintJob[]>([])
@@ -95,7 +114,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
 
-    if (user.role === "admin") {
+    if (user.accessLevel === "admin") {
       // Admin sees all data
       const allPrintJobs = dummyDB.getAllPrintJobs()
       const allLaminationJobs = dummyDB.getAllLaminationJobs()
@@ -137,6 +156,17 @@ export default function DashboardPage() {
     laminationJobs,
     printBilling,
     laminationBilling,
+    // New tab-specific filters
+    activeTab,
+    printTypeFilter,
+    machineFilter,
+    laminationTypeFilter,
+    // Billing table filters
+    billingSearchTerm,
+    billingDebtFilter,
+    billingPriceRange,
+    billingAmountFilter,
+    billingRoleFilter,
   ])
 
   // Reset page on filter change
@@ -147,9 +177,105 @@ export default function DashboardPage() {
     setLaminationBillingPage(1)
   }, [searchTerm, dateFrom, dateTo, statusFilter, typeFilter, deviceFilter, userFilter])
 
+  // Calculate price distribution for billing table filtering
+  const calculateBillingPriceDistribution = () => {
+    const allAmounts: number[] = []
+    
+    printBilling.forEach((billing) => {
+      if (billing.remainingBalance > 0) {
+        allAmounts.push(billing.remainingBalance)
+      }
+    })
+
+    if (allAmounts.length === 0) {
+      return {
+        min: 0,
+        max: 100,
+        distribution: {
+          "0-20": 0,
+          "20-35": 0,
+          "35-90": 0,
+          "90+": 0
+        }
+      }
+    }
+
+    const min = Math.min(...allAmounts)
+    const max = Math.max(...allAmounts)
+    
+    // Create distribution buckets
+    const distribution = {
+      "0-20": allAmounts.filter(amount => amount <= 20).length,
+      "20-35": allAmounts.filter(amount => amount > 20 && amount <= 35).length,
+      "35-90": allAmounts.filter(amount => amount > 35 && amount <= 90).length,
+      "90+": allAmounts.filter(amount => amount > 90).length
+    }
+
+    return { min, max, distribution }
+  }
+
+  const billingPriceDistribution = calculateBillingPriceDistribution()
+
+  // Update billing price range when distribution changes
+  useEffect(() => {
+    setBillingPriceRange([0, billingPriceDistribution.max])
+    setBillingPriceRangeInputs(["0", billingPriceDistribution.max.toString()])
+  }, [billingPriceDistribution.max])
+
   const applyFilters = () => {
-    // Filter Print Billing
+    // Filter Print Billing with billing-specific filters
     let filteredPB = [...printBilling]
+    
+    // Apply billing search filter
+    if (billingSearchTerm) {
+      filteredPB = filteredPB.filter(
+        (item) =>
+          item.period.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+          item.userDisplayName.toLowerCase().includes(billingSearchTerm.toLowerCase()),
+      )
+    }
+
+    // Apply billing debt filter
+    if (billingDebtFilter !== "all") {
+      filteredPB = filteredPB.filter((item) => {
+        if (billingDebtFilter === "paid") return item.paid
+        if (billingDebtFilter === "unpaid") return !item.paid
+        return true
+      })
+    }
+
+    // Apply billing price range filter
+    if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
+      filteredPB = filteredPB.filter((item) => {
+        return item.remainingBalance >= billingPriceRange[0] && item.remainingBalance <= billingPriceRange[1]
+      })
+    }
+
+    // Apply billing amount filter
+    if (billingAmountFilter !== "all") {
+      filteredPB = filteredPB.filter((item) => {
+        switch (billingAmountFilter) {
+          case "under10":
+            return item.remainingBalance < 10
+          case "10to50":
+            return item.remainingBalance >= 10 && item.remainingBalance <= 50
+          case "over50":
+            return item.remainingBalance > 50
+          default:
+            return true
+        }
+      })
+    }
+
+    // Apply billing role filter
+    if (billingRoleFilter !== "all") {
+      filteredPB = filteredPB.filter((item) => {
+        const userData = dummyDB.getUserById(item.uid)
+        return userData?.userRole === billingRoleFilter
+      })
+    }
+
+    // Apply legacy filters for backward compatibility
     if (searchTerm) {
       filteredPB = filteredPB.filter(
         (item) =>
@@ -169,7 +295,7 @@ export default function DashboardPage() {
     }
     setFilteredPrintBilling(filteredPB)
 
-    // Filter Print Jobs
+    // Filter Print Jobs with tab-specific filters
     let filteredPJ = [...printJobs]
     if (searchTerm) {
       filteredPJ = filteredPJ.filter(
@@ -198,6 +324,24 @@ export default function DashboardPage() {
     if (userFilter !== "all") {
       filteredPJ = filteredPJ.filter((item) => item.uid === userFilter)
     }
+    
+    // Apply print type filter
+    if (printTypeFilter !== "all") {
+      filteredPJ = filteredPJ.filter((item) => {
+        switch (printTypeFilter) {
+          case "a4BW":
+            return item.pagesA4BW > 0
+          case "a4Color":
+            return item.pagesA4Color > 0
+          case "a3BW":
+            return item.pagesA3BW > 0
+          case "a3Color":
+            return item.pagesA3Color > 0
+          default:
+            return true
+        }
+      })
+    }
     setFilteredPrintJobs(filteredPJ)
 
     // Filter Lamination Billing
@@ -221,7 +365,7 @@ export default function DashboardPage() {
     }
     setFilteredLaminationBilling(filteredLB)
 
-    // Filter Lamination Jobs
+    // Filter Lamination Jobs with tab-specific filters
     let filteredLJ = [...laminationJobs]
     if (searchTerm) {
       filteredLJ = filteredLJ.filter(
@@ -250,6 +394,26 @@ export default function DashboardPage() {
     if (userFilter !== "all") {
       filteredLJ = filteredLJ.filter((item) => item.uid === userFilter)
     }
+    
+    // Apply machine filter
+    if (machineFilter !== "all") {
+      filteredLJ = filteredLJ.filter((item) => {
+        // This is a simplified filter - you may need to add a machine field to your data model
+        // For now, we'll filter based on type
+        if (machineFilter === "lamination") {
+          return ["A3", "A4", "A5", "cards", "spiral", "colored_cardboard", "plastic_cover"].includes(item.type)
+        }
+        if (machineFilter === "binding") {
+          return ["spiral", "colored_cardboard", "plastic_cover"].includes(item.type)
+        }
+        return true
+      })
+    }
+    
+    // Apply lamination type filter
+    if (laminationTypeFilter !== "all") {
+      filteredLJ = filteredLJ.filter((item) => item.type === laminationTypeFilter)
+    }
     setFilteredLaminationJobs(filteredLJ)
   }
 
@@ -261,6 +425,17 @@ export default function DashboardPage() {
     setTypeFilter("all")
     setDeviceFilter("all")
     setUserFilter("all")
+    // Clear tab-specific filters
+    setPrintTypeFilter("all")
+    setMachineFilter("all")
+    setLaminationTypeFilter("all")
+    // Clear billing table filters
+    setBillingSearchTerm("")
+    setBillingDebtFilter("all")
+    setBillingAmountFilter("all")
+    setBillingPriceRange([0, billingPriceDistribution.max])
+    setBillingPriceRangeInputs(["0", billingPriceDistribution.max.toString()])
+    setBillingRoleFilter("all")
   }
 
   type RGB = string // e.g. "4472C4"
@@ -351,10 +526,10 @@ export default function DashboardPage() {
   if (!user) return null
 
   // Calculate totals based on filtered data or user-specific data
-  const relevantPrintBilling = user.role === "admin" ? printBilling : printBilling
-  const relevantLaminationBilling = user.role === "admin" ? laminationBilling : laminationBilling
-  const relevantPrintJobs = user.role === "admin" ? printJobs : printJobs
-  const relevantLaminationJobs = user.role === "admin" ? laminationJobs : laminationJobs
+      const relevantPrintBilling = user.accessLevel === "admin" ? printBilling : printBilling
+    const relevantLaminationBilling = user.accessLevel === "admin" ? laminationBilling : laminationBilling
+    const relevantPrintJobs = user.accessLevel === "admin" ? printJobs : printJobs
+    const relevantLaminationJobs = user.accessLevel === "admin" ? laminationJobs : laminationJobs
 
   const printUnpaid = relevantPrintBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
   const laminationUnpaid = relevantLaminationBilling
@@ -405,7 +580,7 @@ export default function DashboardPage() {
                 <h1 className="text-3xl font-bold text-gray-900">Πίνακας Ελέγχου</h1>
                 <p className="text-gray-600">
                   Καλώς ήρθατε, {user.displayName}
-                  {user.role === "admin" && " - Προβολή όλων των δεδομένων"}
+                  {user.accessLevel === "admin" && " - Προβολή όλων των δεδομένων"}
                 </p>
               </div>
             </div>
@@ -458,200 +633,94 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Unified Filters */}
-            <Card className="mb-6">
-              <CardHeader>
-                <div className="flex items-center justify-between w-full">
-                  <CardTitle className="flex items-center gap-2">
-                    <Filter className="h-5 w-5" />
-                    Φίλτρα
-                  </CardTitle>
-                  <button
-                    type="button"
-                    aria-label="Επαναφορά φίλτρων"
-                    className="p-2 rounded-full border border-gray-300 hover:bg-gray-100 transition ml-2"
-                    onClick={clearFilters}
-                  >
-                    <RotateCcw className="h-4 w-4 text-gray-500" />
-                  </button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="relative">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-                    {/* Row 1: Search (col 1-2), Status (col 3), Printer (col 4) */}
-                    <div className="md:col-span-2 flex flex-col justify-end">
-                      <Label htmlFor="search">Αναζήτηση</Label>
-                      <Input
-                        id="search"
-                        placeholder="Αναζήτηση..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex flex-col justify-end">
-                      <Label htmlFor="status">Κατάσταση</Label>
-                      <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Όλες</SelectItem>
-                          <SelectItem value="paid">Πληρωμένο</SelectItem>
-                          <SelectItem value="unpaid">Απλήρωτο</SelectItem>
-                          <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
-                          <SelectItem value="pending">Εκκρεμεί</SelectItem>
-                          <SelectItem value="failed">Αποτυχία</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex flex-col justify-end">
-                      <Label htmlFor="device">Εκτυπωτής</Label>
-                      <Select value={deviceFilter} onValueChange={setDeviceFilter}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Όλοι</SelectItem>
-                          {uniqueDevices.map((device) => (
-                            <SelectItem key={device} value={device}>
-                              {device}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+            {/* Consolidated Table Card */}
+            <BillingFilters
+              billingSearchTerm={billingSearchTerm}
+              setBillingSearchTerm={setBillingSearchTerm}
+              billingDebtFilter={billingDebtFilter}
+              setBillingDebtFilter={setBillingDebtFilter}
+              billingAmountFilter={billingAmountFilter}
+              setBillingAmountFilter={setBillingAmountFilter}
+              billingPriceRange={billingPriceRange}
+              setBillingPriceRange={setBillingPriceRange}
+              billingPriceRangeInputs={billingPriceRangeInputs}
+              setBillingPriceRangeInputs={setBillingPriceRangeInputs}
+              billingRoleFilter={billingRoleFilter}
+              setBillingRoleFilter={setBillingRoleFilter}
+              billingPriceDistribution={billingPriceDistribution}
+              printBilling={printBilling}
+              clearFilters={clearFilters}
+            />
+            
 
-                    {/* Row 2: Date From (col 1), Date To (col 2), Type (col 3), User (col 4, admin only) */}
-                    <div className="flex flex-col justify-end">
-                      <GreekDatePicker
-                        id="dateFrom"
-                        label="Από Ημερομηνία"
-                        value={dateFrom}
-                        onChange={setDateFrom}
-                      />
+            
+            {/* Consolidated Table Card */}
+            <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden mb-8">
+              <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="h-6 w-6 text-yellow-700" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-yellow-900">Συγκεντρωτικός Χρεωστικός Πίνακας</h3>
+                      <p className="text-sm text-yellow-700">Συγκεντρωμένα δεδομένα χρεώσεων και πληρωμών</p>
                     </div>
-                    <div className="flex flex-col justify-end">
-                      <GreekDatePicker
-                        id="dateTo"
-                        label="Έως Ημερομηνία"
-                        value={dateTo}
-                        onChange={setDateTo}
-                      />
-                    </div>
-                    <div className="flex flex-col justify-end">
-                      <Label htmlFor="type">Τύπος Πλαστικοποίησης</Label>
-                      <Select value={typeFilter} onValueChange={setTypeFilter}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Όλοι</SelectItem>
-                          <SelectItem value="A3">A3</SelectItem>
-                          <SelectItem value="A4">A4</SelectItem>
-                          <SelectItem value="card_small">Κάρτα Μικρή</SelectItem>
-                          <SelectItem value="card_large">Κάρτα Μεγάλη</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {user.role === "admin" ? (
-                      <div className="flex flex-col justify-end">
-                        <Label htmlFor="userFilter">Χρήστης</Label>
-                        <Select value={userFilter} onValueChange={setUserFilter}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Όλοι οι χρήστες</SelectItem>
-                            {allUsers
-                              .filter((u) => u.role === "user")
-                              .map((u) => (
-                                <SelectItem key={u.uid} value={u.uid}>
-                                  {u.displayName} ({u.username})
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : (
-                      <div></div>
-                    )}
                   </div>
+                  {user.accessLevel === "admin" && (
+                    <Button
+                      onClick={() =>
+                        exportTableXLSX(
+                          filteredPrintBilling.map((b) => {
+                            const userData = dummyDB.getUserById(b.uid)
+                            const responsiblePerson = userData?.userRole === "Άτομο" 
+                              ? userData.displayName 
+                              : userData?.responsiblePerson || "-"
+                            
+                            return {
+                              userRole: userData?.userRole || "-",
+                              userDisplayName: b.userDisplayName,
+                              responsiblePerson: responsiblePerson,
+                              remainingBalance: formatPrice(b.remainingBalance),
+                              lastPayment: b.lastPayment ? b.lastPayment.toLocaleDateString("el-GR") : "-",
+                            }
+                          }),
+                          "print_billing",
+                          [
+                            { key: "userRole", label: "Ρόλος" },
+                            { key: "userDisplayName", label: "Όνομα" },
+                            { key: "responsiblePerson", label: "Υπεύθυνος" },
+                            { key: "remainingBalance", label: "Συνολικό Χρέος" },
+                            { key: "lastPayment", label: "Τελευταία Εξόφληση" }
+                          ],
+                          "EAB308",
+                          "Συγκεντρωτικός Χρεωστικός Πίνακας"
+                        )
+                      }
+                      variant="outline"
+                      size="sm"
+                      className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Εξαγωγή XLSX
+                    </Button>
+                  )}
                 </div>
-                <div className="flex justify-between items-center mt-4">
-                  <div className="text-sm text-gray-600">
-                    Εκτυπώσεις: {filteredPrintJobs.length}/{printJobs.length} | Πλαστικοποιήσεις: {filteredLaminationJobs.length}/{laminationJobs.length}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Print Billing Table - Outside Tabs */}
-            <div className="bg-yellow-50 rounded-lg border border-yellow-200 shadow-sm mb-8">
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <BarChart3 className="h-6 w-6 text-yellow-700" />
-                      <div>
-                        <h3 className="text-lg font-semibold text-yellow-900">Συγκεντρωτικός Χρεωστικός Πίνακας</h3>
-                        <p className="text-sm text-yellow-700">Συγκεντρωμένα δεδομένα χρεώσεων και πληρωμών</p>
-                      </div>
-                    </div>
-                    {user.role === "admin" && (
-                      <Button
-                        onClick={() =>
-                                                          exportTableXLSX(
-                                filteredPrintBilling.map((b) => {
-                                  const userData = dummyDB.getUserById(b.uid)
-                                  const responsiblePerson = userData?.userRole === "Άτομο" 
-                                    ? userData.displayName 
-                                    : userData?.responsiblePerson || "-"
-                                  
-                                  return {
-                                    userRole: userData?.userRole || "-",
-                                    userDisplayName: b.userDisplayName,
-                                    responsiblePerson: responsiblePerson,
-                                    remainingBalance: formatPrice(b.remainingBalance),
-                                    lastPayment: b.lastPayment ? b.lastPayment.toLocaleDateString("el-GR") : "-",
-                                  }
-                                }),
-                                "print_billing",
-                                [
-                                  { key: "userRole", label: "Ρόλος" },
-                                  { key: "userDisplayName", label: "Όνομα" },
-                                  { key: "responsiblePerson", label: "Υπεύθυνος" },
-                                  { key: "remainingBalance", label: "Συνολικό Χρέος" },
-                                  { key: "lastPayment", label: "Τελευταία Εξόφληση" }
-                                ],
-                                "EAB308",
-                                "Συγκεντρωτικός Χρεωστικός Πίνακας"
-                              )
-                        }
-                        variant="outline"
-                        size="sm"
-                        className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Εξαγωγή XLSX
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <div className="p-6">
-                  <PrintBillingTable
-                    data={filteredPrintBilling}
-                    page={printBillingPage}
-                    pageSize={PAGE_SIZE}
-                    onPageChange={setPrintBillingPage}
-                    userRole={user.role}
-                  />
-                </div>
+              </div>
+              
+              <div className="p-6">
+                <PrintBillingTable
+                  data={filteredPrintBilling}
+                  page={printBillingPage}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setPrintBillingPage}
+                  userRole={user.accessLevel}
+                />
               </div>
             </div>
 
+
+
             {/* Tabs for Print and Lamination */}
-            <Tabs defaultValue="printing" className="w-full mb-8 mt-12">
+            <Tabs defaultValue="printing" className="w-full mb-8 mt-12" onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-2 h-16 p-1">
                 <TabsTrigger
                   value="printing"
@@ -669,6 +738,40 @@ export default function DashboardPage() {
                 </TabsTrigger>
               </TabsList>
 
+              {/* Tab-specific Filters */}
+              <div className="mt-4">
+                {activeTab === "printing" ? (
+                  <PrintFilters
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    dateFrom={dateFrom}
+                    setDateFrom={setDateFrom}
+                    dateTo={dateTo}
+                    setDateTo={setDateTo}
+                    deviceFilter={deviceFilter}
+                    setDeviceFilter={setDeviceFilter}
+                    printTypeFilter={printTypeFilter}
+                    setPrintTypeFilter={setPrintTypeFilter}
+                    uniqueDevices={uniqueDevices}
+                    clearFilters={clearFilters}
+                  />
+                ) : (
+                  <LaminationFilters
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    dateFrom={dateFrom}
+                    setDateFrom={setDateFrom}
+                    dateTo={dateTo}
+                    setDateTo={setDateTo}
+                    machineFilter={machineFilter}
+                    setMachineFilter={setMachineFilter}
+                    laminationTypeFilter={laminationTypeFilter}
+                    setLaminationTypeFilter={setLaminationTypeFilter}
+                    clearFilters={clearFilters}
+                  />
+                )}
+              </div>
+
               <TabsContent value="printing" className="mt-4">
                 <div className="bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
                   {/* Print Jobs Table */}
@@ -682,7 +785,7 @@ export default function DashboardPage() {
                             <p className="text-sm text-blue-700">Λεπτομερές ιστορικό όλων των εκτυπώσεων</p>
                           </div>
                         </div>
-                        {user.role === "admin" && (
+                        {user.accessLevel === "admin" && (
                           <Button
                             onClick={() => {
                               // Helper function to expand a print job into individual rows
@@ -775,7 +878,7 @@ export default function DashboardPage() {
                           page={printJobsPage}
                           pageSize={PAGE_SIZE}
                           onPageChange={setPrintJobsPage}
-                          userRole={user.role}
+                          userRole={user.accessLevel}
                         />
                       </ErrorBoundary>
                     </div>
@@ -796,7 +899,7 @@ export default function DashboardPage() {
                             <p className="text-sm text-green-700">Ιστορικό καταχωρημένων πλαστικοποιήσεων</p>
                           </div>
                         </div>
-                        {user.role === "admin" && (
+                        {user.accessLevel === "admin" && (
                           <Button
                             onClick={() =>
                               exportTableXLSX(
@@ -838,7 +941,7 @@ export default function DashboardPage() {
                           page={laminationJobsPage}
                           pageSize={PAGE_SIZE}
                           onPageChange={setLaminationJobsPage}
-                          userRole={user.role}
+                          userRole={user.accessLevel}
                         />
                       </ErrorBoundary>
                     </div>

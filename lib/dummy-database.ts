@@ -3,10 +3,9 @@
 export interface User {
   uid: string
   username: string
-  role: "user" | "admin"
+  accessLevel: "user" | "admin"
   displayName: string
   department: string
-  email?: string
   createdAt: Date
   userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" // New field for the role selection
   responsiblePerson?: string // New field for responsible person
@@ -125,10 +124,9 @@ class DummyDatabase {
       {
         uid: "admin-1",
         username: "admin",
-        role: "admin",
+        accessLevel: "admin",
         displayName: "Διαχειριστής",
         department: "Διοίκηση",
-        email: "admin@example.com",
         createdAt: new Date("2024-01-01"),
         userRole: "Άτομο",
       },
@@ -140,10 +138,9 @@ class DummyDatabase {
         return {
           uid: `user-${num}`,
           username: `${num}`,
-          role: "user" as "user",
+          accessLevel: "user" as "user",
           displayName: `Χρήστης ${num}`,
           department: departments[i % departments.length],
-          email: `user${num}@example.com`,
           createdAt: new Date(`2024-01-${(i % 28) + 1}`),
           userRole: userRole,
           responsiblePerson: isIndividual ? undefined : `Υπεύθυνος ${num}`,
@@ -195,7 +192,7 @@ class DummyDatabase {
 
   private generateSampleData() {
     const now = new Date();
-    const userIds = this.users.filter((u) => u.role === "user").map((u) => u.uid);
+    const userIds = this.users.filter((u) => u.accessLevel === "user").map((u) => u.uid);
 
     // Generate print and lamination jobs for the last 6 months
     for (let monthOffset = 0; monthOffset < 6; monthOffset++) {
@@ -270,7 +267,7 @@ class DummyDatabase {
   }
 
   private generateBillingRecords() {
-    const userIds = this.users.filter((u) => u.role === "user").map((u) => u.uid)
+    const userIds = this.users.filter((u) => u.accessLevel === "user").map((u) => u.uid)
     const now = new Date()
 
     for (let monthOffset = 0; monthOffset < 3; monthOffset++) {
@@ -338,10 +335,10 @@ class DummyDatabase {
           const totalA3 = monthLaminationJobs.filter((j) => j.type === "A3").reduce((sum, j) => sum + j.quantity, 0)
           const totalA4 = monthLaminationJobs.filter((j) => j.type === "A4").reduce((sum, j) => sum + j.quantity, 0)
           const totalCardSmall = monthLaminationJobs
-            .filter((j) => j.type === "card_small")
+            .filter((j) => j.type === "cards")
             .reduce((sum, j) => sum + j.quantity, 0)
           const totalCardLarge = monthLaminationJobs
-            .filter((j) => j.type === "card_large")
+            .filter((j) => j.type === "cards")
             .reduce((sum, j) => sum + j.quantity, 0)
           const totalCost = monthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
 

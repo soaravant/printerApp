@@ -44,7 +44,7 @@ export default function ProfilePage() {
                       Ρόλος
                     </div>
                     <div className="text-lg">
-                      <RoleBadge role={user.role} />
+                      <RoleBadge accessLevel={user.accessLevel} />
                     </div>
                   </div>
 
@@ -56,13 +56,7 @@ export default function ProfilePage() {
                     <div className="text-lg bg-gray-50 p-3 rounded-lg">{user.displayName}</div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
-                      <Mail className="h-4 w-4" />
-                      Email
-                    </div>
-                    <div className="text-lg bg-gray-50 p-3 rounded-lg">{user.email || "Δεν έχει οριστεί"}</div>
-                  </div>
+
 
                   <div className="space-y-2 md:col-span-2">
                     <div className="flex items-center gap-2 text-sm font-medium text-gray-500">

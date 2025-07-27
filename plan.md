@@ -13,7 +13,7 @@
 - [x] **Configuration**: Complete Next.js configuration with App Router and optimization
 
 ### Core Application Architecture
-- [x] **User Authentication**: Firebase Authentication with email/password login system
+- [x] **User Authentication**: Firebase Authentication with username/password login system
 - [x] **Role-Based Access**: User and Admin roles with protected routes
 - [x] **Responsive Design**: Mobile-first design with Tailwind CSS and shadcn/ui
 - [x] **Multi-Page Application**: Dashboard, printing, lamination, admin, and profile pages

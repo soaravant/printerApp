@@ -27,8 +27,8 @@ import {
 import { SearchableSelect } from "@/components/searchable-select"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { useState, useEffect } from "react"
-import { Plus, CreditCard, Users, Settings, User, Building, Printer, Search, Download, Edit, Save, X, ArrowRight, RotateCcw } from "lucide-react"
-import type { User as UserType, LaminationJob, PriceTable } from "@/lib/dummy-database"
+import { Plus, CreditCard, Users, Settings, User as UserIcon, Building, Printer, Search, Download, Edit, Save, X, ArrowRight, RotateCcw } from "lucide-react"
+import type { User, LaminationJob, PriceTable } from "@/lib/dummy-database"
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import * as XLSX from "xlsx"
 
@@ -36,10 +36,11 @@ export default function AdminPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const { triggerRefresh } = useRefresh()
-  const [users, setUsers] = useState<UserType[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<UserType[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [usersTabSearchTerm, setUsersTabSearchTerm] = useState("")
   const [debtFilter, setDebtFilter] = useState("all") // all, print, lamination, both
+  const [roleFilter, setRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Ναός, Τομέας
   const [amountFilter, setAmountFilter] = useState("all") // all, under10, 10to50, over50
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100])
   const [priceRangeInputs, setPriceRangeInputs] = useState<[string, string]>(["0", "100"])
@@ -54,8 +55,7 @@ export default function AdminPage() {
     password: "",
     displayName: "",
     department: "",
-    email: "",
-    role: "user" as "user" | "admin",
+    accessLevel: "user" as "user" | "admin",
     userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας",
     responsiblePerson: "",
   })
@@ -124,7 +124,7 @@ export default function AdminPage() {
 
   const priceDistribution = calculatePriceDistribution()
 
-  // Filter users based on search term, debt filter and price range filter
+  // Filter users based on search term, role filter, debt filter and price range filter
   useEffect(() => {
     let filtered = [...users]
 
@@ -134,9 +134,13 @@ export default function AdminPage() {
         (u) =>
           u.displayName.toLowerCase().includes(usersTabSearchTerm.toLowerCase()) ||
           u.username.toLowerCase().includes(usersTabSearchTerm.toLowerCase()) ||
-          u.department.toLowerCase().includes(usersTabSearchTerm.toLowerCase()) ||
-          u.email?.toLowerCase().includes(usersTabSearchTerm.toLowerCase()),
+          u.department.toLowerCase().includes(usersTabSearchTerm.toLowerCase()),
       )
+    }
+
+    // Apply role filter
+    if (roleFilter !== "all") {
+      filtered = filtered.filter((u) => u.userRole === roleFilter)
     }
 
     // Apply debt filter
@@ -178,7 +182,7 @@ export default function AdminPage() {
     }
 
     setFilteredUsers(filtered)
-  }, [usersTabSearchTerm, debtFilter, priceRange, users, priceDistribution.min, priceDistribution.max])
+  }, [usersTabSearchTerm, roleFilter, debtFilter, priceRange, users, priceDistribution.min, priceDistribution.max])
 
   // Update price range when distribution changes
   useEffect(() => {
@@ -265,13 +269,12 @@ export default function AdminPage() {
     }
 
     try {
-      const userToAdd: UserType = {
+      const userToAdd: User = {
         uid: `user-${Date.now()}`,
         username: newUser.username,
-        role: newUser.role,
+        accessLevel: newUser.accessLevel,
         displayName: newUser.displayName,
         department: newUser.department || "Γενικό",
-        email: newUser.email || undefined,
         createdAt: new Date(),
         userRole: newUser.userRole,
         responsiblePerson: newUser.userRole === "Άτομο" ? undefined : newUser.responsiblePerson,
@@ -288,7 +291,7 @@ export default function AdminPage() {
       })
 
       // Reset form and close dialog
-      setNewUser({ username: "", password: "", displayName: "", department: "", email: "", role: "user", userRole: "Άτομο", responsiblePerson: "" })
+      setNewUser({ username: "", password: "", displayName: "", department: "", accessLevel: "user", userRole: "Άτομο", responsiblePerson: "" })
       setShowAddUserDialog(false)
     } catch (error) {
       toast({
@@ -300,7 +303,7 @@ export default function AdminPage() {
   }
 
   const exportUsersXLSX = () => {
-    const headers = ["Username", "Name", "Email", "Print Debt (€)", "Lamination Debt (€)", "Total Debt (€)"]
+    const headers = ["Username", "Name", "Print Debt (€)", "Lamination Debt (€)", "Total Debt (€)"]
     const worksheetData = [
       headers,
       ...filteredUsers.map((userData) => {
@@ -312,7 +315,6 @@ export default function AdminPage() {
         return [
           userData.username,
           userData.displayName,
-          userData.email || "",
           printUnpaid.toFixed(2),
           laminationUnpaid.toFixed(2),
           totalUnpaid.toFixed(2),
@@ -525,6 +527,16 @@ export default function AdminPage() {
                   <h1 className="text-3xl font-bold text-gray-900">Διαχείριση Συστήματος</h1>
                   <p className="text-gray-600">Διαχειριστείτε χρήστες και προσθέστε χρεώσεις</p>
                 </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleResetData}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Επαναφορά Δεδομένων
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -591,7 +603,7 @@ export default function AdminPage() {
                         <Label htmlFor="user">Χρήστης</Label>
                         <SearchableSelect
                           options={users
-                            .filter((u) => u.role === "user")
+                            .filter((u) => u.accessLevel === "user")
                             .map((user) => ({
                               value: user.uid,
                               label: user.displayName,
@@ -694,10 +706,7 @@ export default function AdminPage() {
                           <Label htmlFor="department">Τμήμα</Label>
                           <Input id="department" value={newUser.department} onChange={e => setNewUser({ ...newUser, department: e.target.value })} />
                         </div>
-                        <div>
-                          <Label htmlFor="email">Email</Label>
-                          <Input id="email" type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
-                        </div>
+
                         <div>
                           <Label htmlFor="userRole">Ρόλος</Label>
                           <Select value={newUser.userRole} onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" })}>
@@ -724,8 +733,8 @@ export default function AdminPage() {
                           </div>
                         )}
                         <div>
-                          <Label htmlFor="role">Ρόλος Συστήματος</Label>
-                          <Select value={newUser.role} onValueChange={role => setNewUser({ ...newUser, role: role as "user" | "admin" })}>
+                          <Label htmlFor="role">Access Level</Label>
+                          <Select value={newUser.accessLevel} onValueChange={accessLevel => setNewUser({ ...newUser, accessLevel: accessLevel as "user" | "admin" })}>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
@@ -746,6 +755,8 @@ export default function AdminPage() {
                   setUsersTabSearchTerm={setUsersTabSearchTerm}
                   debtFilter={debtFilter}
                   setDebtFilter={setDebtFilter}
+                  roleFilter={roleFilter}
+                  setRoleFilter={setRoleFilter}
                   priceRange={priceRange}
                   setPriceRange={setPriceRange}
                   priceRangeInputs={priceRangeInputs}

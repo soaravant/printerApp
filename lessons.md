@@ -2,6 +2,695 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+### Email Data Removal (December 2024)
+
+**Problem**: The application was storing and displaying email addresses for users, but this information was not essential for the core printing management functionality and could be removed to simplify the data model and user interface.
+
+**Solution**: Removed email as a data field from all parts of the application while maintaining all core functionality.
+
+**Changes Made**:
+
+**1. Updated Data Models**:
+- **User Interface (`lib/dummy-database.ts`)**: Removed `email?: string` field from User interface
+- **Data Store (`lib/data-store.ts`)**: User interface already didn't include email field
+- **Dummy Data**: Removed email generation from dummy user creation
+
+**2. Updated Admin Interface (`app/admin/page.tsx`)**:
+- **User Creation Form**: Removed email input field from new user creation dialog
+- **User Search**: Removed email from search filter criteria
+- **User Export**: Removed email column from Excel export
+- **User State**: Removed email from newUser state object
+
+**3. Updated Profile Page (`app/profile/page.tsx`)**:
+- **User Display**: Removed email display section from user profile
+- **Fixed Role Badge**: Corrected property name from `role` to `accessLevel` for RoleBadge component
+
+**4. Updated Admin Users Tab (`components/admin-users-tab.tsx`)**:
+- **User Cards**: Removed email display from user information cards
+- **Cleaner Interface**: Simplified user card layout
+
+**5. Updated Scripts (`scripts/populate-dummy-data.ts`)**:
+- **Dummy Data**: Removed email generation from test user creation
+
+**6. Updated Documentation**:
+- **Plan.md**: Updated authentication description from "email/password" to "username/password"
+- **Documentation.md**: Updated authentication references
+- **README.md**: Updated setup instructions
+- **Lessons.md**: Updated user information description
+
+**Benefits Achieved**:
+- **Simplified Data Model**: Removed unnecessary email field from user data
+- **Cleaner Interface**: Less cluttered user forms and displays
+- **Reduced Complexity**: Fewer fields to manage in user creation and editing
+- **Maintained Functionality**: All core printing management features remain intact
+- **Consistent Authentication**: System uses username-based authentication throughout
+
+**Key Features Preserved**:
+1. **User Authentication**: Username/password login system
+2. **User Management**: Create, edit, and manage user accounts
+3. **Role-Based Access**: Admin and user roles with proper permissions
+4. **Printing Management**: All print job tracking and billing features
+5. **Lamination Management**: All lamination job tracking and billing features
+6. **Data Export**: Excel export functionality (without email column)
+7. **User Profile**: Display of essential user information
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Removed email from User interface and dummy data
+- `app/admin/page.tsx` - Removed email from forms, search, and export
+- `app/profile/page.tsx` - Removed email display and fixed role badge
+- `components/admin-users-tab.tsx` - Removed email from user cards
+- `scripts/populate-dummy-data.ts` - Removed email from test user creation
+- `plan.md` - Updated authentication description
+- `documentation.md` - Updated authentication references
+- `README.md` - Updated setup instructions
+- `lessons.md` - Updated user information description
+
+**Technical Implementation**:
+- Removed email field from all User interfaces
+- Updated all user creation and editing forms
+- Removed email from search and filter functionality
+- Updated data export to exclude email column
+- Maintained all existing authentication and authorization logic
+- Preserved all printing and lamination management features
+
+### Admin Page User Cards Simplification (December 2024)
+
+**Problem**: The admin page user cards contained a statistics section that was not essential for the main admin functionality and made the cards more cluttered. The admin/user role indication was already properly handled with badges in the top right corner.
+
+**Solution**: Removed the statistics section from user cards while keeping the admin/user badges for role indication.
+
+**Changes Made**:
+
+**1. Updated AdminUsersTab Component (`components/admin-users-tab.tsx`)**:
+- **Removed Statistics Section**: Eliminated the "Στατιστικά" (Statistics) section that showed print and lamination job counts
+- **Kept Role Badges**: Maintained the admin/user badges in the top right corner of each card
+- **Cleaned Up Code**: Removed unused variables (`printJobs`, `laminationJobs`) that were only used for statistics
+- **Preserved Core Functionality**: Kept all debt information and user details intact
+
+**Benefits Achieved**:
+- **Cleaner Interface**: User cards are now more focused and less cluttered
+- **Better Performance**: Reduced unnecessary data fetching for statistics
+- **Improved UX**: Cards show only essential information (user details, debts, role)
+- **Consistent Design**: Role indication is handled consistently through badges
+- **Maintained Functionality**: All core admin features remain intact
+
+**Key Features Preserved**:
+1. **Role Badges**: Admin/User badges in top right corner
+2. **User Information**: Username, department, role
+3. **Debt Information**: Print and lamination debts with totals
+4. **Responsible Person**: For team/church/area roles
+5. **Filtering**: All existing filter functionality maintained
+
+**Files Modified**:
+- `components/admin-users-tab.tsx` - Removed statistics section and cleaned up unused variables
+
+**Technical Implementation**:
+- Removed statistics section JSX code
+- Eliminated unused `printJobs` and `laminationJobs` variables
+- Maintained all existing card structure and styling
+- Preserved badge-based role indication system
+- Kept all debt calculation and display logic intact
+
+### Enhanced Greek Date Picker Component (December 2024)
+
+### Enhanced Greek Date Picker Component (December 2024)
+
+**Problem**: The existing date filter interface used basic HTML date inputs that were not user-friendly and lacked quick navigation features. Users wanted a more intuitive date selection experience with faster month/year navigation.
+
+**Solution**: Enhanced the Greek date picker component to provide a better user experience with icon-based interface and improved navigation.
+
+**Changes Made**:
+
+**1. Updated GreekDatePicker Component (`components/ui/greek-date-picker.tsx`)**:
+- **Full-Width Initial Interface**: When no date is selected, shows a full-width button with centered calendar icon
+- **Selected Date Display**: When a date is selected, shows the date text with a clear button
+- **Quick Month Selection**: Added separate dropdown for month selection with Greek month names
+- **Quick Year Selection**: Added separate dropdown for year selection (current year ± 10 years)
+- **Improved Navigation**: Month and year can be changed independently for faster navigation
+- **Clear Functionality**: Added X button to clear selected date
+
+```typescript
+// New interface behavior:
+{displayValue ? (
+  // Show selected date with clear button
+  <div className="flex items-center gap-2 flex-1">
+    <Button variant="outline" className="justify-start text-left font-normal flex-1 h-10">
+      <Calendar className="mr-2 h-4 w-4" />
+      {displayValue}
+    </Button>
+    <Button variant="ghost" size="icon" onClick={handleClear} className="h-10 w-10">
+      <X className="h-4 w-4" />
+    </Button>
+  </div>
+) : (
+  // Show full-width button when no date selected
+  <Button variant="outline" className="h-10 w-full justify-center">
+    <Calendar className="h-4 w-4" />
+  </Button>
+)}
+```
+
+**2. Updated HistoryFilter Component (`components/history-filter.tsx`)**:
+- Replaced basic HTML date inputs with the enhanced GreekDatePicker
+- Maintained all existing filter functionality
+- Improved user experience for date selection
+
+**3. Enhanced Navigation Features**:
+- **Month Dropdown**: Quick selection of any month with Greek names
+- **Year Dropdown**: Quick selection of any year (current ± 10 years)
+- **Independent Control**: Month and year can be changed separately
+- **Visual Feedback**: Clear indication of selected date and navigation state
+
+**Benefits Achieved**:
+- **Better UX**: More intuitive date selection interface
+- **Faster Navigation**: Quick month/year selection without clicking through calendar
+- **Space Efficient**: Icon-only display when no date is selected
+- **Clear Visual Feedback**: Selected dates are clearly displayed
+- **Consistent Styling**: Matches the overall application design
+- **Accessibility**: Maintained keyboard navigation and screen reader support
+
+**Key Features**:
+1. **Full-Width Initial State**: Full-width button with centered calendar icon when no date is selected
+2. **Date Display**: Shows formatted Greek date when selected
+3. **Quick Clear**: X button to easily clear selected date
+4. **Fast Navigation**: Separate month and year dropdowns
+5. **Greek Localization**: All month names in Greek
+6. **Responsive Design**: Works well on all screen sizes
+7. **Centered Layout**: Month and year dropdowns are horizontally centered
+8. **Smart Navigation**: Shows current month initially, selected date's month when date is selected
+9. **Consistent Spacing**: Label spacing matches other filter components
+
+**Files Modified**:
+- `components/ui/greek-date-picker.tsx` - Enhanced with new interface and navigation
+- `components/history-filter.tsx` - Updated to use enhanced date picker
+- `components/print-filters.tsx` - Already using GreekDatePicker (benefits automatically)
+- `components/lamination-filters.tsx` - Already using GreekDatePicker (benefits automatically)
+
+**Technical Implementation**:
+- Uses Popover component for calendar display
+- Implements separate state for current month navigation
+- Generates month/year options dynamically
+- Maintains compatibility with existing date handling logic
+- Preserves all existing props and functionality
+- Centers dropdowns horizontally for better visual balance
+- Smart month navigation: shows current month initially, selected date's month when date is selected
+- Consistent spacing: matches type filter label spacing (space-y-1, text-gray-700)
+
+### Dashboard Filter Component Refactoring (December 2024)
+
+**Problem**: The dashboard page (`app/dashboard/page.tsx`) had become very large and complex with inline filter UI components, making it difficult to maintain and reuse filter logic across different parts of the application.
+
+**Solution**: Successfully extracted filter components into reusable, modular components while maintaining all existing functionality and preserving the exact UI/UX.
+
+**Changes Made**:
+
+**1. Created BillingFilters Component (`components/billing-filters.tsx`)**:
+- Extracted consolidated billing table filters into a dedicated component
+- Maintained all advanced filtering features including price range slider, histogram, and radio buttons
+- Preserved yellow theme styling and all interactive elements
+- Accepts all necessary state and handlers as props
+
+```typescript
+interface BillingFiltersProps {
+  billingSearchTerm: string
+  setBillingSearchTerm: (v: string) => void
+  billingDebtFilter: string
+  setBillingDebtFilter: (v: string) => void
+  billingAmountFilter: string
+  setBillingAmountFilter: (v: string) => void
+  billingPriceRange: [number, number]
+  setBillingPriceRange: (v: [number, number]) => void
+  billingPriceRangeInputs: [string, string]
+  setBillingPriceRangeInputs: (v: [string, string]) => void
+  billingPriceDistribution: any
+  printBilling: any[]
+  clearFilters: () => void
+}
+```
+
+**2. Created PrintFilters Component (`components/print-filters.tsx`)**:
+- Extracted print tab-specific filters into a dedicated component
+- Maintained blue theme styling and all filter options
+- Includes search, date range, device, and print type filters
+- Preserves all existing functionality and UI patterns
+
+**3. Created LaminationFilters Component (`components/lamination-filters.tsx`)**:
+- Extracted lamination tab-specific filters into a dedicated component
+- Maintained green theme styling and dynamic filter options
+- Includes search, date range, machine, and lamination type filters
+- Preserves conditional filter options based on machine selection
+
+**4. Updated Dashboard Page (`app/dashboard/page.tsx`)**:
+- Replaced inline filter JSX with component imports and usage
+- Maintained all state management and filter logic in the parent component
+- Preserved all existing functionality including export, pagination, and data filtering
+- Reduced file size and improved readability significantly
+
+```typescript
+// Before: 1300+ lines with inline filter JSX
+// After: ~950 lines with clean component usage
+
+<BillingFilters
+  billingSearchTerm={billingSearchTerm}
+  setBillingSearchTerm={setBillingSearchTerm}
+  // ... other props
+/>
+
+{activeTab === "printing" ? (
+  <PrintFilters
+    searchTerm={searchTerm}
+    setSearchTerm={setSearchTerm}
+    // ... other props
+  />
+) : (
+  <LaminationFilters
+    searchTerm={searchTerm}
+    setSearchTerm={setSearchTerm}
+    // ... other props
+  />
+)}
+```
+
+**Benefits Achieved**:
+- **Maintainability**: Filter logic is now centralized in dedicated components
+- **Reusability**: Components can be easily reused in other parts of the application
+- **Readability**: Dashboard page is much cleaner and easier to understand
+- **Testability**: Individual filter components can be tested in isolation
+- **Consistency**: Filter UI patterns are now standardized across components
+- **Performance**: No impact on functionality or performance
+
+**Key Lessons Learned**:
+1. **State Lifting**: Keep state management in the parent component and pass down as props for better control
+2. **Component Composition**: Break down complex UI into logical, reusable components
+3. **Props Interface**: Define clear, typed interfaces for component props to ensure type safety
+4. **Preserve Functionality**: Ensure all existing features work exactly as before during refactoring
+5. **Theme Consistency**: Maintain existing color schemes and styling patterns in extracted components
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Updated to use new filter components
+- `components/billing-filters.tsx` - New component for billing table filters
+- `components/print-filters.tsx` - New component for print tab filters  
+- `components/lamination-filters.tsx` - New component for lamination tab filters
+
+### Dashboard Filtering System Enhancement (December 2024)
+
+**Problem**: The dashboard needed improved filtering with tab-specific filters and separate billing table filtering, moving filters underneath tabs and implementing dynamic filtering based on selected tab.
+
+**Solution**: Completely restructured the filtering system to provide context-aware filters and separate billing table filtering.
+
+**Changes Made**:
+
+**1. State Management Updates (`app/dashboard/page.tsx`)**:
+- Added tab-specific filtering states for print and lamination
+- Added billing table specific filters copied from admin page
+- Added active tab tracking for dynamic filter display
+
+```typescript
+// Tab-specific filtering states
+const [activeTab, setActiveTab] = useState("printing")
+const [printTypeFilter, setPrintTypeFilter] = useState("all") // For print type (A4 BW, A4 Color, etc.)
+const [machineFilter, setMachineFilter] = useState("all") // For lamination machine (Πλαστικοποίηση, Βιβλιοδεσία)
+const [laminationTypeFilter, setLaminationTypeFilter] = useState("all") // For lamination type based on machine
+
+// Billing table specific filters (copied from admin page)
+const [billingSearchTerm, setBillingSearchTerm] = useState("")
+const [billingDebtFilter, setBillingDebtFilter] = useState("all") // all, print, lamination, both
+const [billingAmountFilter, setBillingAmountFilter] = useState("all") // all, under10, 10to50, over50
+const [billingPriceRange, setBillingPriceRange] = useState<[number, number]>([0, 100])
+const [billingPriceRangeInputs, setBillingPriceRangeInputs] = useState<[string, string]>(["0", "100"])
+```
+
+**2. Filtering Logic Updates**:
+- Enhanced `applyFilters()` function with tab-specific filtering
+- Added billing table specific filtering with price distribution
+- Implemented dynamic filter options based on machine selection
+
+```typescript
+// Apply print type filter
+if (printTypeFilter !== "all") {
+  filteredPJ = filteredPJ.filter((item) => {
+    switch (printTypeFilter) {
+      case "a4BW":
+        return item.pagesA4BW > 0
+      case "a4Color":
+        return item.pagesA4Color > 0
+      case "a3BW":
+        return item.pagesA3BW > 0
+      case "a3Color":
+        return item.pagesA3Color > 0
+      default:
+        return true
+    }
+  })
+}
+
+// Apply machine filter for lamination
+if (machineFilter !== "all") {
+  filteredLJ = filteredLJ.filter((item) => {
+    if (machineFilter === "lamination") {
+      return ["A3", "A4", "A5", "cards", "spiral", "colored_cardboard", "plastic_cover"].includes(item.type)
+    }
+    if (machineFilter === "binding") {
+      return ["spiral", "colored_cardboard", "plastic_cover"].includes(item.type)
+    }
+    return true
+  })
+}
+```
+
+**3. UI Structure Changes**:
+- Moved filters underneath tab buttons instead of above
+- Removed Χρήστης filter as requested
+- Replaced Κατάσταση with Είδος Εκτύπωσης/Πλαστικοποίησης
+- Added dynamic filter options based on active tab
+
+```typescript
+{/* Tab-specific Filters */}
+<div className="mt-4">
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Filter className="h-5 w-5" />
+        Φίλτρα {activeTab === "printing" ? "Εκτυπώσεων" : "Πλαστικοποιήσεων"}
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      {/* Dynamic filters based on active tab */}
+      {activeTab === "printing" ? (
+        <>
+          <div>Εκτυπωτής filter</div>
+          <div>Είδος Εκτύπωσης filter</div>
+        </>
+      ) : (
+        <>
+          <div>Μηχάνημα filter</div>
+          <div>Είδος Πλαστικοποίησης/Βιβλιοδεσίας filter</div>
+        </>
+      )}
+    </CardContent>
+  </Card>
+</div>
+```
+
+**4. Billing Table Filtering**:
+- Added separate billing table filters with search, debt status, amount range, and price range
+- Implemented price distribution calculation for dynamic range
+- Added billing-specific filter logic
+
+```typescript
+// Billing table specific filters
+<div className="p-4 bg-yellow-50 border-b border-yellow-200">
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="md:col-span-2">
+      <Label htmlFor="billingSearch">Αναζήτηση</Label>
+      <Input value={billingSearchTerm} onChange={(e) => setBillingSearchTerm(e.target.value)} />
+    </div>
+    <div>
+      <Label htmlFor="billingDebt">Κατάσταση</Label>
+      <Select value={billingDebtFilter} onValueChange={setBillingDebtFilter}>
+        <SelectContent>
+          <SelectItem value="all">Όλες</SelectItem>
+          <SelectItem value="paid">Πληρωμένο</SelectItem>
+          <SelectItem value="unpaid">Απλήρωτο</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    <div>
+      <Label htmlFor="billingAmount">Εύρος Ποσού</Label>
+      <Select value={billingAmountFilter} onValueChange={setBillingAmountFilter}>
+        <SelectContent>
+          <SelectItem value="all">Όλα</SelectItem>
+          <SelectItem value="under10">Κάτω από €10</SelectItem>
+          <SelectItem value="10to50">€10 - €50</SelectItem>
+          <SelectItem value="over50">Πάνω από €50</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+</div>
+```
+
+**5. Price Distribution Calculation**:
+- Added `calculateBillingPriceDistribution()` function for dynamic price ranges
+- Implemented automatic price range updates based on data distribution
+- Added price range input controls with validation
+
+```typescript
+const calculateBillingPriceDistribution = () => {
+  const allAmounts: number[] = []
+  
+  printBilling.forEach((billing) => {
+    if (billing.remainingBalance > 0) {
+      allAmounts.push(billing.remainingBalance)
+    }
+  })
+
+  const min = Math.min(...allAmounts)
+  const max = Math.max(...allAmounts)
+  
+  const distribution = {
+    "0-20": allAmounts.filter(amount => amount <= 20).length,
+    "20-35": allAmounts.filter(amount => amount > 20 && amount <= 35).length,
+    "35-90": allAmounts.filter(amount => amount > 35 && amount <= 90).length,
+    "90+": allAmounts.filter(amount => amount > 90).length
+  }
+
+  return { min, max, distribution }
+}
+```
+
+**Benefits**:
+- **Context-Aware Filtering**: Filters change based on selected tab
+- **Improved UX**: Filters are closer to the data they affect
+- **Separate Billing Filtering**: Billing table has its own comprehensive filtering
+- **Dynamic Options**: Filter options change based on machine selection
+- **Better Organization**: Clear separation between different types of filters
+
+**Key Features**:
+- Print tab shows: Εκτυπωτής + Είδος Εκτύπωσης filters
+- Lamination tab shows: Μηχάνημα + Είδος Πλαστικοποίησης/Βιβλιοδεσίας filters
+- Billing table has: Search + Status + Amount Range + Price Range filters
+- All filters are cleared with a single reset button
+- Real-time filter counts show filtered vs total items
+
+### Dashboard Filter Styling Enhancement (December 2024)
+
+**Problem**: The filters needed visual consistency with their respective sections, using blue styling for print filters, green for lamination filters, and yellow for billing table filters.
+
+**Solution**: Applied color-coded styling to match the section themes and moved billing filters above the card with proper yellow styling.
+
+**Changes Made**:
+
+**1. Tab-Specific Filter Styling**:
+- **Print Filters**: Applied blue theme to match "Ιστορικό Εκτυπώσεων" section
+- **Lamination Filters**: Applied green theme to match "Ιστορικό Πλαστικοποιήσεων" section
+- Added proper color-coded borders, backgrounds, and text colors
+
+```typescript
+{/* Print Filters - Blue Theme */}
+<div className="bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+  <Card className="border-blue-200">
+    <CardHeader className="bg-blue-100">
+      <CardTitle className="flex items-center gap-2 text-blue-800">
+        <Filter className="h-5 w-5" />
+        Φίλτρα Εκτυπώσεων
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="pt-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-blue-50 rounded-lg">
+        {/* Blue-themed form elements */}
+        <Label className="text-blue-800">Αναζήτηση</Label>
+        <Input className="border-blue-200 focus:border-blue-500" />
+        <SelectTrigger className="border-blue-200 focus:border-blue-500">
+      </div>
+    </CardContent>
+  </Card>
+</div>
+
+{/* Lamination Filters - Green Theme */}
+<div className="bg-green-50 rounded-lg border border-green-200 shadow-sm">
+  <Card className="border-green-200">
+    <CardHeader className="bg-green-100">
+      <CardTitle className="flex items-center gap-2 text-green-800">
+        <Filter className="h-5 w-5" />
+        Φίλτρα Πλαστικοποιήσεων
+      </CardTitle>
+    </CardHeader>
+    {/* Green-themed form elements */}
+  </Card>
+</div>
+```
+
+**2. Billing Table Filter Repositioning and Advanced Features**:
+- Moved billing table filters above the card instead of inside
+- Applied yellow background only on the title with icon container
+- Added comprehensive advanced filtering features from admin page
+- Added proper spacing and visual separation
+
+```typescript
+{/* Billing Table Filters - Above the card with yellow title only */}
+<div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-8">
+  {/* Filters section */}
+  <div className="p-6 bg-white border-b border-gray-200">
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center gap-3">
+        <div className="bg-yellow-100 p-2 rounded-lg">
+          <Filter className="h-5 w-5 text-yellow-700" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900">Φίλτρα Συγκεντρωτικού Πίνακα</h3>
+      </div>
+      <button className="p-2 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition">
+        <RotateCcw className="h-4 w-4 text-gray-500" />
+      </button>
+    </div>
+    
+    {/* Basic filters with gray styling */}
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <Label className="text-gray-700">Αναζήτηση</Label>
+      <Input className="border-gray-200 focus:border-yellow-500" />
+      <SelectTrigger className="border-gray-200 focus:border-yellow-500" />
+    </div>
+    
+    {/* Advanced price range filter with slider and radio buttons */}
+    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+      {/* Manual input fields */}
+      <div className="flex justify-center">
+        <Input className="w-24 h-9 text-sm border-gray-300 focus:border-yellow-500" />
+        <span>€</span>
+        <span>-</span>
+        <Input className="w-24 h-9 text-sm border-gray-300 focus:border-yellow-500" />
+        <span>€</span>
+      </div>
+      
+      {/* Histogram visualization */}
+      <div className="flex items-end justify-between h-16 mb-2 px-2">
+        {/* Yellow histogram bars showing data distribution */}
+      </div>
+      
+      {/* 2-thumb slider */}
+      <Slider
+        value={billingPriceRange}
+        onValueChange={(value: number[]) => setBillingPriceRange(value as [number, number])}
+        min={0}
+        max={billingPriceDistribution.max}
+        step={0.01}
+        className="w-full"
+      />
+      
+      {/* Quick range radio buttons */}
+      <RadioGroup className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+        {intervals.map(([start, end], i) => (
+          <div className="flex items-center" key={i}>
+            <RadioGroupItem value={`${start}-${end}`} id={`billing-range-${i}`} className="sr-only" />
+            <Label 
+              htmlFor={`billing-range-${i}`} 
+              className={`text-sm px-3 py-1 rounded-full border cursor-pointer transition ${
+                billingPriceRange[0] === start && billingPriceRange[1] === end 
+                  ? 'bg-yellow-100 border-yellow-400 text-yellow-800 font-semibold' 
+                  : 'bg-white border-gray-300 text-gray-700'
+              }`}
+            >
+              {intervalLabels[i]} ({intervalCounts[i]})
+            </Label>
+          </div>
+        ))}
+      </RadioGroup>
+    </div>
+  </div>
+  
+  {/* Billing table card */}
+  <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+    {/* Existing billing table content */}
+  </div>
+</div>
+```
+
+**3. Advanced Filtering Features Added**:
+- **Histogram Visualization**: Yellow bars showing data distribution across price ranges
+- **2-Thumb Slider**: Interactive slider for precise price range selection
+- **Quick Range Radio Buttons**: Pre-defined ranges with counts for rapid filtering
+- **Manual Input Fields**: Direct numeric input with proper formatting
+- **Reset Functionality**: Individual reset for price range and global reset for all filters
+
+```typescript
+// Histogram calculation
+const NUM_BUCKETS = 16;
+const bucketSize = (billingPriceDistribution.max - billingPriceDistribution.min) / NUM_BUCKETS;
+const buckets = Array.from({ length: NUM_BUCKETS }, (_, i) => {
+  const start = billingPriceDistribution.min + i * bucketSize;
+  const end = start + bucketSize;
+  const count = printBilling.filter((b) => {
+    const amount = b.remainingBalance;
+    return amount >= start && (i === NUM_BUCKETS - 1 ? amount <= end : amount < end);
+  }).length;
+  return { start, end, count };
+});
+
+// Quick range intervals
+const intervalSize = (maxValue - minValue) / 4;
+const intervals = [
+  [minValue, minValue + intervalSize],
+  [minValue + intervalSize, minValue + 2 * intervalSize],
+  [minValue + 2 * intervalSize, minValue + 3 * intervalSize],
+  [minValue + 3 * intervalSize, maxValue],
+];
+```
+
+**4. Color-Coded Form Elements**:
+- Applied consistent color themes to all form inputs and selects
+- Added focus states with appropriate colors
+- Styled labels and text with theme colors
+
+```typescript
+// Blue theme for print filters
+className="border-blue-200 focus:border-blue-500"
+className="text-blue-800"
+
+// Green theme for lamination filters  
+className="border-green-200 focus:border-green-500"
+className="text-green-800"
+
+// Yellow theme for billing filters (focus only)
+className="border-gray-200 focus:border-yellow-500"
+className="text-gray-700"
+```
+
+**5. Reset Button Styling**:
+- Applied theme-appropriate colors to reset buttons
+- Added hover states with lighter theme colors
+- Maintained consistent styling across all filter sections
+
+```typescript
+// Blue theme reset button
+className="p-2 rounded-full border border-blue-300 bg-white hover:bg-blue-50 transition"
+<RotateCcw className="h-4 w-4 text-blue-600" />
+
+// Green theme reset button
+className="p-2 rounded-full border border-green-300 bg-white hover:bg-green-50 transition"
+<RotateCcw className="h-4 w-4 text-green-600" />
+
+// Gray theme reset button (billing)
+className="p-2 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition"
+<RotateCcw className="h-4 w-4 text-gray-500" />
+```
+
+**Benefits**:
+- **Visual Consistency**: Filters now match their respective section themes
+- **Better Organization**: Billing filters are clearly separated above the table
+- **Advanced Functionality**: Comprehensive filtering with slider, radio buttons, and histogram
+- **Improved UX**: Color coding helps users understand which filters affect which data
+- **Professional Appearance**: Consistent styling throughout the interface
+- **Clear Hierarchy**: Proper visual hierarchy with themed sections
+
+**Key Features**:
+- **Blue Theme**: Print filters match the blue "Ιστορικό Εκτυπώσεων" section
+- **Green Theme**: Lamination filters match the green "Ιστορικό Πλαστικοποιήσεων" section  
+- **Yellow Title Only**: Billing filters use yellow background only on the title icon
+- **Advanced Filtering**: Slider, radio buttons, histogram, and manual input fields
+- **Proper Spacing**: Adequate gaps between filter sections and cards
+- **Consistent Styling**: All form elements use theme-appropriate colors
+- **Responsive Design**: Works well on all screen sizes
+
 ### Printer Configuration Update (December 2024)
 
 **Problem**: The system needed to be updated to include 3 specific printers: Canon Colour, Canon B/W, and Brother, replacing the previous generic printer names.

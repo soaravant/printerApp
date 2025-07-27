@@ -3,11 +3,13 @@
 import React, { useEffect, useState } from "react"
 import { Input } from "./input"
 import { Label } from "./label"
-import { Calendar } from "lucide-react"
+import { Calendar, X } from "lucide-react"
 import { Button } from "./button"
 import { Popover, PopoverContent, PopoverTrigger } from "./popover"
 import { Calendar as CalendarComponent } from "./calendar"
+
 import { formatGreekDate, toLocalISOString } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 
 interface GreekDatePickerProps {
   id: string
@@ -35,6 +37,7 @@ export function GreekDatePicker({
   const [isClient, setIsClient] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [displayValue, setDisplayValue] = useState("")
+  const [currentMonth, setCurrentMonth] = useState(new Date())
 
   useEffect(() => {
     setIsClient(true)
@@ -44,8 +47,11 @@ export function GreekDatePicker({
     if (value) {
       const date = new Date(value)
       setDisplayValue(formatGreekDate(date))
+      setCurrentMonth(date)
     } else {
       setDisplayValue("")
+      // Reset to current month when no date is selected
+      setCurrentMonth(new Date())
     }
   }, [value])
 
@@ -58,67 +64,71 @@ export function GreekDatePicker({
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value
-    setDisplayValue(inputValue)
-    
-    // Try to parse the Greek format input
-    const parts = inputValue.split('/')
-    if (parts.length === 3) {
-      const [dayStr, monthStr, yearStr] = parts
-      const date = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr))
-      if (!isNaN(date.getTime())) {
-        // Use local date formatting to avoid timezone issues
-        const isoDate = toLocalISOString(date)
-        onChange(isoDate)
-      }
-    }
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onChange("")
+    setDisplayValue("")
   }
 
   const selectedDate = value ? new Date(value) : undefined
 
+
+
   return (
-    <div className={`space-y-2 ${className}`}>
+    <div className={cn("", className)}>
       {label && (
-        <Label htmlFor={id} className="text-sm font-medium">
+        <Label htmlFor={id} className="text-gray-700">
           {label}
         </Label>
       )}
       
-      <div className="flex gap-2">
-        <Input
-          id={id}
-          type="text"
-          value={displayValue}
-          onChange={handleInputChange}
-          placeholder="ηη/μμ/εεεε"
-          required={required}
-          disabled={disabled}
-          className="flex-1"
-          style={{ direction: 'ltr' }}
-        />
-        
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={disabled}
-              className="shrink-0"
-            >
-              <Calendar className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <CalendarComponent
-              mode="single"
-              selected={selectedDate}
-              onSelect={handleDateSelect}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <div className="flex items-center gap-2">
+            {displayValue ? (
+              // Show selected date with clear button
+              <div className="flex items-center gap-2 flex-1">
+                <Button
+                  variant="outline"
+                  className="justify-start text-left font-normal flex-1 h-10"
+                  disabled={disabled}
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {displayValue}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleClear}
+                  disabled={disabled}
+                  className="h-10 w-10"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              // Show full-width button when no date selected
+              <Button
+                variant="outline"
+                disabled={disabled}
+                className="h-10 w-full justify-center"
+              >
+                <Calendar className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <CalendarComponent
+            mode="single"
+            selected={selectedDate}
+            onSelect={handleDateSelect}
+            month={currentMonth}
+            onMonthChange={setCurrentMonth}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
     </div>
   )
 } 

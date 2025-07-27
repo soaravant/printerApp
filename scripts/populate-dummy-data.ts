@@ -28,7 +28,7 @@ export function populateDummyData() {
     // Log some sample data
     console.log("\n👥 Sample Users:")
     users.forEach((user) => {
-      console.log(`   - ${user.displayName} (${user.username}) - ${user.role}`)
+      console.log(`   - ${user.displayName} (${user.username}) - ${user.accessLevel}`)
     })
 
     console.log("\n💰 Current Pricing:")
@@ -83,7 +83,7 @@ export function addTestUser(
   username: string,
   displayName: string,
   department: string,
-  role: "user" | "admin" = "user",
+  accessLevel: "user" | "admin" = "user",
 ) {
   try {
     const users = dummyDB.getUsers()
@@ -97,10 +97,9 @@ export function addTestUser(
     const newUser: User = {
       uid: `user-${Date.now()}`,
       username,
-      role,
+      accessLevel,
       displayName,
       department,
-      email: `${username}@example.com`,
       createdAt: new Date(),
     }
 

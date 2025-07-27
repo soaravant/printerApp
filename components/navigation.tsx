@@ -40,7 +40,7 @@ export function Navigation() {
     },
   ]
 
-  const visibleItems = navItems.filter((item) => item.roles.includes(user.role))
+  const visibleItems = navItems.filter((item) => item.roles.includes(user.accessLevel))
 
   // Truncate username if too long
   const truncateText = (text: string, maxLength: number) => {
@@ -90,7 +90,7 @@ export function Navigation() {
                   <div className="text-sm font-medium text-gray-700">{displayUsername}</div>
                   {displayName && <div className="text-xs text-gray-500">{displayName}</div>}
                 </div>
-                <RoleBadge role={user.role} className="text-xs" />
+                <RoleBadge accessLevel={user.accessLevel} className="text-xs" />
               </div>
             </div>
 

@@ -33,7 +33,7 @@ export default function PopulateDataPage() {
     {
       uid: "admin-001",
       username: "admin",
-      role: "admin",
+              accessLevel: "admin",
       displayName: "Διαχειριστής",
       department: "Πληροφορική",
     },
@@ -175,7 +175,7 @@ export default function PopulateDataPage() {
       const allBilling: BillingRecord[] = []
 
       for (const user of demoUsers) {
-        if (user.role === "admin") continue // Παράλειψη admin χρήστη για εκτυπώσεις
+        if (user.accessLevel === "admin") continue // Παράλειψη admin χρήστη για εκτυπώσεις
 
         const jobCount = Math.floor(Math.random() * 40) + 20 // 20-60 εκτυπώσεις ανά χρήστη
         const userJobs = generateRandomJobs(user, jobCount)

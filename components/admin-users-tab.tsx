@@ -14,6 +14,8 @@ interface AdminUsersTabProps {
   setUsersTabSearchTerm: (v: string) => void;
   debtFilter: string;
   setDebtFilter: (v: string) => void;
+  roleFilter: string;
+  setRoleFilter: (v: string) => void;
   priceRange: [number, number];
   setPriceRange: (v: [number, number]) => void;
   priceRangeInputs: [string, string];
@@ -30,6 +32,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
   setUsersTabSearchTerm,
   debtFilter,
   setDebtFilter,
+  roleFilter,
+  setRoleFilter,
   priceRange,
   setPriceRange,
   priceRangeInputs,
@@ -102,6 +106,20 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 className="pl-10"
               />
             </div>
+          </div>
+          <div className="w-full md:w-60 flex items-center">
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Όλοι οι ρόλοι</SelectItem>
+                <SelectItem value="Άτομο">Άτομο</SelectItem>
+                <SelectItem value="Ομάδα">Ομάδα</SelectItem>
+                <SelectItem value="Ναός">Ναός</SelectItem>
+                <SelectItem value="Τομέας">Τομέας</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="w-full md:w-60 flex items-center">
             <Select value={debtFilter} onValueChange={setDebtFilter}>
@@ -269,84 +287,68 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
         {filteredUsers.map((userData) => {
           const printBilling = dummyDB.getPrintBilling(userData.uid);
           const laminationBilling = dummyDB.getLaminationBilling(userData.uid);
-          const printJobs = dummyDB.getPrintJobs(userData.uid);
-          const laminationJobs = dummyDB.getLaminationJobs(userData.uid);
           const printUnpaid = printBilling.filter((b: any) => !b.paid).reduce((sum: number, b: any) => sum + b.remainingBalance, 0);
           const laminationUnpaid = laminationBilling.filter((b: any) => !b.paid).reduce((sum: number, b: any) => sum + b.remainingBalance, 0);
           const totalUnpaid = printUnpaid + laminationUnpaid;
           return (
-            <Card key={userData.uid} className="hover:shadow-lg transition-shadow">
+            <Card key={userData.uid} className="hover:shadow-lg transition-shadow flex flex-col h-full">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <User className="h-5 w-5" />
                     {userData.displayName}
                   </div>
-                  <Badge variant={userData.role === "admin" ? "default" : "secondary"}>
-                    {userData.role === "admin" ? "Admin" : "User"}
+                  <Badge variant={userData.accessLevel === "admin" ? "default" : "secondary"}>
+                    {userData.accessLevel === "admin" ? "Admin" : "User"}
                   </Badge>
                 </CardTitle>
                 <CardDescription className="flex items-center gap-2">
                   <Building className="h-4 w-4" />
-                  {userData.department}
+                  {userData.department} • {userData.userRole}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="flex flex-col flex-1 space-y-4">
                 <div className="text-sm space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Username:</span>
                     <span className="font-mono">{userData.username}</span>
                   </div>
-                  {userData.email && (
+
+                  {userData.responsiblePerson && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Email:</span>
-                      <span className="text-sm">{userData.email}</span>
+                      <span className="text-gray-600">Υπεύθυνος:</span>
+                      <span className="text-sm">{userData.responsiblePerson}</span>
                     </div>
                   )}
                 </div>
-                {userData.role === "user" && (
-                  <>
-                    <div className="border-t pt-4">
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">Οφειλές</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between items-center">
-                          <span className="flex items-center gap-1">
-                            <Printer className="h-3 w-3" /> Εκτυπώσεις:
-                          </span>
-                          <span className={printUnpaid > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
-                            {formatPrice(printUnpaid)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="flex items-center gap-1">
-                            <Printer className="h-3 w-3" /> Πλαστικοποιήσεις:
-                          </span>
-                          <span className={laminationUnpaid > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
-                            {formatPrice(laminationUnpaid)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center border-t pt-2">
-                          <span className="font-medium">Σύνολο:</span>
-                          <span className={totalUnpaid > 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>
-                            {formatPrice(Math.round((printUnpaid + laminationUnpaid + Number.EPSILON) * 100) / 100)}
-                          </span>
-                        </div>
+                {userData.accessLevel === "user" && (
+                  <div className="border-t pt-4 mt-auto">
+                    <h4 className="font-medium text-sm text-gray-700 mb-2">Οφειλές</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1">
+                          <Printer className="h-3 w-3" /> Εκτυπώσεις:
+                        </span>
+                        <span className={printUnpaid > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
+                          {formatPrice(printUnpaid)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1">
+                          <Printer className="h-3 w-3" /> Πλαστικοποιήσεις:
+                        </span>
+                        <span className={laminationUnpaid > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
+                          {formatPrice(laminationUnpaid)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center border-t pt-2">
+                        <span className="font-medium">Σύνολο:</span>
+                        <span className={totalUnpaid > 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>
+                          {formatPrice(Math.round((printUnpaid + laminationUnpaid + Number.EPSILON) * 100) / 100)}
+                        </span>
                       </div>
                     </div>
-                    <div className="border-t pt-4">
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">Στατιστικά</h4>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="text-center p-2 bg-gray-50 rounded">
-                          <div className="font-semibold">{printJobs.length}</div>
-                          <div className="text-gray-600">Εκτυπώσεις</div>
-                        </div>
-                        <div className="text-center p-2 bg-gray-50 rounded">
-                          <div className="font-semibold">{laminationJobs.length}</div>
-                          <div className="text-gray-600">Πλαστικοποιήσεις</div>
-                        </div>
-                      </div>
-                    </div>
-                  </>
+                  </div>
                 )}
               </CardContent>
             </Card>

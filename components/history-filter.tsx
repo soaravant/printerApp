@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Filter, X } from "lucide-react"
+import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 
 export interface FilterConfig {
   searchFields: string[]
@@ -134,13 +135,11 @@ export function HistoryFilter({ data, config, onFilteredData, title = "Φίλτ�
             {/* Date From */}
             {config.dateField && (
               <div className="space-y-2">
-                <Label htmlFor="dateFrom">Από Ημερομηνία</Label>
-                <Input 
-                  id="dateFrom" 
-                  type="date" 
-                  value={dateFrom} 
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  lang="el-GR"
+                <GreekDatePicker
+                  id="dateFrom"
+                  label="Από Ημερομηνία"
+                  value={dateFrom}
+                  onChange={setDateFrom}
                 />
               </div>
             )}
@@ -148,13 +147,11 @@ export function HistoryFilter({ data, config, onFilteredData, title = "Φίλτ�
             {/* Date To */}
             {config.dateField && (
               <div className="space-y-2">
-                <Label htmlFor="dateTo">Έως Ημερομηνία</Label>
-                <Input 
-                  id="dateTo" 
-                  type="date" 
-                  value={dateTo} 
-                  onChange={(e) => setDateTo(e.target.value)}
-                  lang="el-GR"
+                <GreekDatePicker
+                  id="dateTo"
+                  label="Έως Ημερομηνία"
+                  value={dateTo}
+                  onChange={setDateTo}
                 />
               </div>
             )}

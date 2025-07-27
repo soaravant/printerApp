@@ -81,7 +81,7 @@ A comprehensive printer billing and management system built with Next.js, Fireba
 4. **Set up Firebase**
    - Create a Firebase project
    - Enable Firestore database
-   - Enable Authentication with Email/Password
+   - Enable Authentication with Username/Password
    - Deploy Firestore security rules from `firestore.rules`
 
 5. **Run the development server**
@@ -204,7 +204,7 @@ Set pricing through the admin interface or directly in Firestore:
 ## Security
 
 ### Authentication
-- Firebase Authentication with email/password
+- Firebase Authentication with username/password
 - Role-based access control (user/admin)
 - Secure session management
 

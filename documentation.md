@@ -101,7 +101,7 @@ Real-time Updates: Live data synchronization
 - **Tailwind Merge**: Utility for merging Tailwind CSS classes
 
 ### Backend Services
-- **Firebase Authentication**: Email/password authentication with role-based access
+- **Firebase Authentication**: Username/password authentication with role-based access
 - **Firestore**: NoSQL database for real-time data storage and synchronization
 - **Python**: Data collection service for printer integration
 - **Google Cloud Run**: Containerized deployment for Python service
@@ -116,7 +116,7 @@ Real-time Updates: Live data synchronization
 ## Key Features Implementation
 
 ### Authentication System
-- **Firebase Integration**: Email/password authentication with secure session management
+- **Firebase Integration**: Username/password authentication with secure session management
 - **Role-Based Access**: User and Admin roles with protected route components
 - **Session Persistence**: User stays logged in between browser sessions
 - **Profile Management**: User profile information and account settings
@@ -148,7 +148,7 @@ Real-time Updates: Live data synchronization
 ## User Experience Flow
 
 ### User Workflow
-1. **Login**: User authenticates with email/password through Firebase
+1. **Login**: User authenticates with username/password through Firebase
 2. **Dashboard**: View personal printing statistics and recent activity
 3. **Print History**: Browse detailed print job history with filtering options
 4. **Cost Calculator**: Calculate printing costs for different formats and quantities

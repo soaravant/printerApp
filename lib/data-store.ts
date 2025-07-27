@@ -4,7 +4,7 @@
 export interface User {
   uid: string
   username: string
-  role: "user" | "admin"
+  accessLevel: "user" | "admin"
   displayName: string
   department: string
 }

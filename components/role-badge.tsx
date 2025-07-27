@@ -1,12 +1,12 @@
 import { Badge } from "@/components/ui/badge"
 
 interface RoleBadgeProps {
-  role: "user" | "admin"
+  accessLevel: "user" | "admin"
   className?: string
 }
 
-export function RoleBadge({ role, className = "" }: RoleBadgeProps) {
-  const isAdmin = role === "admin"
+export function RoleBadge({ accessLevel, className = "" }: RoleBadgeProps) {
+  const isAdmin = accessLevel === "admin"
   
   return (
     <Badge 
