@@ -139,39 +139,39 @@ export default function PrintingPage() {
                     <CardContent>
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Περίοδος</TableHead>
-                            <TableHead>A4 Α/Μ</TableHead>
-                            <TableHead>A4 Έγχρωμο</TableHead>
-                            <TableHead>A3 Α/Μ</TableHead>
-                            <TableHead>A3 Έγχρωμο</TableHead>
-                            <TableHead>Συνολικό Κόστος</TableHead>
-                            <TableHead>Πληρωμένο</TableHead>
-                            <TableHead>Υπόλοιπο</TableHead>
-                            <TableHead>Ημ/νία Λήξης</TableHead>
-                            <TableHead>Κατάσταση</TableHead>
-                          </TableRow>
+                                              <TableRow>
+                      <TableHead className="text-center">Περίοδος</TableHead>
+                      <TableHead className="text-center">A4 Α/Μ</TableHead>
+                      <TableHead className="text-center">A4 Έγχρωμο</TableHead>
+                      <TableHead className="text-center">A3 Α/Μ</TableHead>
+                      <TableHead className="text-center">A3 Έγχρωμο</TableHead>
+                      <TableHead className="text-center">Συνολικό Κόστος</TableHead>
+                      <TableHead className="text-center">Πληρωμένο</TableHead>
+                      <TableHead className="text-center">Υπόλοιπο</TableHead>
+                      <TableHead className="text-center">Ημ/νία Λήξης</TableHead>
+                      <TableHead className="text-center">Κατάσταση</TableHead>
+                    </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filteredPrintBilling.map((billing) => (
                             <TableRow key={billing.billingId}>
-                              <TableCell className="font-medium">{billing.period}</TableCell>
-                              <TableCell>{billing.totalA4BW}</TableCell>
-                              <TableCell>{billing.totalA4Color}</TableCell>
-                              <TableCell>{billing.totalA3BW}</TableCell>
-                              <TableCell>{billing.totalA3Color}</TableCell>
-                              <TableCell>{formatPrice(billing.totalCost)}</TableCell>
-                              <TableCell>{formatPrice(billing.paidAmount)}</TableCell>
-                              <TableCell className={billing.remainingBalance > 0 ? "text-red-600 font-semibold" : ""}>
+                              <TableCell className="text-center font-medium">{billing.period}</TableCell>
+                              <TableCell className="text-center">{billing.totalA4BW}</TableCell>
+                              <TableCell className="text-center">{billing.totalA4Color}</TableCell>
+                              <TableCell className="text-center">{billing.totalA3BW}</TableCell>
+                              <TableCell className="text-center">{billing.totalA3Color}</TableCell>
+                              <TableCell className="text-center">{formatPrice(billing.totalCost)}</TableCell>
+                              <TableCell className="text-center">{formatPrice(billing.paidAmount)}</TableCell>
+                              <TableCell className={`text-center ${billing.remainingBalance > 0 ? "text-red-600 font-semibold" : ""}`}>
                                 {formatPrice(billing.remainingBalance)}
                               </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
+                              <TableCell className="text-center">
+                                <div className="flex items-center justify-center gap-1">
                                   <Calendar className="h-4 w-4" />
                                   {billing.dueDate.toLocaleDateString("el-GR")}
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="text-center">
                                 <Badge variant={billing.paid ? "default" : "destructive"}>
                                   {billing.paid ? "Πληρωμένο" : "Απλήρωτο"}
                                 </Badge>
@@ -201,30 +201,30 @@ export default function PrintingPage() {
                     <CardContent>
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Ημερομηνία</TableHead>
-                            <TableHead>Εκτυπωτής</TableHead>
-                            <TableHead>A4 Α/Μ</TableHead>
-                            <TableHead>A4 Έγχρωμο</TableHead>
-                            <TableHead>A3 Α/Μ</TableHead>
-                            <TableHead>A3 Έγχρωμο</TableHead>
-                            <TableHead>Κόστος</TableHead>
-                            <TableHead>Κατάσταση</TableHead>
-                          </TableRow>
+                                              <TableRow>
+                      <TableHead className="text-center">Ημερομηνία</TableHead>
+                      <TableHead className="text-center">Εκτυπωτής</TableHead>
+                      <TableHead className="text-center">A4 Α/Μ</TableHead>
+                      <TableHead className="text-center">A4 Έγχρωμο</TableHead>
+                      <TableHead className="text-center">A3 Α/Μ</TableHead>
+                      <TableHead className="text-center">A3 Έγχρωμο</TableHead>
+                      <TableHead className="text-center">Κόστος</TableHead>
+                      <TableHead className="text-center">Κατάσταση</TableHead>
+                    </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filteredPrintJobs.map((job) => (
                             <TableRow key={job.jobId}>
-                              <TableCell>{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
-                              <TableCell>
+                              <TableCell className="text-center">{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
+                              <TableCell className="text-center">
                                 <Badge variant="outline">{job.deviceName}</Badge>
                               </TableCell>
-                              <TableCell>{job.pagesA4BW}</TableCell>
-                              <TableCell>{job.pagesA4Color}</TableCell>
-                              <TableCell>{job.pagesA3BW}</TableCell>
-                              <TableCell>{job.pagesA3Color}</TableCell>
-                              <TableCell>{formatPrice(job.totalCost)}</TableCell>
-                              <TableCell>
+                              <TableCell className="text-center">{job.pagesA4BW}</TableCell>
+                              <TableCell className="text-center">{job.pagesA4Color}</TableCell>
+                              <TableCell className="text-center">{job.pagesA3BW}</TableCell>
+                              <TableCell className="text-center">{job.pagesA3Color}</TableCell>
+                              <TableCell className="text-center">{formatPrice(job.totalCost)}</TableCell>
+                              <TableCell className="text-center">
                                 <Badge variant={job.status === "completed" ? "default" : "secondary"}>
                                   {job.status === "completed" ? "Ολοκληρώθηκε" : job.status}
                                 </Badge>

@@ -12,6 +12,7 @@ export interface User {
 export interface PrintJob {
   jobId: string
   uid: string
+  username: string
   userDisplayName: string
   department: string
   pagesA4BW: number

@@ -106,6 +106,42 @@ const PaginationEllipsis = ({
 )
 PaginationEllipsis.displayName = "PaginationEllipsis"
 
+// Simple pagination component for table usage
+const SimplePagination = ({ 
+  page, 
+  total, 
+  pageSize, 
+  onPageChange 
+}: { 
+  page: number
+  total: number
+  pageSize: number
+  onPageChange: (p: number) => void 
+}) => {
+  const totalPages = Math.ceil(total / pageSize)
+  if (totalPages <= 1) return null
+  
+  return (
+    <div className="flex gap-2 justify-end items-center mt-2">
+      <button
+        className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        onClick={() => onPageChange(page - 1)}
+        disabled={page === 1}
+      >
+        &lt;
+      </button>
+      <span className="text-xs">Σελίδα {page} από {totalPages}</span>
+      <button
+        className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        onClick={() => onPageChange(page + 1)}
+        disabled={page === totalPages}
+      >
+        &gt;
+      </button>
+    </div>
+  )
+}
+
 export {
   Pagination,
   PaginationContent,
@@ -114,4 +150,5 @@ export {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
+  SimplePagination,
 }

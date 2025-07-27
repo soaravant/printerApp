@@ -15,6 +15,7 @@ export interface User {
 export interface PrintJob {
   jobId: string
   uid: string
+  username: string
   userDisplayName: string
   department: string
   pagesA4BW: number
@@ -35,9 +36,10 @@ export interface PrintJob {
 export interface LaminationJob {
   jobId: string
   uid: string
+  username: string
   userDisplayName: string
   department: string
-  type: "A3" | "A4" | "card_small" | "card_large"
+  type: "A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover"
   quantity: number
   pricePerUnit: number
   totalCost: number
@@ -156,9 +158,9 @@ class DummyDatabase {
         name: "Εκτυπώσεις",
         prices: {
           a4BW: 0.05,
-          a4Color: 0.15,
+          a4Color: 0.25,
           a3BW: 0.1,
-          a3Color: 0.3,
+          a3Color: 0.5,
         },
         isActive: true,
         createdAt: new Date("2024-01-01"),
@@ -168,10 +170,13 @@ class DummyDatabase {
         id: "lamination",
         name: "Πλαστικοποιήσεις",
         prices: {
-          A4: 1.5,
-          A3: 3.0,
-          card_small: 0.5,
-          card_large: 1.0,
+          A3: 0.4,
+          A4: 0.2,
+          A5: 0.1,
+          cards: 0.02,
+          spiral: 0.15,
+          colored_cardboard: 0.1,
+          plastic_cover: 0.15,
         },
         isActive: true,
         createdAt: new Date("2024-01-01"),
@@ -181,6 +186,11 @@ class DummyDatabase {
 
     // Generate sample data
     this.generateSampleData();
+  }
+
+  private getRandomPrinterName(): string {
+    const printers = ["Canon Colour", "Canon B/W", "Brother"];
+    return printers[Math.floor(Math.random() * printers.length)];
   }
 
   private generateSampleData() {
@@ -198,14 +208,15 @@ class DummyDatabase {
           const printJob: PrintJob = {
             jobId: `print-${userId}-${monthOffset}-${i}`,
             uid: userId,
+            username: user.username,
             userDisplayName: user.displayName,
             department: user.department,
             pagesA4BW: Math.floor(Math.random() * 8) + 1, // 1-8
             pagesA4Color: Math.floor(Math.random() * 4),   // 0-3
             pagesA3BW: Math.floor(Math.random() * 3),      // 0-2
             pagesA3Color: Math.floor(Math.random() * 2),   // 0-1
-            deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 10)}`,
-            deviceName: `Printer-${Math.floor(Math.random() * 3) + 1}`,
+            deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 3)}`,
+            deviceName: this.getRandomPrinterName(),
             timestamp: jobDate,
             costA4BW: 0,
             costA4Color: 0,
@@ -231,7 +242,7 @@ class DummyDatabase {
         const laminationJobsCount = Math.floor(Math.random() * 6) + 3;
         for (let i = 0; i < laminationJobsCount; i++) {
           const jobDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, Math.floor(Math.random() * 28) + 1);
-          const types: ("A3" | "A4" | "card_small" | "card_large")[] = ["A3", "A4", "card_small", "card_large"];
+          const types: ("A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover")[] = ["A3", "A4", "A5", "cards", "spiral", "colored_cardboard", "plastic_cover"];
           const type = types[Math.floor(Math.random() * types.length)];
           const quantity = Math.floor(Math.random() * 3) + 1; // 1-3
           const prices = this.priceTables.find((p) => p.id === "lamination")?.prices || {};
@@ -239,6 +250,7 @@ class DummyDatabase {
           const laminationJob: LaminationJob = {
             jobId: `lamination-${userId}-${monthOffset}-${i}`,
             uid: userId,
+            username: user.username,
             userDisplayName: user.displayName,
             department: user.department,
             type,

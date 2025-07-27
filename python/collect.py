@@ -65,15 +65,22 @@ class PrinterCollector:
             printer_config = os.getenv('PRINTER_CONFIG', '''[
                 {
                     "ip": "192.168.3.41",
-                    "name": "Canon iR-ADV C3330",
-                    "model": "canon_ir_adv",
+                    "name": "Canon Colour",
+                    "model": "canon_color",
                     "username": "admin",
                     "password": "admin"
                 },
                 {
                     "ip": "192.168.3.42", 
-                    "name": "HP LaserJet Pro M404",
-                    "model": "hp_laserjet",
+                    "name": "Canon B/W",
+                    "model": "canon_bw",
+                    "username": "admin",
+                    "password": "admin"
+                },
+                {
+                    "ip": "192.168.3.43",
+                    "name": "Brother",
+                    "model": "brother",
                     "username": "admin",
                     "password": "admin"
                 }
@@ -113,11 +120,11 @@ class PrinterCollector:
         
         return jobs
     
-    def collect_hp_data(self, printer: Dict[str, str]) -> List[Dict[str, Any]]:
-        """Collect data from HP LaserJet series printers"""
+    def collect_brother_data(self, printer: Dict[str, str]) -> List[Dict[str, Any]]:
+        """Collect data from Brother printers"""
         jobs = []
         try:
-            # HP specific API endpoints
+            # Brother specific API endpoints
             base_url = f"http://{printer['ip']}"
             
             # Get job history
@@ -129,11 +136,11 @@ class PrinterCollector:
             )
             
             if response.status_code == 200:
-                # Parse HP XML response
-                jobs = self.parse_hp_xml(response.text, printer)
+                # Parse Brother XML response
+                jobs = self.parse_brother_xml(response.text, printer)
             
         except Exception as e:
-            logger.error(f"Failed to collect HP data from {printer['ip']}: {e}")
+            logger.error(f"Failed to collect Brother data from {printer['ip']}: {e}")
         
         return jobs
     
@@ -156,17 +163,17 @@ class PrinterCollector:
             logger.error(f"Failed to parse Canon job: {e}")
             return None
     
-    def parse_hp_xml(self, xml_data: str, printer: Dict) -> List[Dict[str, Any]]:
-        """Parse HP XML job data"""
+    def parse_brother_xml(self, xml_data: str, printer: Dict) -> List[Dict[str, Any]]:
+        """Parse Brother XML job data"""
         jobs = []
         try:
             # Simplified XML parsing - in production, use proper XML parser
-            # This is a placeholder for HP-specific parsing logic
+            # This is a placeholder for Brother-specific parsing logic
             root = ET.fromstring(xml_data)
             
             for job_elem in root.findall('.//Job'):
                 job_data = {
-                    'jobId': job_elem.get('id', f"hp_{int(time.time())}"),
+                    'jobId': job_elem.get('id', f"brother_{int(time.time())}"),
                     'deviceIP': printer['ip'],
                     'deviceName': printer['name'],
                     'timestamp': datetime.now(),
@@ -180,7 +187,7 @@ class PrinterCollector:
                 jobs.append(job_data)
                 
         except Exception as e:
-            logger.error(f"Failed to parse HP XML: {e}")
+            logger.error(f"Failed to parse Brother XML: {e}")
         
         return jobs
     
@@ -296,10 +303,10 @@ class PrinterCollector:
             logger.info(f"Collecting data from {printer['name']} ({printer['ip']})")
             
             try:
-                if printer['model'] == 'canon_ir_adv':
+                if printer['model'] in ['canon_color', 'canon_bw']:
                     jobs = self.collect_canon_data(printer)
-                elif printer['model'] == 'hp_laserjet':
-                    jobs = self.collect_hp_data(printer)
+                elif printer['model'] == 'brother':
+                    jobs = self.collect_brother_data(printer)
                 else:
                     logger.warning(f"Unknown printer model: {printer['model']}")
                     continue
@@ -384,8 +391,6 @@ class PrinterCollector:
             data.update(self.extract_generic_counters(soup))
         elif 'canon' in text_content:
             data.update(self.extract_canon_counters(soup))
-        elif 'hp' in text_content or 'hewlett' in text_content:
-            data.update(self.extract_hp_counters(soup))
         elif 'brother' in text_content:
             data.update(self.extract_brother_counters(soup))
         else:
@@ -424,10 +429,7 @@ class PrinterCollector:
         # Canon-specific parsing logic
         return self.extract_generic_counters(soup)
     
-    def extract_hp_counters(self, soup: BeautifulSoup) -> Dict:
-        """Extract counters for HP printers"""
-        # HP-specific parsing logic
-        return self.extract_generic_counters(soup)
+
     
     def extract_brother_counters(self, soup: BeautifulSoup) -> Dict:
         """Extract counters for Brother printers"""

@@ -23,13 +23,13 @@ export function SortableTableHeader({
   return (
     <TableHead 
       className={cn(
-        "cursor-pointer select-none hover:bg-gray-50 transition-colors",
+        "cursor-pointer select-none hover:bg-gray-50 transition-colors text-center",
         isActive && "bg-blue-50",
         className
       )}
       onClick={() => onSort(sortKey)}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center justify-center gap-1">
         <span>{children}</span>
         <div className="flex flex-col">
           {!isActive ? (

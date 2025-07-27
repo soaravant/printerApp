@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import Pagination from "./pagination-helper"
+import { SimplePagination } from "@/components/ui/pagination"
 import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
 import { useState, useEffect } from "react"
@@ -44,8 +44,11 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
     switch (type) {
       case "A3": return "A3"
       case "A4": return "A4"
-      case "card_small": return "Κάρτα Μικρή"
-      case "card_large": return "Κάρτα Μεγάλη"
+      case "A5": return "A5"
+      case "cards": return "Κάρτες"
+      case "spiral": return "Σπιράλ"
+      case "colored_cardboard": return "Χρωματιστά Χαρτόνια"
+      case "plastic_cover": return "Πλαστικό Κάλυμμα"
       default: return type
     }
   }
@@ -67,11 +70,11 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
             </SortableTableHeader>
             {userRole === "admin" && (
               <SortableTableHeader
-                sortKey="uid"
+                sortKey="username"
                 currentSort={sortConfig}
                 onSort={handleSort}
               >
-                Χρήστης (ID)
+                Χρήστης
               </SortableTableHeader>
             )}
             {userRole === "admin" && (
@@ -122,14 +125,14 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
             ) : (
               sortedData.slice((page-1)*pageSize, page*pageSize).map((job: LaminationJob) => (
                 <TableRow key={job.jobId}>
-                  <TableCell>{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
-                  {userRole === "admin" && <TableCell>{job.uid}</TableCell>}
-                  {userRole === "admin" && <TableCell>{job.userDisplayName}</TableCell>}
-                  <TableCell>
+                  <TableCell className="text-center">{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
+                  {userRole === "admin" && <TableCell className="text-center">{job.username}</TableCell>}
+                  {userRole === "admin" && <TableCell className="text-center">{job.userDisplayName}</TableCell>}
+                  <TableCell className="text-center">
                     <Badge variant="outline">{getLaminationTypeLabel(job.type)}</Badge>
                   </TableCell>
-                  <TableCell>{job.quantity}</TableCell>
-                  <TableCell>{formatPrice(job.totalCost)}</TableCell>
+                  <TableCell className="text-center">{job.quantity}</TableCell>
+                  <TableCell className="text-center">{formatPrice(job.totalCost)}</TableCell>
                 </TableRow>
               ))
             )}
@@ -137,7 +140,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
         </Table>
       </div>
 
-      <Pagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
+              <SimplePagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
     </div>
   )
 } 

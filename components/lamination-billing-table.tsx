@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import Pagination from "./pagination-helper"
+import { SimplePagination } from "@/components/ui/pagination"
 import { Calendar } from "lucide-react"
 import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
@@ -163,25 +163,25 @@ export default function LaminationBillingTable({ data, page, pageSize, onPageCha
             ) : (
               sortedData.slice((page-1)*pageSize, page*pageSize).map((billing: LaminationBilling) => (
                 <TableRow key={billing.billingId}>
-                  <TableCell className="font-medium">{billing.period}</TableCell>
-                  {userRole === "admin" && <TableCell>{billing.userDisplayName}</TableCell>}
-                  {userRole === "admin" && <TableCell>{billing.department}</TableCell>}
-                  <TableCell>{billing.totalA3}</TableCell>
-                  <TableCell>{billing.totalA4}</TableCell>
-                  <TableCell>{billing.totalCardSmall}</TableCell>
-                  <TableCell>{billing.totalCardLarge}</TableCell>
-                  <TableCell>{formatPrice(billing.totalCost)}</TableCell>
-                  <TableCell>{formatPrice(billing.paidAmount)}</TableCell>
-                  <TableCell className={billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
+                  <TableCell className="text-center font-medium">{billing.period}</TableCell>
+                  {userRole === "admin" && <TableCell className="text-center">{billing.userDisplayName}</TableCell>}
+                  {userRole === "admin" && <TableCell className="text-center">{billing.department}</TableCell>}
+                  <TableCell className="text-center">{billing.totalA3}</TableCell>
+                  <TableCell className="text-center">{billing.totalA4}</TableCell>
+                  <TableCell className="text-center">{billing.totalCardSmall}</TableCell>
+                  <TableCell className="text-center">{billing.totalCardLarge}</TableCell>
+                  <TableCell className="text-center">{formatPrice(billing.totalCost)}</TableCell>
+                  <TableCell className="text-center">{formatPrice(billing.paidAmount)}</TableCell>
+                  <TableCell className={`text-center ${billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"}`}>
                     {formatPrice(billing.remainingBalance)}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
                       <Calendar className="h-4 w-4" />
                       {billing.dueDate.toLocaleDateString("el-GR")}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
                     <Badge variant={billing.paid ? "default" : "destructive"}>
                       {billing.paid ? "Πληρωμένο" : "Απλήρωτο"}
                     </Badge>
@@ -193,7 +193,7 @@ export default function LaminationBillingTable({ data, page, pageSize, onPageCha
         </Table>
       </div>
 
-      <Pagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
+              <SimplePagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
     </div>
   )
 } 

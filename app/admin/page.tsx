@@ -44,7 +44,7 @@ export default function AdminPage() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100])
   const [priceRangeInputs, setPriceRangeInputs] = useState<[string, string]>(["0", "100"])
   const [selectedUser, setSelectedUser] = useState("")
-  const [laminationType, setLaminationType] = useState<"A3" | "A4" | "card_small" | "card_large">("A4")
+  const [laminationType, setLaminationType] = useState<"A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover">("A4")
   const [quantity, setQuantity] = useState("1")
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(false)
@@ -210,6 +210,7 @@ export default function AdminPage() {
       const newJob: LaminationJob = {
         jobId: `lamination-job-${Date.now()}`,
         uid: selectedUser,
+        username: selectedUserData.username,
         userDisplayName: selectedUserData.displayName,
         department: selectedUserData.department,
         type: laminationType,
@@ -349,10 +350,16 @@ export default function AdminPage() {
         return "A3"
       case "A4":
         return "A4"
-      case "card_small":
-        return "Κάρτα Μικρή"
-      case "card_large":
-        return "Κάρτα Μεγάλη"
+      case "A5":
+        return "A5"
+      case "cards":
+        return "Κάρτες"
+      case "spiral":
+        return "Σπιράλ"
+      case "colored_cardboard":
+        return "Χρωματιστά Χαρτόνια"
+      case "plastic_cover":
+        return "Πλαστικό Κάλυμμα"
       default:
         return type
     }
@@ -387,10 +394,13 @@ export default function AdminPage() {
     setEditingPrices(prev => ({
       ...prev,
       lamination: {
-        A4: laminationPrices.A4?.toString() || "",
         A3: laminationPrices.A3?.toString() || "",
-        card_small: laminationPrices.card_small?.toString() || "",
-        card_large: laminationPrices.card_large?.toString() || "",
+        A4: laminationPrices.A4?.toString() || "",
+        A5: laminationPrices.A5?.toString() || "",
+        cards: laminationPrices.cards?.toString() || "",
+        spiral: laminationPrices.spiral?.toString() || "",
+        colored_cardboard: laminationPrices.colored_cardboard?.toString() || "",
+        plastic_cover: laminationPrices.plastic_cover?.toString() || "",
       }
     }))
   }
@@ -613,14 +623,13 @@ export default function AdminPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="A4">A4 ({formatPrice(laminationPrices.A4)})</SelectItem>
                             <SelectItem value="A3">A3 ({formatPrice(laminationPrices.A3)})</SelectItem>
-                            <SelectItem value="card_small">
-                              Κάρτα Μικρή ({formatPrice(laminationPrices.card_small)})
-                            </SelectItem>
-                            <SelectItem value="card_large">
-                              Κάρτα Μεγάλη ({formatPrice(laminationPrices.card_large)})
-                            </SelectItem>
+                            <SelectItem value="A4">A4 ({formatPrice(laminationPrices.A4)})</SelectItem>
+                            <SelectItem value="A5">A5 ({formatPrice(laminationPrices.A5)})</SelectItem>
+                            <SelectItem value="cards">Κάρτες ({formatPrice(laminationPrices.cards)})</SelectItem>
+                            <SelectItem value="spiral">Σπιράλ ({formatPrice(laminationPrices.spiral)})</SelectItem>
+                            <SelectItem value="colored_cardboard">Χρωματιστά Χαρτόνια ({formatPrice(laminationPrices.colored_cardboard)})</SelectItem>
+                            <SelectItem value="plastic_cover">Πλαστικό Κάλυμμα ({formatPrice(laminationPrices.plastic_cover)})</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -905,28 +914,7 @@ export default function AdminPage() {
                       </div>
                     </CardHeader>
                     <CardContent className="pt-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                          <h3 className="font-medium text-green-800">A4</h3>
-                          {isEditingLamination ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-green-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={editingPrices.lamination.A4 || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  lamination: { ...prev.lamination, A4: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-green-600">{formatPrice(laminationPrices.A4)}</p>
-                          )}
-                        </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="p-4 border border-green-200 rounded-lg bg-green-50">
                           <h3 className="font-medium text-green-800">A3</h3>
                           {isEditingLamination ? (
@@ -949,7 +937,7 @@ export default function AdminPage() {
                           )}
                         </div>
                         <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                          <h3 className="font-medium text-green-800">Κάρτα Μικρή</h3>
+                          <h3 className="font-medium text-green-800">A4</h3>
                           {isEditingLamination ? (
                             <div className="flex items-center gap-2 mt-2">
                               <span className="text-green-600">€</span>
@@ -957,22 +945,64 @@ export default function AdminPage() {
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={editingPrices.lamination.card_small || ""}
+                                value={editingPrices.lamination.A4 || ""}
                                 onChange={(e) => setEditingPrices(prev => ({
                                   ...prev,
-                                  lamination: { ...prev.lamination, card_small: e.target.value }
+                                  lamination: { ...prev.lamination, A4: e.target.value }
+                                }))}
+                                className="w-20 h-8 text-sm"
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-2xl font-bold text-green-600">{formatPrice(laminationPrices.A4)}</p>
+                          )}
+                        </div>
+                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
+                          <h3 className="font-medium text-green-800">A5</h3>
+                          {isEditingLamination ? (
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-green-600">€</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={editingPrices.lamination.A5 || ""}
+                                onChange={(e) => setEditingPrices(prev => ({
+                                  ...prev,
+                                  lamination: { ...prev.lamination, A5: e.target.value }
+                                }))}
+                                className="w-20 h-8 text-sm"
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-2xl font-bold text-green-600">{formatPrice(laminationPrices.A5)}</p>
+                          )}
+                        </div>
+                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
+                          <h3 className="font-medium text-green-800">Κάρτες</h3>
+                          {isEditingLamination ? (
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-green-600">€</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={editingPrices.lamination.cards || ""}
+                                onChange={(e) => setEditingPrices(prev => ({
+                                  ...prev,
+                                  lamination: { ...prev.lamination, cards: e.target.value }
                                 }))}
                                 className="w-20 h-8 text-sm"
                               />
                             </div>
                           ) : (
                             <p className="text-2xl font-bold text-green-600">
-                              {formatPrice(laminationPrices.card_small)}
+                              {formatPrice(laminationPrices.cards)}
                             </p>
                           )}
                         </div>
                         <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                          <h3 className="font-medium text-green-800">Κάρτα Μεγάλη</h3>
+                          <h3 className="font-medium text-green-800">Σπιράλ</h3>
                           {isEditingLamination ? (
                             <div className="flex items-center gap-2 mt-2">
                               <span className="text-green-600">€</span>
@@ -980,17 +1010,63 @@ export default function AdminPage() {
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={editingPrices.lamination.card_large || ""}
+                                value={editingPrices.lamination.spiral || ""}
                                 onChange={(e) => setEditingPrices(prev => ({
                                   ...prev,
-                                  lamination: { ...prev.lamination, card_large: e.target.value }
+                                  lamination: { ...prev.lamination, spiral: e.target.value }
                                 }))}
                                 className="w-20 h-8 text-sm"
                               />
                             </div>
                           ) : (
                             <p className="text-2xl font-bold text-green-600">
-                              {formatPrice(laminationPrices.card_large)}
+                              {formatPrice(laminationPrices.spiral)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
+                          <h3 className="font-medium text-green-800">Χρωματιστά Χαρτόνια</h3>
+                          {isEditingLamination ? (
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-green-600">€</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={editingPrices.lamination.colored_cardboard || ""}
+                                onChange={(e) => setEditingPrices(prev => ({
+                                  ...prev,
+                                  lamination: { ...prev.lamination, colored_cardboard: e.target.value }
+                                }))}
+                                className="w-20 h-8 text-sm"
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-2xl font-bold text-green-600">
+                              {formatPrice(laminationPrices.colored_cardboard)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
+                          <h3 className="font-medium text-green-800">Πλαστικό Κάλυμμα</h3>
+                          {isEditingLamination ? (
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-green-600">€</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={editingPrices.lamination.plastic_cover || ""}
+                                onChange={(e) => setEditingPrices(prev => ({
+                                  ...prev,
+                                  lamination: { ...prev.lamination, plastic_cover: e.target.value }
+                                }))}
+                                className="w-20 h-8 text-sm"
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-2xl font-bold text-green-600">
+                              {formatPrice(laminationPrices.plastic_cover)}
                             </p>
                           )}
                         </div>

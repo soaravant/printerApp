@@ -1,6 +1,6 @@
 # Printer Billing Application - File Structure
 
-> File structure current as of December 2024, including new admin UI components and scripts for price editing, filtering, and data reset features.
+> File structure current as of December 2024, including cleanup of unused components and files.
 
 ## Root Structure
 ```
@@ -114,22 +114,15 @@ components/
 │   └── use-toast.ts            # Toast hook
 ├── navigation.tsx              # Main navigation component
 ├── protected-route.tsx         # Route protection component
-├── theme-provider.tsx          # Theme context provider
-├── user-dashboard.tsx          # User dashboard component
-├── dashboard-stats.tsx         # Dashboard statistics component
-├── usage-chart.tsx             # Usage chart component
-├── cost-calculator.tsx         # Cost calculation component
-├── job-table.tsx               # Print job table component
-├── history-table.tsx           # History table component
-├── history-filter.tsx          # History filtering component
-├── billing-table.tsx           # Billing table component
-├── billing-management.tsx      # Billing management component
-├── admin-user-table.tsx        # Admin user management table
-├── admin-billing-table.tsx     # Admin billing table
-├── price-table-manager.tsx     # Price management component
-├── printer-status.tsx          # Printer status component
+├── role-badge.tsx              # User role badge component
 ├── searchable-select.tsx       # Searchable select component
-└── demo-login.tsx              # Demo login component
+├── history-filter.tsx          # History filtering component
+├── print-jobs-table.tsx        # Print job table component
+├── print-billing-table.tsx     # Print billing table component
+├── lamination-jobs-table.tsx   # Lamination job table component
+├── lamination-billing-table.tsx # Lamination billing table component
+├── usage-chart.tsx             # Usage chart component
+└── admin-users-tab.tsx         # Admin user management tab component
 ```
 
 ## Library Directory (`lib/`)
@@ -138,6 +131,8 @@ lib/
 ├── auth-context.tsx            # Firebase authentication context
 ├── data-store.ts               # Data store and state management
 ├── dummy-database.ts           # Dummy data for development
+├── refresh-context.tsx         # Global refresh context for data synchronization
+├── sort-utils.ts               # Table sorting utilities
 └── utils.ts                    # Utility functions and helpers
 ```
 
@@ -205,17 +200,17 @@ public/
 - Public access without authentication
 - Application overview and branding
 
-**`components/user-dashboard.tsx`** - User Dashboard:
+**`app/dashboard/page.tsx`** - User Dashboard:
 - Personal printing statistics display
 - Recent activity overview
 - Cost tracking and visualization
 - Navigation to other user features
 
-**`components/billing-management.tsx`** - Billing Management:
-- Admin billing interface
-- Monthly billing generation
-- Export functionality
-- User billing management
+**`components/navigation.tsx`** - Navigation:
+- Role-based navigation menu
+- Responsive design
+- Active state management
+- User profile integration
 
 **`lib/auth-context.tsx`** - Authentication Context:
 - Firebase authentication integration
@@ -237,17 +232,16 @@ public/
 - Accessibility features
 - TypeScript support
 
-**`components/navigation.tsx`** - Navigation:
-- Role-based navigation menu
-- Responsive design
-- Active state management
-- User profile integration
+**`components/history-filter.tsx`** - History Filter:
+- Advanced filtering for print and lamination history
+- Date range selection
+- Status filtering
+- Search functionality
 
-**`components/cost-calculator.tsx`** - Cost Calculator:
-- Real-time cost calculation
-- Multiple format support
-- Dynamic pricing integration
-- User-friendly interface
+**`components/searchable-select.tsx`** - Searchable Select:
+- Enhanced select component with search functionality
+- Used in admin interface for user selection
+- Proper keyboard navigation support
 
 ### Data Collection
 
@@ -310,4 +304,4 @@ public/
 - **Environment Configuration**: Flexible configuration for different deployment environments
 - **Error Resilience**: Comprehensive error handling with graceful fallbacks
 
-This streamlined structure focuses on the core printing management functionality while maintaining clean architecture and modern development practices. 
+This streamlined structure focuses on the core printing management functionality while maintaining clean architecture and modern development practices. The cleanup removed 15 unused components, reducing the components directory from 25 files to 10 files while preserving all functionality. 

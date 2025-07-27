@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import Pagination from "./pagination-helper"
+import { SimplePagination } from "@/components/ui/pagination"
 import { Calendar } from "lucide-react"
 import type { PrintBilling, User } from "@/lib/dummy-database"
 import { dummyDB } from "@/lib/dummy-database"
@@ -15,8 +15,8 @@ const BillingColGroup = () => (
     <col style={{ width: "15%" }} />
     <col style={{ width: "25%" }} />
     <col style={{ width: "25%" }} />
-    <col style={{ width: "20%" }} />
     <col style={{ width: "15%" }} />
+    <col style={{ width: "20%" }} />
   </colgroup>
 )
 
@@ -142,6 +142,7 @@ export default function PrintBillingTable({ data, page, pageSize, onPageChange, 
               sortKey="lastPayment"
               currentSort={sortConfig}
               onSort={handleSort}
+              className="whitespace-nowrap"
             >
               Τελευταία Εξόφληση
             </SortableTableHeader>
@@ -169,15 +170,15 @@ export default function PrintBillingTable({ data, page, pageSize, onPageChange, 
                 
                 return (
                   <TableRow key={billing.billingId}>
-                    <TableCell className="font-medium">{userData?.userRole || "-"}</TableCell>
-                    <TableCell>{billing.userDisplayName}</TableCell>
-                    <TableCell>{responsiblePerson}</TableCell>
-                    <TableCell className={billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
+                    <TableCell className="text-center font-medium">{userData?.userRole || "-"}</TableCell>
+                    <TableCell className="text-center">{billing.userDisplayName}</TableCell>
+                    <TableCell className="text-center">{responsiblePerson}</TableCell>
+                    <TableCell className={`text-center ${billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"}`}>
                       {formatPrice(billing.remainingBalance)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       {billing.lastPayment ? (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center justify-center gap-1">
                           <Calendar className="h-4 w-4" />
                           {billing.lastPayment.toLocaleDateString("el-GR")}
                         </div>
@@ -193,7 +194,7 @@ export default function PrintBillingTable({ data, page, pageSize, onPageChange, 
         </Table>
       </div>
 
-      <Pagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
+              <SimplePagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
     </div>
   )
 } 

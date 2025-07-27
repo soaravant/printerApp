@@ -80,6 +80,7 @@ export default function PopulateDataPage() {
       jobs.push({
         jobId: `job-${user.uid}-${i}-${Date.now()}`,
         uid: user.uid,
+        username: user.username,
         userDisplayName: user.displayName,
         department: user.department,
         pagesA4BW,

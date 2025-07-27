@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import Pagination from "./pagination-helper"
+import { SimplePagination } from "@/components/ui/pagination"
 import { Calendar } from "lucide-react"
 import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
@@ -40,7 +40,7 @@ const expandPrintJob = (job: PrintJob) => {
       ...job,
       printType: "A4 Ασπρόμαυρο",
       quantity: job.pagesA4BW,
-      cost: job.pagesA4BW * 0.05, // Assuming 0.05 per A4 BW page
+      cost: job.costA4BW, // Use the actual calculated cost from database
       originalJobId: job.jobId,
       rowId: `${job.jobId}-a4bw`
     })
@@ -51,7 +51,7 @@ const expandPrintJob = (job: PrintJob) => {
       ...job,
       printType: "A4 Έγχρωμο",
       quantity: job.pagesA4Color,
-      cost: job.pagesA4Color * 0.20, // Assuming 0.20 per A4 color page
+      cost: job.costA4Color, // Use the actual calculated cost from database
       originalJobId: job.jobId,
       rowId: `${job.jobId}-a4color`
     })
@@ -62,7 +62,7 @@ const expandPrintJob = (job: PrintJob) => {
       ...job,
       printType: "A3 Ασπρόμαυρο",
       quantity: job.pagesA3BW,
-      cost: job.pagesA3BW * 0.10, // Assuming 0.10 per A3 BW page
+      cost: job.costA3BW, // Use the actual calculated cost from database
       originalJobId: job.jobId,
       rowId: `${job.jobId}-a3bw`
     })
@@ -73,7 +73,7 @@ const expandPrintJob = (job: PrintJob) => {
       ...job,
       printType: "A3 Έγχρωμο",
       quantity: job.pagesA3Color,
-      cost: job.pagesA3Color * 0.40, // Assuming 0.40 per A3 color page
+      cost: job.costA3Color, // Use the actual calculated cost from database
       originalJobId: job.jobId,
       rowId: `${job.jobId}-a3color`
     })
@@ -115,11 +115,11 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
             </SortableTableHeader>
             {userRole === "admin" && (
               <SortableTableHeader
-                sortKey="uid"
+                sortKey="username"
                 currentSort={sortConfig}
                 onSort={handleSort}
               >
-                Χρήστης (ID)
+                Χρήστης
               </SortableTableHeader>
             )}
             {userRole === "admin" && (
@@ -177,15 +177,15 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
             ) : (
               sortedData.slice((page-1)*pageSize, page*pageSize).map((row: any) => (
                 <TableRow key={row.rowId}>
-                  <TableCell>{row.timestamp.toLocaleString("el-GR")}</TableCell>
-                  {userRole === "admin" && <TableCell>{row.uid}</TableCell>}
-                  {userRole === "admin" && <TableCell>{row.userDisplayName}</TableCell>}
-                  <TableCell>
+                  <TableCell className="text-center">{row.timestamp.toLocaleString("el-GR")}</TableCell>
+                  {userRole === "admin" && <TableCell className="text-center">{row.username}</TableCell>}
+                  {userRole === "admin" && <TableCell className="text-center">{row.userDisplayName}</TableCell>}
+                  <TableCell className="text-center">
                     <Badge variant="outline">{row.deviceName}</Badge>
                   </TableCell>
-                  <TableCell className="text-sm">{row.printType}</TableCell>
-                  <TableCell>{row.quantity}</TableCell>
-                  <TableCell>{formatPrice(row.cost)}</TableCell>
+                  <TableCell className="text-center text-sm">{row.printType}</TableCell>
+                  <TableCell className="text-center">{row.quantity}</TableCell>
+                  <TableCell className="text-center">{formatPrice(row.cost)}</TableCell>
                 </TableRow>
               ))
             )}
@@ -193,7 +193,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
         </Table>
       </div>
 
-      <Pagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
+      <SimplePagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
     </div>
   )
 } 

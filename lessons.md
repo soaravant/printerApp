@@ -2,6 +2,323 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+### Printer Configuration Update (December 2024)
+
+**Problem**: The system needed to be updated to include 3 specific printers: Canon Colour, Canon B/W, and Brother, replacing the previous generic printer names.
+
+**Solution**: Updated both the dummy database and Python data collection service to use the 3 specific printer names and their corresponding models.
+
+**Changes Made**:
+
+**1. Dummy Database Updates (`lib/dummy-database.ts`)**:
+- Added `getRandomPrinterName()` method that returns one of the 3 printer names
+- Updated print job generation to use the new printer names
+- Reduced IP range to 3 printers (192.168.1.100-102)
+
+```typescript
+private getRandomPrinterName(): string {
+  const printers = ["Canon Colour", "Canon B/W", "Brother"];
+  return printers[Math.floor(Math.random() * printers.length)];
+}
+
+// Updated in generateSampleData()
+deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 3)}`,
+deviceName: this.getRandomPrinterName(),
+```
+
+**2. Python Data Collection Updates (`python/collect.py`)**:
+- Updated printer configuration to include the 3 specific printers
+- Replaced HP LaserJet with Brother printer
+- Updated model types to match the new printers
+- Added Brother-specific data collection method
+
+```python
+printer_config = os.getenv('PRINTER_CONFIG', '''[
+    {
+        "ip": "192.168.3.41",
+        "name": "Canon Colour",
+        "model": "canon_color",
+        "username": "admin",
+        "password": "admin"
+    },
+    {
+        "ip": "192.168.3.42", 
+        "name": "Canon B/W",
+        "model": "canon_bw",
+        "username": "admin",
+        "password": "admin"
+    },
+    {
+        "ip": "192.168.3.43",
+        "name": "Brother",
+        "model": "brother",
+        "username": "admin",
+        "password": "admin"
+    }
+]''')
+```
+
+**3. Collection Logic Updates**:
+- Updated printer model detection to handle the new types
+- Added Brother data collection method
+- Removed HP-specific parsing methods
+- Updated status parsing to handle Brother printers
+
+```python
+# Updated collection logic
+if printer['model'] in ['canon_color', 'canon_bw']:
+    jobs = self.collect_canon_data(printer)
+elif printer['model'] == 'brother':
+    jobs = self.collect_brother_data(printer)
+else:
+    logger.warning(f"Unknown printer model: {printer['model']}")
+    continue
+
+# Added Brother collection method
+def collect_brother_data(self, printer: Dict[str, str]) -> List[Dict[str, Any]]:
+    """Collect data from Brother printers"""
+    # Brother-specific implementation
+```
+
+**4. Status Parsing Updates**:
+- Removed HP-specific counter extraction
+- Updated pattern matching to handle Brother printers
+- Maintained Canon and generic parsing methods
+
+```python
+# Updated pattern matching
+if 'canon' in text_content:
+    data.update(self.extract_canon_counters(soup))
+elif 'brother' in text_content:
+    data.update(self.extract_brother_counters(soup))
+else:
+    data.update(self.extract_fallback_counters(soup))
+```
+
+**Benefits**:
+- **Specific Printer Names**: Clear identification of the 3 actual printers in use
+- **Consistent Data**: Both dummy data and real collection use the same printer names
+- **Better Organization**: Canon printers are distinguished by color capability
+- **Realistic Configuration**: Matches the actual printer setup in the environment
+
+**Technical Notes**:
+- Canon printers are distinguished as "Canon Colour" and "Canon B/W" for clarity
+- Brother printer uses the "brother" model type for data collection
+- IP addresses are assigned sequentially (192.168.3.41, 192.168.3.42, 192.168.3.43)
+- All printers use the same admin credentials for consistency
+- Dummy data generation now creates more realistic printer assignments
+
+**Verification Process**:
+1. **Dummy Data Test**: Confirmed new printer names appear in generated print jobs
+2. **Collection Test**: Verified Python service can handle the new printer models
+3. **UI Display Test**: Confirmed printer names display correctly in all tables
+4. **Export Test**: Verified printer names are included in exported data
+
+**Future Considerations**:
+- Consider adding printer-specific capabilities (e.g., color support, paper sizes)
+- Implement printer status monitoring for each specific model
+- Add printer-specific error handling and troubleshooting
+- Consider printer-specific pricing if different models have different costs
+
+### Chart Removal from Dashboard (December 2024)
+
+**Problem**: The monthly cost chart ("Μηνιαία Κόστη (Τελευταίοι 6 Μήνες)") was displayed to all users on the dashboard, but it was requested to be removed for all users.
+
+**Solution**: Completely removed the chart component and all related code from the dashboard page.
+
+**Changes Made**:
+1. **Removed Dynamic Import**: Deleted the dynamic import for `UsageChart` component
+2. **Removed Chart Function**: Deleted the `generateChartData()` function that was generating chart data
+3. **Removed Chart JSX**: Deleted the entire chart section from the dashboard layout
+
+**Code Removed**:
+```tsx
+// Dynamic import (removed)
+const UsageChart = dynamic(() => import("@/components/usage-chart"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση γραφήματος...</div>,
+  ssr: false,
+})
+
+// Chart function (removed)
+const generateChartData = () => {
+  // ... chart data generation logic
+}
+
+// Chart JSX section (removed)
+<div className="bg-blue-50 p-6 rounded-lg space-y-6 w-full max-w-full">
+  <UsageChart
+    data={generateChartData()}
+    title="Μηνιαία Κόστη (Τελευταίοι 6 Μήνες)"
+    printLabel="Εκτυπώσεις"
+    laminationLabel="Πλαστικοποιήσεις"
+  />
+</div>
+```
+
+**Benefits**:
+- **Cleaner Interface**: Removes visual clutter from the dashboard
+- **Simplified Layout**: Dashboard focuses on essential data tables and summary cards
+- **Reduced Bundle Size**: Removes unused chart component from the build
+- **Better Performance**: Eliminates chart rendering overhead
+
+**Verification Process**:
+1. **Build Test**: Confirmed application builds successfully after chart removal
+2. **Functionality Test**: Verified all other dashboard features work correctly
+3. **Layout Test**: Confirmed dashboard layout remains consistent without the chart
+4. **Import Check**: Verified no broken imports or missing dependencies
+
+**Technical Notes**:
+- Chart component file (`components/usage-chart.tsx`) remains in the codebase for potential future use
+- No other components or functionality were affected by the removal
+- Dashboard now ends with the tabs section, providing a cleaner layout
+- All existing data tables and summary cards remain fully functional
+
+**Future Considerations**:
+- Chart component can be easily re-added if needed in the future
+- Consider adding alternative data visualization if required
+- Monitor user feedback on the simplified dashboard layout
+
+### Role-Based Export Button Visibility (December 2024)
+
+**Problem**: Simple users (non-admin) were able to see and use the "Εξαγωγή XLSX" (Export XLSX) buttons on all tables in the dashboard, which should be restricted to admin users only for security and data protection reasons.
+
+**Solution**: Implemented role-based conditional rendering for all export buttons in the dashboard tables by wrapping them with `{user.role === "admin" && (...)}` conditions.
+
+**Changes Made**:
+1. **Billing Table Export Button**: Wrapped the export button in the "Συγκεντρωτικός Χρεωστικός Πίνακας" section with admin role check
+2. **Print Jobs Export Button**: Wrapped the export button in the "Ιστορικό Εκτυπώσεων" section with admin role check  
+3. **Lamination Jobs Export Button**: Wrapped the export button in the "Ιστορικό Πλαστικοποιήσεων" section with admin role check
+
+**Code Pattern Used**:
+```tsx
+{user.role === "admin" && (
+  <Button
+    onClick={() => exportTableXLSX(...)}
+    variant="outline"
+    size="sm"
+    className="..."
+  >
+    <Download className="h-4 w-4 mr-2" />
+    Εξαγωγή XLSX
+  </Button>
+)}
+```
+
+**Benefits**:
+- **Security**: Prevents unauthorized data export by simple users
+- **Data Protection**: Ensures sensitive billing and job data is only accessible to admins
+- **User Experience**: Cleaner interface for simple users without unnecessary export options
+- **Role Compliance**: Maintains proper role-based access control throughout the application
+
+**Verification Process**:
+1. **Admin User Test**: Confirmed export buttons are visible and functional for admin users
+2. **Simple User Test**: Verified export buttons are hidden for users with "user" role
+3. **Functionality Test**: Ensured all other dashboard features work correctly for both user types
+4. **UI Consistency**: Confirmed the layout remains consistent when buttons are hidden
+
+**Technical Notes**:
+- Used existing `user.role` property from the auth context
+- Maintained all existing export functionality for admin users
+- No changes to the export logic itself, only visibility control
+- Consistent with existing role-based patterns in the application
+
+**Future Considerations**:
+- Consider adding audit logging for export actions
+- Implement export permission granularity if needed
+- Add user feedback when export is not available
+- Consider role-based export format restrictions
+
+### Code Cleanup - Removal of Unused Components and Files (December 2024)
+
+**Problem**: The codebase had accumulated several unused components and files that were not being imported or used anywhere in the application, creating unnecessary clutter and maintenance overhead.
+
+**Solution**: Conducted a comprehensive analysis of component usage and removed all unused files while ensuring no existing functionality was broken.
+
+**Analysis Process**:
+1. **Component Usage Analysis**: Searched for all import statements across the codebase to identify which components were actually being used
+2. **Dynamic Import Check**: Verified components that were dynamically imported in the dashboard page
+3. **Direct Import Verification**: Confirmed components imported directly in app pages
+4. **Cross-Reference**: Cross-referenced with the file structure documentation to ensure accuracy
+
+**Components Found to be Unused**:
+- `components/user-dashboard.tsx` - Not imported anywhere, dashboard functionality moved to `app/dashboard/page.tsx`
+- `components/dashboard-stats.tsx` - Only used by the unused `user-dashboard.tsx`
+- `components/cost-calculator.tsx` - Not imported or used in any page
+- `components/job-table.tsx` - Not imported or used in any page
+- `components/history-table.tsx` - Not imported or used in any page
+- `components/billing-table.tsx` - Not imported or used in any page
+- `components/billing-management.tsx` - Not imported or used in any page
+- `components/admin-user-table.tsx` - Not imported or used in any page
+- `components/admin-billing-table.tsx` - Not imported or used in any page
+- `components/price-table-manager.tsx` - Not imported or used in any page
+- `components/printer-status.tsx` - Not imported or used in any page
+- `components/demo-login.tsx` - Not imported or used in any page
+- `components/theme-provider.tsx` - Not imported or used in any page
+- `components/pagination-helper.tsx` - Not imported or used in any page
+
+**Components Confirmed to be Used**:
+- `components/protected-route.tsx` - Used in all protected pages
+- `components/navigation.tsx` - Used in all pages with navigation
+- `components/role-badge.tsx` - Used in navigation and profile pages
+- `components/searchable-select.tsx` - Used in admin page
+- `components/history-filter.tsx` - Used in printing and lamination pages
+- `components/print-jobs-table.tsx` - Dynamically imported in dashboard
+- `components/print-billing-table.tsx` - Dynamically imported in dashboard
+- `components/lamination-jobs-table.tsx` - Dynamically imported in dashboard
+- `components/lamination-billing-table.tsx` - Dynamically imported in dashboard
+- `components/usage-chart.tsx` - Dynamically imported in dashboard
+- `components/admin-users-tab.tsx` - Used in admin page
+
+**Files Removed**:
+- `components/user-dashboard.tsx`
+- `components/dashboard-stats.tsx`
+- `components/cost-calculator.tsx`
+- `components/job-table.tsx`
+- `components/history-table.tsx`
+- `components/billing-table.tsx`
+- `components/billing-management.tsx`
+- `components/admin-user-table.tsx`
+- `components/admin-billing-table.tsx`
+- `components/price-table-manager.tsx`
+- `components/printer-status.tsx`
+- `components/demo-login.tsx`
+- `components/theme-provider.tsx`
+- `components/pagination-helper.tsx`
+
+**Benefits**:
+- **Reduced Bundle Size**: Removed unused code from the application bundle
+- **Cleaner Codebase**: Eliminated clutter and improved maintainability
+- **Faster Development**: Easier to navigate and understand the codebase
+- **Reduced Confusion**: No more wondering if unused components are needed
+- **Better Performance**: Smaller bundle size leads to faster loading times
+
+**Verification Process**:
+1. **Build Test**: Ensured the application builds successfully after cleanup
+2. **Functionality Test**: Verified all existing features work correctly
+3. **Import Check**: Confirmed no broken imports or missing dependencies
+4. **Documentation Update**: Updated file structure documentation to reflect changes
+
+**Prevention Strategy**:
+- **Regular Audits**: Conduct periodic code audits to identify unused files
+- **Import Tracking**: Use tools to track component usage automatically
+- **Documentation**: Keep file structure documentation up to date
+- **Code Reviews**: Include usage verification in code review process
+
+**Technical Notes**:
+- All removed components were confirmed to have no imports or usage
+- Dynamic imports in dashboard page were preserved and verified
+- UI components in `components/ui/` were kept as they are part of the design system
+- No functionality was lost during the cleanup process
+- The cleanup reduced the components directory from 25 files to 10 files
+
+**Future Considerations**:
+- Consider implementing automated tools for detecting unused code
+- Add linting rules to prevent creation of unused components
+- Regular cleanup as part of the development cycle
+- Document component usage patterns for better organization
+
+This cleanup significantly improved the codebase organization and maintainability while ensuring no functionality was lost.
+
 ### Greek Date Formatting Implementation (December 2024)
 
 **Problem**: Users requested that all dates throughout the website should be displayed in Greek format (day first, then month) instead of the default browser locale format. This included both displayed dates and date input components. Additionally, there were hydration mismatches due to server/client date formatting differences, and timezone issues causing the wrong date to be selected when picking dates from the calendar.

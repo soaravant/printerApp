@@ -169,39 +169,39 @@ export default function LaminationPage() {
                     <CardContent>
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Περίοδος</TableHead>
-                            <TableHead>A3</TableHead>
-                            <TableHead>A4</TableHead>
-                            <TableHead>Κάρτα Μικρή</TableHead>
-                            <TableHead>Κάρτα Μεγάλη</TableHead>
-                            <TableHead>Συνολικό Κόστος</TableHead>
-                            <TableHead>Πληρωμένο</TableHead>
-                            <TableHead>Υπόλοιπο</TableHead>
-                            <TableHead>Ημ. Εξόφλησης</TableHead>
-                            <TableHead>Κατάσταση</TableHead>
-                          </TableRow>
+                                              <TableRow>
+                      <TableHead className="text-center">Περίοδος</TableHead>
+                      <TableHead className="text-center">A3</TableHead>
+                      <TableHead className="text-center">A4</TableHead>
+                      <TableHead className="text-center">Κάρτα Μικρή</TableHead>
+                      <TableHead className="text-center">Κάρτα Μεγάλη</TableHead>
+                      <TableHead className="text-center">Συνολικό Κόστος</TableHead>
+                      <TableHead className="text-center">Πληρωμένο</TableHead>
+                      <TableHead className="text-center">Υπόλοιπο</TableHead>
+                      <TableHead className="text-center">Ημ. Εξόφλησης</TableHead>
+                      <TableHead className="text-center">Κατάσταση</TableHead>
+                    </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filteredLaminationBilling.map((billing) => (
                             <TableRow key={billing.billingId}>
-                              <TableCell className="font-medium">{billing.period}</TableCell>
-                              <TableCell>{billing.totalA3}</TableCell>
-                              <TableCell>{billing.totalA4}</TableCell>
-                              <TableCell>{billing.totalCardSmall}</TableCell>
-                              <TableCell>{billing.totalCardLarge}</TableCell>
-                              <TableCell>{formatPrice(billing.totalCost)}</TableCell>
-                              <TableCell>{formatPrice(billing.paidAmount)}</TableCell>
-                              <TableCell className={billing.remainingBalance > 0 ? "text-red-600 font-semibold" : ""}>
+                              <TableCell className="text-center font-medium">{billing.period}</TableCell>
+                              <TableCell className="text-center">{billing.totalA3}</TableCell>
+                              <TableCell className="text-center">{billing.totalA4}</TableCell>
+                              <TableCell className="text-center">{billing.totalCardSmall}</TableCell>
+                              <TableCell className="text-center">{billing.totalCardLarge}</TableCell>
+                              <TableCell className="text-center">{formatPrice(billing.totalCost)}</TableCell>
+                              <TableCell className="text-center">{formatPrice(billing.paidAmount)}</TableCell>
+                              <TableCell className={`text-center ${billing.remainingBalance > 0 ? "text-red-600 font-semibold" : ""}`}>
                                 {formatPrice(billing.remainingBalance)}
                               </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
+                              <TableCell className="text-center">
+                                <div className="flex items-center justify-center gap-1">
                                   <Calendar className="h-4 w-4" />
                                   {billing.dueDate.toLocaleDateString("el-GR")}
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="text-center">
                                 <Badge variant={billing.paid ? "default" : "destructive"}>
                                   {billing.paid ? "Πληρωμένο" : "Απλήρωτο"}
                                 </Badge>
@@ -231,32 +231,32 @@ export default function LaminationPage() {
                     <CardContent>
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Ημερομηνία</TableHead>
-                            <TableHead>Τύπος</TableHead>
-                            <TableHead>Ποσότητα</TableHead>
-                            <TableHead>Τιμή/Μονάδα</TableHead>
-                            <TableHead>Συνολικό Κόστος</TableHead>
-                            <TableHead>Κατάσταση</TableHead>
-                            <TableHead>Σημειώσεις</TableHead>
-                          </TableRow>
+                                              <TableRow>
+                      <TableHead className="text-center">Ημερομηνία</TableHead>
+                      <TableHead className="text-center">Τύπος</TableHead>
+                      <TableHead className="text-center">Ποσότητα</TableHead>
+                      <TableHead className="text-center">Τιμή/Μονάδα</TableHead>
+                      <TableHead className="text-center">Συνολικό Κόστος</TableHead>
+                      <TableHead className="text-center">Κατάσταση</TableHead>
+                      <TableHead className="text-center">Σημειώσεις</TableHead>
+                    </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filteredLaminationJobs.map((job) => (
                             <TableRow key={job.jobId}>
-                              <TableCell>{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
-                              <TableCell>
+                              <TableCell className="text-center">{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
+                              <TableCell className="text-center">
                                 <Badge variant="outline">{getLaminationTypeLabel(job.type)}</Badge>
                               </TableCell>
-                              <TableCell>{job.quantity}</TableCell>
-                              <TableCell>{formatPrice(job.pricePerUnit)}</TableCell>
-                              <TableCell>{formatPrice(job.totalCost)}</TableCell>
-                              <TableCell>
+                              <TableCell className="text-center">{job.quantity}</TableCell>
+                              <TableCell className="text-center">{formatPrice(job.pricePerUnit)}</TableCell>
+                              <TableCell className="text-center">{formatPrice(job.totalCost)}</TableCell>
+                              <TableCell className="text-center">
                                 <Badge variant={job.status === "completed" ? "default" : "secondary"}>
                                   {job.status === "completed" ? "Ολοκληρώθηκε" : job.status}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-sm text-gray-500">{job.notes || "-"}</TableCell>
+                              <TableCell className="text-center text-sm text-gray-500">{job.notes || "-"}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
