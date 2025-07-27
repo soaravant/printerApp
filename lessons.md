@@ -2,6 +2,83 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+### Vercel Deployment Setup (December 2024)
+
+**Problem**: Project needed to be prepared for Vercel deployment with proper configuration and documentation.
+
+**Solution**: Created comprehensive Vercel deployment setup with configuration files, environment templates, and deployment guides.
+
+**Changes Made**:
+
+**1. Vercel Configuration (`vercel.json`)**:
+- **Build Command**: `pnpm build` for proper package manager usage
+- **Output Directory**: `.next` for Next.js standard output
+- **Framework**: Explicitly set to `nextjs` for optimal handling
+- **Install Command**: `pnpm install` for consistent package management
+- **Dev Command**: `pnpm dev` for local development
+- **Regions**: Set to `iad1` (US East) for optimal performance
+- **Function Timeouts**: Set to 30 seconds for API routes
+- **Security Headers**: Added X-Content-Type-Options, X-Frame-Options, X-XSS-Protection
+
+**2. Environment Variables Template (`env.example`)**:
+- **Firebase Configuration**: All required Firebase environment variables
+- **Application Configuration**: App name and version variables
+- **Optional Analytics**: Google Analytics and Sentry DSN placeholders
+- **Clear Documentation**: Comments explaining each variable's purpose
+
+**3. Deployment Documentation (`DEPLOYMENT.md`)**:
+- **Quick Deployment Guide**: Step-by-step instructions for Vercel dashboard deployment
+- **CLI Deployment**: Alternative deployment method using Vercel CLI
+- **Environment Setup**: Detailed instructions for configuring environment variables
+- **Firebase Integration**: Optional Firebase setup instructions
+- **Troubleshooting**: Common issues and solutions
+- **Performance Optimization**: Vercel-specific optimizations
+- **Security Guidelines**: Best practices for secure deployment
+
+**4. Updated README (`README.md`)**:
+- **Vercel Deployment Section**: Added comprehensive deployment instructions
+- **Quick Start Guide**: Simplified setup process
+- **Project Structure**: Updated to reflect current organization
+- **Configuration**: Clear environment variable setup instructions
+- **Tech Stack**: Updated to include Vercel deployment
+
+**Key Benefits**:
+- **Easy Deployment**: One-click deployment to Vercel
+- **Proper Configuration**: Optimized settings for Next.js applications
+- **Environment Management**: Clear template for environment variables
+- **Comprehensive Documentation**: Step-by-step guides for all deployment scenarios
+- **Security Best Practices**: Proper security headers and environment variable handling
+- **Performance Optimization**: Vercel-specific optimizations for better performance
+
+**Technical Implementation**:
+- Used Vercel's recommended configuration for Next.js applications
+- Implemented proper security headers for production deployment
+- Created environment variable templates for easy setup
+- Provided both dashboard and CLI deployment options
+- Included troubleshooting and optimization guides
+
+**Files Created/Modified**:
+- `vercel.json` - Vercel deployment configuration
+- `env.example` - Environment variables template
+- `DEPLOYMENT.md` - Comprehensive deployment guide
+- `README.md` - Updated with Vercel deployment instructions
+
+**Deployment Process**:
+1. **Push to GitHub**: Commit and push all changes
+2. **Connect to Vercel**: Import repository in Vercel dashboard
+3. **Configure Environment**: Add environment variables from template
+4. **Deploy**: Automatic deployment with optimized settings
+5. **Monitor**: Use Vercel Analytics and monitoring tools
+
+**Testing Considerations**:
+- Verify build process works with `pnpm build`
+- Test environment variable configuration
+- Check security headers are properly applied
+- Verify performance optimizations are working
+- Test both preview and production deployments
+
+### Stats Cards Filtering Fix (December 2024)
+
 ### Stats Cards Filtering Fix (December 2024)
 
 **Problem**: When users applied filters to the printing and lamination pages, the stats cards (Οφειλόμενα, Συνολικές Εκτυπώσεις/Πλαστικοποιήσεις, Συνολικό Κόστος) continued to show statistics from the original unfiltered data instead of reflecting the filtered results.
