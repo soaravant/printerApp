@@ -27,7 +27,7 @@ import {
 import { SearchableSelect } from "@/components/searchable-select"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { useState, useEffect } from "react"
-import { Plus, CreditCard, Users, Settings, User as UserIcon, Building, Printer, Search, Download, Edit, Save, X, ArrowRight, RotateCcw } from "lucide-react"
+import { Plus, CreditCard, Users, User as UserIcon, Building, Printer, Search, Download, Edit, Save, X, ArrowRight, RotateCcw } from "lucide-react"
 import type { User, LaminationJob, PriceTable } from "@/lib/dummy-database"
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import * as XLSX from "xlsx"
@@ -39,13 +39,14 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [usersTabSearchTerm, setUsersTabSearchTerm] = useState("")
-  const [debtFilter, setDebtFilter] = useState("all") // all, print, lamination, both
+
   const [roleFilter, setRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Ναός, Τομέας
   const [amountFilter, setAmountFilter] = useState("all") // all, under10, 10to50, over50
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100])
   const [priceRangeInputs, setPriceRangeInputs] = useState<[string, string]>(["0", "100"])
   const [selectedUser, setSelectedUser] = useState("")
   const [laminationType, setLaminationType] = useState<"A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover">("A4")
+  const [printingType, setPrintingType] = useState<"a4BW" | "a4Color" | "a3BW" | "a3Color" | "rizocharto" | "chartoni" | "autokollito">("a4BW")
   const [quantity, setQuantity] = useState("1")
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(false)
@@ -60,16 +61,7 @@ export default function AdminPage() {
     responsiblePerson: "",
   })
 
-  // Price editing state
-  const [editingPrices, setEditingPrices] = useState<{
-    printing: { [key: string]: string }
-    lamination: { [key: string]: string }
-  }>({
-    printing: {},
-    lamination: {},
-  })
-  const [isEditingPrinting, setIsEditingPrinting] = useState(false)
-  const [isEditingLamination, setIsEditingLamination] = useState(false)
+
 
   useEffect(() => {
     const allUsers = dummyDB.getUsers()
@@ -143,28 +135,7 @@ export default function AdminPage() {
       filtered = filtered.filter((u) => u.userRole === roleFilter)
     }
 
-    // Apply debt filter
-    if (debtFilter !== "all") {
-      filtered = filtered.filter((u) => {
-        const printBilling = dummyDB.getPrintBilling(u.uid)
-        const laminationBilling = dummyDB.getLaminationBilling(u.uid)
-        const printUnpaid = printBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
-        const laminationUnpaid = laminationBilling
-          .filter((b) => !b.paid)
-          .reduce((sum, b) => sum + b.remainingBalance, 0)
 
-        switch (debtFilter) {
-          case "print":
-            return printUnpaid > 0
-          case "lamination":
-            return laminationUnpaid > 0
-          case "both":
-            return printUnpaid > 0 && laminationUnpaid > 0
-          default:
-            return true
-        }
-      })
-    }
 
     // Apply price range filter
     if (priceRange[0] !== priceDistribution.min || priceRange[1] !== priceDistribution.max) {
@@ -182,7 +153,7 @@ export default function AdminPage() {
     }
 
     setFilteredUsers(filtered)
-  }, [usersTabSearchTerm, roleFilter, debtFilter, priceRange, users, priceDistribution.min, priceDistribution.max])
+  }, [usersTabSearchTerm, roleFilter, priceRange, users, priceDistribution.min, priceDistribution.max])
 
   // Update price range when distribution changes
   useEffect(() => {
@@ -377,117 +348,9 @@ export default function AdminPage() {
     return `€${formatted}`
   }
 
-  // Price editing functions
-  const startEditingPrinting = () => {
-    setIsEditingPrinting(true)
-    setEditingPrices(prev => ({
-      ...prev,
-      printing: {
-        a4BW: printingPrices.a4BW?.toString() || "",
-        a4Color: printingPrices.a4Color?.toString() || "",
-        a3BW: printingPrices.a3BW?.toString() || "",
-        a3Color: printingPrices.a3Color?.toString() || "",
-      }
-    }))
-  }
 
-  const startEditingLamination = () => {
-    setIsEditingLamination(true)
-    setEditingPrices(prev => ({
-      ...prev,
-      lamination: {
-        A3: laminationPrices.A3?.toString() || "",
-        A4: laminationPrices.A4?.toString() || "",
-        A5: laminationPrices.A5?.toString() || "",
-        cards: laminationPrices.cards?.toString() || "",
-        spiral: laminationPrices.spiral?.toString() || "",
-        colored_cardboard: laminationPrices.colored_cardboard?.toString() || "",
-        plastic_cover: laminationPrices.plastic_cover?.toString() || "",
-      }
-    }))
-  }
 
-  const savePrintingPrices = () => {
-    try {
-      const newPrices: { [key: string]: number } = {}
-      Object.entries(editingPrices.printing).forEach(([key, value]) => {
-        const numValue = parseFloat(value)
-        if (isNaN(numValue) || numValue < 0) {
-          throw new Error(`Μη έγκυρη τιμή για ${key}`)
-        }
-        newPrices[key] = numValue
-      })
 
-      dummyDB.updatePriceTable("printing", { prices: newPrices })
-      setIsEditingPrinting(false)
-      setEditingPrices(prev => ({ ...prev, printing: {} }))
-
-      toast({
-        title: "Επιτυχία",
-        description: "Οι τιμές εκτυπώσεων ενημερώθηκαν επιτυχώς",
-        variant: "success",
-      })
-    } catch (error) {
-      toast({
-        title: "Σφάλμα Επικύρωσης Τιμών",
-        description: error instanceof Error ? error.message : "Αποτυχία ενημέρωσης τιμών εκτυπώσεων",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const saveLaminationPrices = () => {
-    try {
-      const newPrices: { [key: string]: number } = {}
-      Object.entries(editingPrices.lamination).forEach(([key, value]) => {
-        const numValue = parseFloat(value)
-        if (isNaN(numValue) || numValue < 0) {
-          throw new Error(`Μη έγκυρη τιμή για ${key}`)
-        }
-        newPrices[key] = numValue
-      })
-
-      dummyDB.updatePriceTable("lamination", { prices: newPrices })
-      setIsEditingLamination(false)
-      setEditingPrices(prev => ({ ...prev, lamination: {} }))
-
-      toast({
-        title: "Επιτυχία",
-        description: "Οι τιμές πλαστικοποιήσεων ενημερώθηκαν επιτυχώς",
-        variant: "success",
-      })
-    } catch (error) {
-      toast({
-        title: "Σφάλμα Επικύρωσης Τιμών",
-        description: error instanceof Error ? error.message : "Αποτυχία ενημέρωσης τιμών πλαστικοποιήσεων",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const cancelEditingPrinting = () => {
-    setIsEditingPrinting(false)
-    setEditingPrices(prev => ({ ...prev, printing: {} }))
-  }
-
-  const cancelEditingLamination = () => {
-    setIsEditingLamination(false)
-    setEditingPrices(prev => ({ ...prev, lamination: {} }))
-  }
-
-  const handleResetData = () => {
-    if (confirm("Είστε σίγουροι ότι θέλετε να επαναφέρετε όλα τα δεδομένα; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.")) {
-      dummyDB.reset()
-      const allUsers = dummyDB.getUsers()
-      setUsers(allUsers)
-      setFilteredUsers(allUsers)
-      toast({
-        title: "Επιτυχία",
-        description: "Τα δεδομένα επαναφέρθηκαν επιτυχώς",
-        variant: "success",
-      })
-    }
-  }
 
   const handleResetLaminationForm = () => {
     setSelectedUser("")
@@ -527,16 +390,7 @@ export default function AdminPage() {
                   <h1 className="text-3xl font-bold text-gray-900">Διαχείριση Συστήματος</h1>
                   <p className="text-gray-600">Διαχειριστείτε χρήστες και προσθέστε χρεώσεις</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleResetData}
-                    variant="outline"
-                    className="flex items-center gap-2"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    Επαναφορά Δεδομένων
-                  </Button>
-                </div>
+
               </div>
             </div>
 
@@ -544,37 +398,155 @@ export default function AdminPage() {
               <TabsList className="grid w-full grid-cols-3 bg-white mb-8 p-2 h-16">
                 <TabsTrigger 
                   value="users" 
-                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:text-blue-700 data-[state=active]:bg-transparent hover:bg-blue-50 hover:text-blue-700 transition-colors text-base font-medium py-3"
+                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-yellow-500 data-[state=active]:text-yellow-700 data-[state=active]:bg-transparent hover:bg-yellow-50 hover:text-yellow-700 transition-colors text-base font-medium py-3"
                 >
                   <Users className="h-5 w-5" />
                   Χρήστες
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="printing" 
+                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:text-blue-700 data-[state=active]:bg-transparent hover:bg-blue-50 hover:text-blue-700 transition-colors text-base font-medium py-3"
+                >
+                  <Printer className="h-5 w-5" />
+                  Χρέωση ΤΟ. ΦΩ.
                 </TabsTrigger>
                 <TabsTrigger 
                   value="lamination" 
                   className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:bg-transparent hover:bg-green-50 hover:text-green-700 transition-colors text-base font-medium py-3"
                 >
                   <CreditCard className="h-5 w-5" />
-                  Πλαστικοποιήσεις
+                  Χρέωση ΠΛΑ. ΤΟ.
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="settings" 
-                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-yellow-500 data-[state=active]:text-yellow-700 data-[state=active]:bg-transparent hover:bg-yellow-50 hover:text-yellow-700 transition-colors text-base font-medium py-3"
-                >
-                  <Settings className="h-5 w-5" />
-                  Τιμές
-                </TabsTrigger>
+
               </TabsList>
+
+              <TabsContent value="printing" className="mt-8">
+                <Card className="border-blue-200">
+                  <CardHeader className="bg-blue-100">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <Printer className="h-6 w-6 text-blue-800 flex-shrink-0" />
+                        <div>
+                          <CardTitle className="text-blue-800">
+                            Προσθήκη Χρέους ΤΟ. ΦΩ.
+                          </CardTitle>
+                          <CardDescription className="text-blue-600">Προσθέστε χρέωση εκτύπωσης σε χρήστη</CardDescription>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          aria-label="Επαναφορά φόρμας"
+                          className="w-10 h-10 rounded-full border border-blue-300 bg-white hover:bg-blue-50 transition flex items-center justify-center"
+                          onClick={() => {
+                            // Reset printing form
+                            setSelectedUser("")
+                            setPrintingType("a4BW")
+                            setQuantity("1")
+                            setSelectedDate(new Date().toISOString().split('T')[0])
+                          }}
+                        >
+                          <RotateCcw className="h-4 w-4 text-blue-600" />
+                        </button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Row 1: User, Date */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="user">Χρήστης</Label>
+                        <SearchableSelect
+                          options={users
+                            .filter((u) => u.accessLevel === "user")
+                            .map((user) => ({
+                              value: user.uid,
+                              label: user.displayName,
+                              description: `${user.department} - ${user.username}`
+                            }))}
+                          value={selectedUser}
+                          onValueChange={setSelectedUser}
+                          placeholder="Επιλέξτε χρήστη"
+                          searchPlaceholder="Αναζήτηση χρήστη..."
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <GreekDatePicker
+                          id="date"
+                          label="Ημερομηνία"
+                          value={selectedDate}
+                          onChange={setSelectedDate}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 2: Type, Quantity */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="type">Τύπος Εκτύπωσης</Label>
+                        <Select value={printingType} onValueChange={(value: any) => setPrintingType(value)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                                            <SelectItem value="a4BW">A4 Ασπρόμαυρο ({formatPrice(printingPrices.a4BW)})</SelectItem>
+                <SelectItem value="a4Color">A4 Έγχρωμο ({formatPrice(printingPrices.a4Color)})</SelectItem>
+                <SelectItem value="a3BW">A3 Ασπρόμαυρο ({formatPrice(printingPrices.a3BW)})</SelectItem>
+                <SelectItem value="a3Color">A3 Έγχρωμο ({formatPrice(printingPrices.a3Color)})</SelectItem>
+                <SelectItem value="rizocharto">Ριζόχαρτο ({formatPrice(printingPrices.rizocharto)})</SelectItem>
+                <SelectItem value="chartoni">Χαρτόνι ({formatPrice(printingPrices.chartoni)})</SelectItem>
+                <SelectItem value="autokollito">Αυτοκόλλητο ({formatPrice(printingPrices.autokollito)})</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="quantity">Ποσότητα</Label>
+                        <Input
+                          id="quantity"
+                          type="number"
+                          min="1"
+                          value={quantity}
+                          onChange={(e) => setQuantity(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 3: Total Cost (full width) */}
+                    <div className="space-y-2 text-center">
+                      <Label>Συνολικό Κόστος</Label>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {formatPrice((printingPrices[printingType] || 0) * Number.parseInt(quantity || "0"))}
+                      </div>
+                    </div>
+
+                    <Button onClick={() => {
+                      // Handle printing charge addition
+                      toast({
+                        title: "Επιτυχία",
+                        description: "Η χρέωση εκτύπωσης προστέθηκε επιτυχώς",
+                        variant: "success",
+                      })
+                    }} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                      {loading ? "Προσθήκη..." : "Προσθήκη Χρέους ΤΟ. ΦΩ."}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
               <TabsContent value="lamination" className="mt-8">
                 <Card className="border-green-200">
-                  <CardHeader className="bg-green-50">
+                  <CardHeader className="bg-green-100">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="flex items-center gap-2 text-green-800">
-                          <CreditCard className="h-5 w-5" />
-                          Προσθήκη Χρέους Πλαστικοποιητή
-                        </CardTitle>
-                        <CardDescription className="text-green-600">Προσθέστε χρέωση πλαστικοποίησης σε χρήστη</CardDescription>
+                      <div className="flex items-center gap-3">
+                        <CreditCard className="h-6 w-6 text-green-800 flex-shrink-0" />
+                        <div>
+                          <CardTitle className="text-green-800">
+                            Προσθήκη Χρέους Πλαστικοποιητή
+                          </CardTitle>
+                          <CardDescription className="text-green-600">Προσθέστε χρέωση πλαστικοποίησης σε χρήστη</CardDescription>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -753,8 +725,6 @@ export default function AdminPage() {
                   users={users}
                   usersTabSearchTerm={usersTabSearchTerm}
                   setUsersTabSearchTerm={setUsersTabSearchTerm}
-                  debtFilter={debtFilter}
-                  setDebtFilter={setDebtFilter}
                   roleFilter={roleFilter}
                   setRoleFilter={setRoleFilter}
                   priceRange={priceRange}
@@ -768,324 +738,7 @@ export default function AdminPage() {
                 />
               </TabsContent>
 
-              <TabsContent value="settings" className="mt-8">
-                <div className="space-y-6">
-                  {/* Printing Prices */}
-                  <Card className="border-blue-200">
-                    <CardHeader className="bg-blue-50">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <CardTitle className="flex items-center gap-2 text-blue-800">
-                            <Printer className="h-5 w-5" />
-                            Τιμοκατάλογος Εκτυπώσεων
-                          </CardTitle>
-                          <CardDescription className="text-blue-600">
-                            Τρέχουσες τιμές για τους διαφορετικούς τύπους εκτυπώσεων
-                          </CardDescription>
-                        </div>
-                        {!isEditingPrinting ? (
-                          <Button onClick={startEditingPrinting} variant="outline" size="sm">
-                            <Edit className="h-4 w-4 mr-2" />
-                            Επεξεργασία
-                          </Button>
-                        ) : (
-                          <div className="flex gap-2">
-                            <Button onClick={savePrintingPrices} size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black">
-                              <Save className="h-4 w-4 mr-2" />
-                              Αποθήκευση
-                            </Button>
-                            <Button onClick={cancelEditingPrinting} variant="outline" size="sm">
-                              <X className="h-4 w-4 mr-2" />
-                              Ακύρωση
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
-                          <h3 className="font-medium text-blue-800">A4 Ασπρόμαυρο</h3>
-                          {isEditingPrinting ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-blue-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.001"
-                                min="0"
-                                value={editingPrices.printing.a4BW || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  printing: { ...prev.printing, a4BW: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-blue-600">{formatPrice(printingPrices.a4BW)}</p>
-                          )}
-                        </div>
-                        <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
-                          <h3 className="font-medium text-blue-800">A4 Έγχρωμο</h3>
-                          {isEditingPrinting ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-blue-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.001"
-                                min="0"
-                                value={editingPrices.printing.a4Color || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  printing: { ...prev.printing, a4Color: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-blue-600">{formatPrice(printingPrices.a4Color)}</p>
-                          )}
-                        </div>
-                        <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
-                          <h3 className="font-medium text-blue-800">A3 Ασπρόμαυρο</h3>
-                          {isEditingPrinting ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-blue-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.001"
-                                min="0"
-                                value={editingPrices.printing.a3BW || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  printing: { ...prev.printing, a3BW: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-blue-600">{formatPrice(printingPrices.a3BW)}</p>
-                          )}
-                        </div>
-                        <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
-                          <h3 className="font-medium text-blue-800">A3 Έγχρωμο</h3>
-                          {isEditingPrinting ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-blue-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.001"
-                                min="0"
-                                value={editingPrices.printing.a3Color || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  printing: { ...prev.printing, a3Color: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-blue-600">{formatPrice(printingPrices.a3Color)}</p>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
 
-                  {/* Lamination Prices */}
-                  <Card className="border-green-200">
-                    <CardHeader className="bg-green-50">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <CardTitle className="flex items-center gap-2 text-green-800">
-                            <CreditCard className="h-5 w-5" />
-                            Τιμοκατάλογος Πλαστικοποιήσεων
-                          </CardTitle>
-                          <CardDescription className="text-green-600">
-                            Τρέχουσες τιμές για τους διαφορετικούς τύπους πλαστικοποίησης
-                          </CardDescription>
-                        </div>
-                        {!isEditingLamination ? (
-                          <Button onClick={startEditingLamination} variant="outline" size="sm">
-                            <Edit className="h-4 w-4 mr-2" />
-                            Επεξεργασία
-                          </Button>
-                        ) : (
-                          <div className="flex gap-2">
-                            <Button onClick={saveLaminationPrices} size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black">
-                              <Save className="h-4 w-4 mr-2" />
-                              Αποθήκευση
-                            </Button>
-                            <Button onClick={cancelEditingLamination} variant="outline" size="sm">
-                              <X className="h-4 w-4 mr-2" />
-                              Ακύρωση
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                          <h3 className="font-medium text-green-800">A3</h3>
-                          {isEditingLamination ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-green-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={editingPrices.lamination.A3 || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  lamination: { ...prev.lamination, A3: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-green-600">{formatPrice(laminationPrices.A3)}</p>
-                          )}
-                        </div>
-                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                          <h3 className="font-medium text-green-800">A4</h3>
-                          {isEditingLamination ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-green-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={editingPrices.lamination.A4 || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  lamination: { ...prev.lamination, A4: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-green-600">{formatPrice(laminationPrices.A4)}</p>
-                          )}
-                        </div>
-                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                          <h3 className="font-medium text-green-800">A5</h3>
-                          {isEditingLamination ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-green-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={editingPrices.lamination.A5 || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  lamination: { ...prev.lamination, A5: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-green-600">{formatPrice(laminationPrices.A5)}</p>
-                          )}
-                        </div>
-                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                          <h3 className="font-medium text-green-800">Κάρτες</h3>
-                          {isEditingLamination ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-green-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={editingPrices.lamination.cards || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  lamination: { ...prev.lamination, cards: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-green-600">
-                              {formatPrice(laminationPrices.cards)}
-                            </p>
-                          )}
-                        </div>
-                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                          <h3 className="font-medium text-green-800">Σπιράλ</h3>
-                          {isEditingLamination ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-green-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={editingPrices.lamination.spiral || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  lamination: { ...prev.lamination, spiral: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-green-600">
-                              {formatPrice(laminationPrices.spiral)}
-                            </p>
-                          )}
-                        </div>
-                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                          <h3 className="font-medium text-green-800">Χρωματιστά Χαρτόνια</h3>
-                          {isEditingLamination ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-green-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={editingPrices.lamination.colored_cardboard || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  lamination: { ...prev.lamination, colored_cardboard: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-green-600">
-                              {formatPrice(laminationPrices.colored_cardboard)}
-                            </p>
-                          )}
-                        </div>
-                        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                          <h3 className="font-medium text-green-800">Πλαστικό Κάλυμμα</h3>
-                          {isEditingLamination ? (
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-green-600">€</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={editingPrices.lamination.plastic_cover || ""}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  lamination: { ...prev.lamination, plastic_cover: e.target.value }
-                                }))}
-                                className="w-20 h-8 text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <p className="text-2xl font-bold text-green-600">
-                              {formatPrice(laminationPrices.plastic_cover)}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
             </Tabs>
           </div>
         </main>

@@ -50,9 +50,10 @@ export default function LaminationPage() {
     }
   }
 
-  const totalUnpaid = laminationBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
-  const totalJobs = laminationJobs.length
-  const totalCost = laminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
+  // Calculate stats from filtered data instead of original data
+  const totalUnpaid = filteredLaminationBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
+  const totalJobs = filteredLaminationJobs.length
+  const totalCost = filteredLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
 
   const laminationBillingFilterConfig: FilterConfig = {
     searchFields: ["period"],

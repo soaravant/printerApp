@@ -79,6 +79,39 @@ const expandPrintJob = (job: PrintJob) => {
     })
   }
   
+  if (job.pagesRizocharto > 0) {
+    rows.push({
+      ...job,
+      printType: "Ριζόχαρτο",
+      quantity: job.pagesRizocharto,
+      cost: job.costRizocharto, // Use the actual calculated cost from database
+      originalJobId: job.jobId,
+      rowId: `${job.jobId}-rizocharto`
+    })
+  }
+  
+  if (job.pagesChartoni > 0) {
+    rows.push({
+      ...job,
+      printType: "Χαρτόνι",
+      quantity: job.pagesChartoni,
+      cost: job.costChartoni, // Use the actual calculated cost from database
+      originalJobId: job.jobId,
+      rowId: `${job.jobId}-chartoni`
+    })
+  }
+  
+  if (job.pagesAutokollito > 0) {
+    rows.push({
+      ...job,
+      printType: "Αυτοκόλλητο",
+      quantity: job.pagesAutokollito,
+      cost: job.costAutokollito, // Use the actual calculated cost from database
+      originalJobId: job.jobId,
+      rowId: `${job.jobId}-autokollito`
+    })
+  }
+  
   return rows
 }
 

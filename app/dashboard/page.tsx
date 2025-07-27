@@ -337,6 +337,12 @@ export default function DashboardPage() {
             return item.pagesA3BW > 0
           case "a3Color":
             return item.pagesA3Color > 0
+          case "rizocharto":
+            return item.pagesRizocharto > 0
+          case "chartoni":
+            return item.pagesChartoni > 0
+          case "autokollito":
+            return item.pagesAutokollito > 0
           default:
             return true
         }
@@ -398,12 +404,13 @@ export default function DashboardPage() {
     // Apply machine filter
     if (machineFilter !== "all") {
       filteredLJ = filteredLJ.filter((item) => {
-        // This is a simplified filter - you may need to add a machine field to your data model
-        // For now, we'll filter based on type
+        // Filter based on machine type
         if (machineFilter === "lamination") {
-          return ["A3", "A4", "A5", "cards", "spiral", "colored_cardboard", "plastic_cover"].includes(item.type)
+          // Only include laminator types: A3, A4, A5, cards
+          return ["A3", "A4", "A5", "cards"].includes(item.type)
         }
         if (machineFilter === "binding") {
+          // Only include binding types: spiral, colored_cardboard, plastic_cover
           return ["spiral", "colored_cardboard", "plastic_cover"].includes(item.type)
         }
         return true
@@ -526,10 +533,10 @@ export default function DashboardPage() {
   if (!user) return null
 
   // Calculate totals based on filtered data or user-specific data
-      const relevantPrintBilling = user.accessLevel === "admin" ? printBilling : printBilling
-    const relevantLaminationBilling = user.accessLevel === "admin" ? laminationBilling : laminationBilling
-    const relevantPrintJobs = user.accessLevel === "admin" ? printJobs : printJobs
-    const relevantLaminationJobs = user.accessLevel === "admin" ? laminationJobs : laminationJobs
+  const relevantPrintBilling = user.accessLevel === "admin" ? filteredPrintBilling : filteredPrintBilling
+  const relevantLaminationBilling = user.accessLevel === "admin" ? filteredLaminationBilling : filteredLaminationBilling
+  const relevantPrintJobs = user.accessLevel === "admin" ? filteredPrintJobs : filteredPrintJobs
+  const relevantLaminationJobs = user.accessLevel === "admin" ? filteredLaminationJobs : filteredLaminationJobs
 
   const printUnpaid = relevantPrintBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
   const laminationUnpaid = relevantLaminationBilling
@@ -561,6 +568,88 @@ export default function DashboardPage() {
   }
 
   const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
+
+  // Calculate print statistics
+  const calculatePrintStatistics = () => {
+    const stats = {
+      canonBW: {
+        a4BW: 0
+      },
+      canonColour: {
+        a4BW: 0,
+        a4Colour: 0,
+        a3BW: 0,
+        a3Colour: 0,
+        a4Total: 0,
+        a3Total: 0,
+        total: 0
+      },
+      brother: {
+        a4BW: 0
+      },
+      total: 0
+    }
+
+    filteredPrintJobs.forEach(job => {
+      if (job.deviceName === "Canon B/W") {
+        stats.canonBW.a4BW += job.pagesA4BW
+        stats.total += job.pagesA4BW
+      } else if (job.deviceName === "Canon Colour") {
+        stats.canonColour.a4BW += job.pagesA4BW
+        stats.canonColour.a4Colour += job.pagesA4Color
+        stats.canonColour.a3BW += job.pagesA3BW
+        stats.canonColour.a3Colour += job.pagesA3Color
+      } else if (job.deviceName === "Brother") {
+        stats.brother.a4BW += job.pagesA4BW
+        stats.total += job.pagesA4BW
+      }
+    })
+
+    // Calculate totals after all jobs are processed
+    stats.canonColour.a4Total = stats.canonColour.a4BW + stats.canonColour.a4Colour
+    stats.canonColour.a3Total = stats.canonColour.a3BW + stats.canonColour.a3Colour
+    stats.canonColour.total = stats.canonColour.a4Total + stats.canonColour.a3Total
+    
+    // Calculate overall total
+    stats.total = stats.canonBW.a4BW + stats.canonColour.total + stats.brother.a4BW
+
+    return stats
+  }
+
+  // Calculate lamination statistics
+  const calculateLaminationStatistics = () => {
+    const stats = {
+      laminator: {
+        a3: 0,
+        a4: 0,
+        a5: 0,
+        cards: 0
+      },
+      binding: {
+        spiral: 0,
+        coloredCardboard: 0,
+        plasticCover: 0
+      }
+    }
+
+    filteredLaminationJobs.forEach(job => {
+      if (["A3", "A4", "A5", "cards"].includes(job.type)) {
+        if (job.type === "A3") stats.laminator.a3 += job.quantity
+        else if (job.type === "A4") stats.laminator.a4 += job.quantity
+        else if (job.type === "A5") stats.laminator.a5 += job.quantity
+        else if (job.type === "cards") stats.laminator.cards += job.quantity
+      } else if (["spiral", "colored_cardboard", "plastic_cover"].includes(job.type)) {
+        if (job.type === "spiral") stats.binding.spiral += job.quantity
+        else if (job.type === "colored_cardboard") stats.binding.coloredCardboard += job.quantity
+        else if (job.type === "plastic_cover") stats.binding.plasticCover += job.quantity
+      }
+    })
+
+    return stats
+  }
+
+  const printStats = calculatePrintStatistics()
+  const laminationStats = calculateLaminationStatistics()
 
   // Generate chart data for last 6 months
 
@@ -840,6 +929,42 @@ export default function DashboardPage() {
                                   })
                                 }
                                 
+                                if (job.pagesRizocharto > 0) {
+                                  rows.push({
+                                    timestamp: job.timestamp.toLocaleString("el-GR"),
+                                    uid: job.uid,
+                                    userDisplayName: job.userDisplayName,
+                                    deviceName: job.deviceName,
+                                    printType: "Ριζόχαρτο",
+                                    quantity: job.pagesRizocharto,
+                                    cost: formatPrice(job.pagesRizocharto * 0.10)
+                                  })
+                                }
+                                
+                                if (job.pagesChartoni > 0) {
+                                  rows.push({
+                                    timestamp: job.timestamp.toLocaleString("el-GR"),
+                                    uid: job.uid,
+                                    userDisplayName: job.userDisplayName,
+                                    deviceName: job.deviceName,
+                                    printType: "Χαρτόνι",
+                                    quantity: job.pagesChartoni,
+                                    cost: formatPrice(job.pagesChartoni * 0.10)
+                                  })
+                                }
+                                
+                                if (job.pagesAutokollito > 0) {
+                                  rows.push({
+                                    timestamp: job.timestamp.toLocaleString("el-GR"),
+                                    uid: job.uid,
+                                    userDisplayName: job.userDisplayName,
+                                    deviceName: job.deviceName,
+                                    printType: "Αυτοκόλλητο",
+                                    quantity: job.pagesAutokollito,
+                                    cost: formatPrice(job.pagesAutokollito * 0.10)
+                                  })
+                                }
+                                
                                 return rows
                               }
 
@@ -881,6 +1006,103 @@ export default function DashboardPage() {
                           userRole={user.accessLevel}
                         />
                       </ErrorBoundary>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Print Statistics Cards */}
+                <div className="mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    {/* Canon Colour Statistics */}
+                    <div className="md:col-span-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                        <div className="flex items-center gap-2">
+                          <Printer className="h-5 w-5 text-blue-700" />
+                          <h3 className="text-sm font-semibold text-blue-900">Canon Colour</h3>
+                        </div>
+                      </div>
+                      <div className="bg-white p-4">
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                          <div>
+                            <div className="text-xs text-gray-600">A4 B/W</div>
+                            <div className="text-lg font-bold text-black">{printStats.canonColour.a4BW}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600">A4 Colour</div>
+                            <div className="text-lg font-bold text-black">{printStats.canonColour.a4Colour}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600">A3 B/W</div>
+                            <div className="text-lg font-bold text-black">{printStats.canonColour.a3BW}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600">A3 Colour</div>
+                            <div className="text-lg font-bold text-black">{printStats.canonColour.a3Colour}</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+                          <div>
+                            <div className="text-xs text-gray-600">A4 Total</div>
+                            <div className="text-sm font-bold text-black">{printStats.canonColour.a4Total}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600">A3 Total</div>
+                            <div className="text-sm font-bold text-black">{printStats.canonColour.a3Total}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600">Total</div>
+                            <div className="text-sm font-bold text-black">{printStats.canonColour.total}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Canon B/W Statistics */}
+                    <div className="md:col-span-2 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                        <div className="flex items-center gap-2">
+                          <Printer className="h-5 w-5 text-blue-700" />
+                          <h3 className="text-sm font-semibold text-blue-900">Canon B/W</h3>
+                        </div>
+                      </div>
+                      <div className="bg-white p-4">
+                        <div className="text-center">
+                          <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
+                          <div className="text-xl font-bold text-black">{printStats.canonBW.a4BW}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Brother Statistics */}
+                    <div className="md:col-span-2 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                        <div className="flex items-center gap-2">
+                          <Printer className="h-5 w-5 text-blue-700" />
+                          <h3 className="text-sm font-semibold text-blue-900">Brother</h3>
+                        </div>
+                      </div>
+                      <div className="bg-white p-4">
+                        <div className="text-center">
+                          <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
+                          <div className="text-xl font-bold text-black">{printStats.brother.a4BW}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Total Print Statistics */}
+                    <div className="md:col-span-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="h-5 w-5 text-blue-700" />
+                          <h3 className="text-sm font-semibold text-blue-900">Σύνολο</h3>
+                        </div>
+                      </div>
+                      <div className="bg-white p-4">
+                        <div className="text-center">
+                          <div className="text-sm text-gray-600 mb-1">Συνολικές Εκτυπώσεις</div>
+                          <div className="text-2xl font-bold text-black">{printStats.total}</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -944,6 +1166,67 @@ export default function DashboardPage() {
                           userRole={user.accessLevel}
                         />
                       </ErrorBoundary>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lamination Statistics Cards */}
+                <div className="mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Πλαστικοποιητής Statistics */}
+                    <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm">
+                      <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-5 w-5 text-green-700" />
+                          <h3 className="text-sm font-semibold text-green-900">Πλαστικοποιητής</h3>
+                        </div>
+                      </div>
+                      <div className="bg-white p-4">
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                          <div>
+                            <div className="text-xs text-gray-600">Α3</div>
+                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.a3}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600">Α4</div>
+                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.a4}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600">Α5</div>
+                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.a5}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600">Κάρτες</div>
+                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.cards}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Βιβλιοδεσία Statistics */}
+                    <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm">
+                      <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-5 w-5 text-green-700" />
+                          <h3 className="text-sm font-semibold text-green-900">Βιβλιοδεσία</h3>
+                        </div>
+                      </div>
+                      <div className="bg-white p-4">
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div>
+                            <div className="text-xs text-gray-600">Σπιράλ</div>
+                            <div className="text-lg font-bold text-gray-900">{laminationStats.binding.spiral}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600">Χρωματιστά Χαρτόνια</div>
+                            <div className="text-lg font-bold text-gray-900">{laminationStats.binding.coloredCardboard}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600">Πλαστικό Κάλυμμα</div>
+                            <div className="text-lg font-bold text-gray-900">{laminationStats.binding.plasticCover}</div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -12,8 +12,6 @@ interface AdminUsersTabProps {
   users: any[];
   usersTabSearchTerm: string;
   setUsersTabSearchTerm: (v: string) => void;
-  debtFilter: string;
-  setDebtFilter: (v: string) => void;
   roleFilter: string;
   setRoleFilter: (v: string) => void;
   priceRange: [number, number];
@@ -30,8 +28,6 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
   users,
   usersTabSearchTerm,
   setUsersTabSearchTerm,
-  debtFilter,
-  setDebtFilter,
   roleFilter,
   setRoleFilter,
   priceRange,
@@ -121,19 +117,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
               </SelectContent>
             </Select>
           </div>
-          <div className="w-full md:w-60 flex items-center">
-            <Select value={debtFilter} onValueChange={setDebtFilter}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Όλοι οι χρήστες</SelectItem>
-                <SelectItem value="print">Με οφειλές εκτυπώσεων</SelectItem>
-                <SelectItem value="lamination">Με οφειλές πλαστικοποιήσεων</SelectItem>
-                <SelectItem value="both">Με οφειλές και στα δύο</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
         </div>
         <div className="w-full flex flex-col gap-2 mt-2">
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col gap-4 min-h-[120px]">

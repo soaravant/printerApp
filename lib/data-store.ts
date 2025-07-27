@@ -19,6 +19,9 @@ export interface PrintJob {
   pagesA4Color: number
   pagesA3BW: number
   pagesA3Color: number
+  pagesRizocharto: number
+  pagesChartoni: number
+  pagesAutokollito: number
   deviceIP: string
   deviceName: string
   timestamp: Date
@@ -26,6 +29,9 @@ export interface PrintJob {
   costA4Color: number
   costA3BW: number
   costA3Color: number
+  costRizocharto: number
+  costChartoni: number
+  costAutokollito: number
   totalCost: number
   status: "completed" | "pending" | "failed"
 }
@@ -40,6 +46,9 @@ export interface BillingRecord {
   totalA4Color: number
   totalA3BW: number
   totalA3Color: number
+  totalRizocharto: number
+  totalChartoni: number
+  totalAutokollito: number
   totalCost: number
   paid: boolean
   paidDate?: Date
@@ -58,6 +67,9 @@ export interface PriceTable {
     a4Color: number
     a3BW: number
     a3Color: number
+    rizocharto: number
+    chartoni: number
+    autokollito: number
   }
   isActive: boolean
   createdAt: Date

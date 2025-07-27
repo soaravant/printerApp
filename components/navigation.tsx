@@ -3,7 +3,7 @@
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { useRouter, usePathname } from "next/navigation"
-import { Printer, Settings, LogOut, UserIcon } from "lucide-react"
+import { Printer, Settings, LogOut, UserIcon, Euro } from "lucide-react"
 import Link from "next/link"
 import { RoleBadge } from "@/components/role-badge"
 
@@ -30,6 +30,12 @@ export function Navigation() {
       href: "/admin",
       label: "Διαχείριση",
       icon: Settings,
+      roles: ["admin"],
+    },
+    {
+      href: "/prices",
+      label: "Τιμές",
+      icon: Euro,
       roles: ["admin"],
     },
     {

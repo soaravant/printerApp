@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
-import { Filter, RotateCcw } from "lucide-react"
+import { Filter, RotateCcw, X } from "lucide-react"
 
 interface LaminationFiltersProps {
   searchTerm: string
@@ -58,13 +58,26 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="md:col-span-2">
             <Label htmlFor="search" className="text-gray-700">Αναζήτηση</Label>
-            <Input
-              id="search"
-              placeholder="Αναζήτηση..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="border-gray-200 focus:border-green-500"
-            />
+            <div className="relative">
+              <Input
+                id="search"
+                placeholder="Αναζήτηση..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`border-gray-200 focus:border-green-500 ${searchTerm ? "pr-10" : ""}`}
+              />
+              {searchTerm && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
+                  onClick={() => setSearchTerm("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
           <div>
             <Label htmlFor="machine" className="text-gray-700">Μηχάνημα</Label>

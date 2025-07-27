@@ -21,6 +21,9 @@ export interface PrintJob {
   pagesA4Color: number
   pagesA3BW: number
   pagesA3Color: number
+  pagesRizocharto: number
+  pagesChartoni: number
+  pagesAutokollito: number
   deviceIP: string
   deviceName: string
   timestamp: Date
@@ -28,6 +31,9 @@ export interface PrintJob {
   costA4Color: number
   costA3BW: number
   costA3Color: number
+  costRizocharto: number
+  costChartoni: number
+  costAutokollito: number
   totalCost: number
   status: "completed" | "pending" | "failed"
 }
@@ -57,6 +63,9 @@ export interface PrintBilling {
   totalA4Color: number
   totalA3BW: number
   totalA3Color: number
+  totalRizocharto: number
+  totalChartoni: number
+  totalAutokollito: number
   totalCost: number
   paid: boolean
   paidDate?: Date
@@ -158,6 +167,9 @@ class DummyDatabase {
           a4Color: 0.25,
           a3BW: 0.1,
           a3Color: 0.5,
+          rizocharto: 0.1,
+          chartoni: 0.1,
+          autokollito: 0.1,
         },
         isActive: true,
         createdAt: new Date("2024-01-01"),
@@ -212,6 +224,9 @@ class DummyDatabase {
             pagesA4Color: Math.floor(Math.random() * 4),   // 0-3
             pagesA3BW: Math.floor(Math.random() * 3),      // 0-2
             pagesA3Color: Math.floor(Math.random() * 2),   // 0-1
+            pagesRizocharto: Math.floor(Math.random() * 5), // 0-4
+            pagesChartoni: Math.floor(Math.random() * 5), // 0-4
+            pagesAutokollito: Math.floor(Math.random() * 5), // 0-4
             deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 3)}`,
             deviceName: this.getRandomPrinterName(),
             timestamp: jobDate,
@@ -219,6 +234,9 @@ class DummyDatabase {
             costA4Color: 0,
             costA3BW: 0,
             costA3Color: 0,
+            costRizocharto: 0,
+            costChartoni: 0,
+            costAutokollito: 0,
             totalCost: 0,
             status: "completed",
           };
@@ -228,11 +246,17 @@ class DummyDatabase {
           printJob.costA4Color = printJob.pagesA4Color * (prices.a4Color || 0);
           printJob.costA3BW = printJob.pagesA3BW * (prices.a3BW || 0);
           printJob.costA3Color = printJob.pagesA3Color * (prices.a3Color || 0);
+          printJob.costRizocharto = printJob.pagesRizocharto * (prices.rizocharto || 0);
+          printJob.costChartoni = printJob.pagesChartoni * (prices.chartoni || 0);
+          printJob.costAutokollito = printJob.pagesAutokollito * (prices.autokollito || 0);
           printJob.totalCost =
             printJob.costA4BW +
             printJob.costA4Color +
             printJob.costA3BW +
-            printJob.costA3Color;
+            printJob.costA3Color +
+            printJob.costRizocharto +
+            printJob.costChartoni +
+            printJob.costAutokollito;
           this.printJobs.push(printJob);
         }
         // 3-8 lamination jobs per user per month
@@ -283,11 +307,14 @@ class DummyDatabase {
         )
 
         if (monthPrintJobs.length > 0) {
-          const totalA4BW = monthPrintJobs.reduce((sum, j) => sum + j.pagesA4BW, 0)
-          const totalA4Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA4Color, 0)
-          const totalA3BW = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3BW, 0)
-          const totalA3Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3Color, 0)
-          const totalCost = monthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
+                  const totalA4BW = monthPrintJobs.reduce((sum, j) => sum + j.pagesA4BW, 0)
+        const totalA4Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA4Color, 0)
+        const totalA3BW = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3BW, 0)
+        const totalA3Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3Color, 0)
+        const totalRizocharto = monthPrintJobs.reduce((sum, j) => sum + j.pagesRizocharto, 0)
+        const totalChartoni = monthPrintJobs.reduce((sum, j) => sum + j.pagesChartoni, 0)
+        const totalAutokollito = monthPrintJobs.reduce((sum, j) => sum + j.pagesAutokollito, 0)
+        const totalCost = monthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
 
           const isPaid = Math.random() > 0.75
           const paidAmount = isPaid ? totalCost : Math.random() * totalCost
@@ -308,10 +335,13 @@ class DummyDatabase {
             userDisplayName: user.displayName,
             department: user.department,
             period,
-            totalA4BW,
-            totalA4Color,
-            totalA3BW,
-            totalA3Color,
+                      totalA4BW,
+          totalA4Color,
+          totalA3BW,
+          totalA3Color,
+          totalRizocharto,
+          totalChartoni,
+          totalAutokollito,
             totalCost,
             paid: isPaid,
             paidDate: isPaid ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) : undefined,

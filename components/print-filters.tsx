@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
-import { Filter, RotateCcw } from "lucide-react"
+import { Filter, RotateCcw, X } from "lucide-react"
 
 interface PrintFiltersProps {
   searchTerm: string
@@ -60,13 +60,26 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
           {/* Row 1: Search and Printer */}
           <div className="md:col-span-2">
             <Label htmlFor="search" className="text-gray-700">Αναζήτηση</Label>
-            <Input
-              id="search"
-              placeholder="Αναζήτηση..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="border-gray-200 focus:border-blue-500"
-            />
+            <div className="relative">
+              <Input
+                id="search"
+                placeholder="Αναζήτηση..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`border-gray-200 focus:border-blue-500 ${searchTerm ? "pr-10" : ""}`}
+              />
+              {searchTerm && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
+                  onClick={() => setSearchTerm("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
           <div className="md:col-span-1">
             <Label htmlFor="device" className="text-gray-700">Εκτυπωτής</Label>
@@ -114,6 +127,9 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
                 <SelectItem value="a4Color">A4 Έγχρωμο</SelectItem>
                 <SelectItem value="a3BW">A3 Ασπρόμαυρο</SelectItem>
                 <SelectItem value="a3Color">A3 Έγχρωμο</SelectItem>
+                <SelectItem value="rizocharto">Ριζόχαρτο</SelectItem>
+                <SelectItem value="chartoni">Χαρτόνι</SelectItem>
+                <SelectItem value="autokollito">Αυτοκόλλητο</SelectItem>
               </SelectContent>
             </Select>
           </div>
