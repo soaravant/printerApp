@@ -32,9 +32,10 @@ interface LaminationBillingTableProps {
   pageSize: number
   onPageChange: (page: number) => void
   userRole: string
+  onRowHover?: (hoveredJob: { machine: string; type: string } | null) => void
 }
 
-export default function LaminationBillingTable({ data, page, pageSize, onPageChange, userRole }: LaminationBillingTableProps) {
+export default function LaminationBillingTable({ data, page, pageSize, onPageChange, userRole, onRowHover }: LaminationBillingTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
   const [sortedData, setSortedData] = useState(data)
 
@@ -162,7 +163,12 @@ export default function LaminationBillingTable({ data, page, pageSize, onPageCha
               </TableRow>
             ) : (
               sortedData.slice((page-1)*pageSize, page*pageSize).map((billing: LaminationBilling) => (
-                <TableRow key={billing.billingId}>
+                <TableRow 
+                  key={billing.billingId}
+                  className="hover:bg-yellow-50 cursor-pointer transition-colors duration-200"
+                  onMouseEnter={() => onRowHover?.({ machine: "billing", type: "lamination" })}
+                  onMouseLeave={() => onRowHover?.(null)}
+                >
                   <TableCell className="text-center font-medium">{billing.period}</TableCell>
                   {userRole === "admin" && <TableCell className="text-center">{billing.userDisplayName}</TableCell>}
                   {/* Department field removed - no longer exists in LaminationBilling interface */}

@@ -109,8 +109,10 @@ export function calculatePrintJobTotal(costs: {
   costA4Color: number
   costA3BW: number
   costA3Color: number
-  costRizocharto: number
-  costChartoni: number
+  costRizochartoA3: number
+  costRizochartoA4: number
+  costChartoniA3: number
+  costChartoniA4: number
   costAutokollito: number
 }): number {
   return addMoney(
@@ -118,8 +120,10 @@ export function calculatePrintJobTotal(costs: {
     costs.costA4Color,
     costs.costA3BW,
     costs.costA3Color,
-    costs.costRizocharto,
-    costs.costChartoni,
+    costs.costRizochartoA3,
+    costs.costRizochartoA4,
+    costs.costChartoniA3,
+    costs.costChartoniA4,
     costs.costAutokollito
   )
 }

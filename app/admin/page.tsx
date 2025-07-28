@@ -42,7 +42,7 @@ export default function AdminPage() {
   const [teamFilter, setTeamFilter] = useState("all") // all, Ενωμένοι, Σποριάδες, etc.
   const [selectedUser, setSelectedUser] = useState("")
   const [laminationType, setLaminationType] = useState<"A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover">("A4")
-  const [printingType, setPrintingType] = useState<"a4BW" | "a4Color" | "a3BW" | "a3Color" | "rizocharto" | "chartoni" | "autokollito">("a4BW")
+  const [printingType, setPrintingType] = useState<"a4BW" | "a4Color" | "a3BW" | "a3Color" | "rizochartoA3" | "rizochartoA4" | "chartoniA3" | "chartoniA4" | "autokollito">("a4BW")
   const [quantity, setQuantity] = useState("1")
   const [selectedDate, setSelectedDate] = useState("")
   const [loading, setLoading] = useState(false)
@@ -558,13 +558,15 @@ export default function AdminPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                                            <SelectItem value="a4BW">A4 Ασπρόμαυρο ({formatPrice(printingPrices.a4BW)})</SelectItem>
-                <SelectItem value="a4Color">A4 Έγχρωμο ({formatPrice(printingPrices.a4Color)})</SelectItem>
-                <SelectItem value="a3BW">A3 Ασπρόμαυρο ({formatPrice(printingPrices.a3BW)})</SelectItem>
-                <SelectItem value="a3Color">A3 Έγχρωμο ({formatPrice(printingPrices.a3Color)})</SelectItem>
-                <SelectItem value="rizocharto">Ριζόχαρτο ({formatPrice(printingPrices.rizocharto)})</SelectItem>
-                <SelectItem value="chartoni">Χαρτόνι ({formatPrice(printingPrices.chartoni)})</SelectItem>
-                <SelectItem value="autokollito">Αυτοκόλλητο ({formatPrice(printingPrices.autokollito)})</SelectItem>
+                            <SelectItem value="a4BW">A4 Ασπρόμαυρο ({formatPrice(printingPrices.a4BW)})</SelectItem>
+                            <SelectItem value="a4Color">A4 Έγχρωμο ({formatPrice(printingPrices.a4Color)})</SelectItem>
+                            <SelectItem value="a3BW">A3 Ασπρόμαυρο ({formatPrice(printingPrices.a3BW)})</SelectItem>
+                            <SelectItem value="a3Color">A3 Έγχρωμο ({formatPrice(printingPrices.a3Color)})</SelectItem>
+                            <SelectItem value="rizochartoA3">Ριζόχαρτο A3 ({formatPrice(printingPrices.rizochartoA3)})</SelectItem>
+                            <SelectItem value="rizochartoA4">Ριζόχαρτο A4 ({formatPrice(printingPrices.rizochartoA4)})</SelectItem>
+                            <SelectItem value="chartoniA3">Χαρτόνι A3 ({formatPrice(printingPrices.chartoniA3)})</SelectItem>
+                            <SelectItem value="chartoniA4">Χαρτόνι A4 ({formatPrice(printingPrices.chartoniA4)})</SelectItem>
+                            <SelectItem value="autokollito">Αυτοκόλλητο ({formatPrice(printingPrices.autokollito)})</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

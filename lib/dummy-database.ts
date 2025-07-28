@@ -24,8 +24,10 @@ export interface PrintJob {
   pagesA4Color: number
   pagesA3BW: number
   pagesA3Color: number
-  pagesRizocharto: number
-  pagesChartoni: number
+  pagesRizochartoA3: number
+  pagesRizochartoA4: number
+  pagesChartoniA3: number
+  pagesChartoniA4: number
   pagesAutokollito: number
   deviceIP: string
   deviceName: string
@@ -34,8 +36,10 @@ export interface PrintJob {
   costA4Color: number
   costA3BW: number
   costA3Color: number
-  costRizocharto: number
-  costChartoni: number
+  costRizochartoA3: number
+  costRizochartoA4: number
+  costChartoniA3: number
+  costChartoniA4: number
   costAutokollito: number
   totalCost: number
   status: "completed" | "pending" | "failed"
@@ -64,8 +68,10 @@ export interface PrintBilling {
   totalA4Color: number
   totalA3BW: number
   totalA3Color: number
-  totalRizocharto: number
-  totalChartoni: number
+  totalRizochartoA3: number
+  totalRizochartoA4: number
+  totalChartoniA3: number
+  totalChartoniA4: number
   totalAutokollito: number
   totalCost: number
   paid: boolean
@@ -1169,8 +1175,10 @@ class DummyDatabase {
           a4Color: 0.25,
           a3BW: 0.1,
           a3Color: 0.5,
-          rizocharto: 0.1,
-          chartoni: 0.1,
+          rizochartoA3: 0.2,
+          rizochartoA4: 0.15,
+          chartoniA3: 0.2,
+          chartoniA4: 0.15,
           autokollito: 0.1,
         },
         isActive: true,
@@ -1216,47 +1224,77 @@ class DummyDatabase {
         const jobsCount = Math.floor(Math.random() * 11) + 10;
         for (let i = 0; i < jobsCount; i++) {
           const jobDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, Math.floor(Math.random() * 28) + 1);
+          const deviceName = this.getRandomPrinterName();
+          
+          // Initialize print job with device name first
           const printJob: PrintJob = {
             jobId: `print-${userId}-${monthOffset}-${i}`,
             uid: userId,
             username: user.username,
             userDisplayName: user.displayName,
-            pagesA4BW: Math.floor(Math.random() * 8) + 1, // 1-8
-            pagesA4Color: Math.floor(Math.random() * 4),   // 0-3
-            pagesA3BW: Math.floor(Math.random() * 3),      // 0-2
-            pagesA3Color: Math.floor(Math.random() * 2),   // 0-1
-            pagesRizocharto: Math.floor(Math.random() * 5), // 0-4
-            pagesChartoni: Math.floor(Math.random() * 5), // 0-4
-            pagesAutokollito: Math.floor(Math.random() * 5), // 0-4
+            pagesA4BW: 0,
+            pagesA4Color: 0,
+            pagesA3BW: 0,
+            pagesA3Color: 0,
+            pagesRizochartoA3: 0,
+            pagesRizochartoA4: 0,
+            pagesChartoniA3: 0,
+            pagesChartoniA4: 0,
+            pagesAutokollito: 0,
             deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 3)}`,
-            deviceName: this.getRandomPrinterName(),
+            deviceName: deviceName,
             timestamp: jobDate,
             costA4BW: 0,
             costA4Color: 0,
             costA3BW: 0,
             costA3Color: 0,
-            costRizocharto: 0,
-            costChartoni: 0,
+            costRizochartoA3: 0,
+            costRizochartoA4: 0,
+            costChartoniA3: 0,
+            costChartoniA4: 0,
             costAutokollito: 0,
             totalCost: 0,
             status: "completed",
           };
+
+          // Generate pages based on printer capabilities
+          if (deviceName === "Canon Colour") {
+            // Canon Colour can print everything
+            printJob.pagesA4BW = Math.floor(Math.random() * 8) + 1; // 1-8
+            printJob.pagesA4Color = Math.floor(Math.random() * 4);   // 0-3
+            printJob.pagesA3BW = Math.floor(Math.random() * 3);      // 0-2
+            printJob.pagesA3Color = Math.floor(Math.random() * 2);   // 0-1
+            printJob.pagesRizochartoA3 = Math.floor(Math.random() * 3); // 0-2
+            printJob.pagesRizochartoA4 = Math.floor(Math.random() * 4); // 0-3
+            printJob.pagesChartoniA3 = Math.floor(Math.random() * 3); // 0-2
+            printJob.pagesChartoniA4 = Math.floor(Math.random() * 4); // 0-3
+            printJob.pagesAutokollito = Math.floor(Math.random() * 5); // 0-4
+          } else if (deviceName === "Canon B/W" || deviceName === "Brother") {
+            // Canon B/W and Brother can only print A4 B/W
+            printJob.pagesA4BW = Math.floor(Math.random() * 8) + 1; // 1-8
+            // All other page types remain 0
+          }
+
           // Calculate costs with proper money rounding
           const prices = this.priceTables.find((p) => p.id === "printing")?.prices || {};
           printJob.costA4BW = calculatePrintCost(printJob.pagesA4BW, prices.a4BW || 0);
           printJob.costA4Color = calculatePrintCost(printJob.pagesA4Color, prices.a4Color || 0);
           printJob.costA3BW = calculatePrintCost(printJob.pagesA3BW, prices.a3BW || 0);
           printJob.costA3Color = calculatePrintCost(printJob.pagesA3Color, prices.a3Color || 0);
-          printJob.costRizocharto = calculatePrintCost(printJob.pagesRizocharto, prices.rizocharto || 0);
-          printJob.costChartoni = calculatePrintCost(printJob.pagesChartoni, prices.chartoni || 0);
+          printJob.costRizochartoA3 = calculatePrintCost(printJob.pagesRizochartoA3, prices.rizochartoA3 || 0);
+          printJob.costRizochartoA4 = calculatePrintCost(printJob.pagesRizochartoA4, prices.rizochartoA4 || 0);
+          printJob.costChartoniA3 = calculatePrintCost(printJob.pagesChartoniA3, prices.chartoniA3 || 0);
+          printJob.costChartoniA4 = calculatePrintCost(printJob.pagesChartoniA4, prices.chartoniA4 || 0);
           printJob.costAutokollito = calculatePrintCost(printJob.pagesAutokollito, prices.autokollito || 0);
           printJob.totalCost = calculatePrintJobTotal({
             costA4BW: printJob.costA4BW,
             costA4Color: printJob.costA4Color,
             costA3BW: printJob.costA3BW,
             costA3Color: printJob.costA3Color,
-            costRizocharto: printJob.costRizocharto,
-            costChartoni: printJob.costChartoni,
+            costRizochartoA3: printJob.costRizochartoA3,
+            costRizochartoA4: printJob.costRizochartoA4,
+            costChartoniA3: printJob.costChartoniA3,
+            costChartoniA4: printJob.costChartoniA4,
             costAutokollito: printJob.costAutokollito
           });
           this.printJobs.push(printJob);
@@ -1312,8 +1350,10 @@ class DummyDatabase {
         const totalA4Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA4Color, 0)
         const totalA3BW = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3BW, 0)
         const totalA3Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3Color, 0)
-        const totalRizocharto = monthPrintJobs.reduce((sum, j) => sum + j.pagesRizocharto, 0)
-        const totalChartoni = monthPrintJobs.reduce((sum, j) => sum + j.pagesChartoni, 0)
+        const totalRizochartoA3 = monthPrintJobs.reduce((sum, j) => sum + j.pagesRizochartoA3, 0)
+        const totalRizochartoA4 = monthPrintJobs.reduce((sum, j) => sum + j.pagesRizochartoA4, 0)
+        const totalChartoniA3 = monthPrintJobs.reduce((sum, j) => sum + j.pagesChartoniA3, 0)
+        const totalChartoniA4 = monthPrintJobs.reduce((sum, j) => sum + j.pagesChartoniA4, 0)
         const totalAutokollito = monthPrintJobs.reduce((sum, j) => sum + j.pagesAutokollito, 0)
         const totalCost = roundMoney(monthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0))
 
@@ -1335,13 +1375,15 @@ class DummyDatabase {
             uid: userId,
             userDisplayName: user.displayName,
             period,
-                      totalA4BW,
-          totalA4Color,
-          totalA3BW,
-          totalA3Color,
-          totalRizocharto,
-          totalChartoni,
-          totalAutokollito,
+            totalA4BW,
+            totalA4Color,
+            totalA3BW,
+            totalA3Color,
+            totalRizochartoA3,
+            totalRizochartoA4,
+            totalChartoniA3,
+            totalChartoniA4,
+            totalAutokollito,
             totalCost,
             paid: isPaid,
             paidDate: isPaid ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) : undefined,

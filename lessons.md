@@ -2,6 +2,273 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+### Print Type Filter Fix - Filter Expanded Rows (December 2024)
+
+**Problem**: The print type filter was not working as expected. When users selected a specific print type (e.g., "Α4 Ασπρόμαυρο"), the table would show all print types from jobs that contained the selected type, rather than showing only the specific print type rows.
+
+**Root Cause**: The filtering was applied to the raw print jobs before they were expanded into individual rows. This meant that if a job contained multiple print types and one matched the filter, the entire job would be included, and all its print types would be displayed.
+
+**Example of the Issue**:
+- A job has: `pagesA4BW: 5`, `pagesRizochartoA3: 2`, `pagesChartoniA4: 1`
+- User selects filter: "Α4 Ασπρόμαυρο" (a4BW)
+- Expected: Show only A4 Ασπρόμαυρο rows
+- Actual: Showed A4 Ασπρόμαυρο, Ριζόχαρτο A3, and Χαρτόνι A4 rows
+
+**Solution**: Modified the PrintJobsTable component to accept a `printTypeFilter` prop and apply filtering to the expanded rows instead of the raw jobs.
+
+**Changes Made**:
+
+**1. Updated PrintJobsTable Component (`components/print-jobs-table.tsx`)**:
+- **Added printTypeFilter prop**: New optional prop to receive the current print type filter
+- **Added filterExpandedRowsByType function**: Helper function to filter expanded rows by print type
+- **Updated useEffect**: Now applies print type filtering to expanded rows after job expansion
+- **Maintained existing functionality**: All other filtering and sorting remains unchanged
+
+```typescript
+// New prop interface
+interface PrintJobsTableProps {
+  // ... existing props
+  printTypeFilter?: string // New prop for filtering expanded rows
+}
+
+// New filter function
+const filterExpandedRowsByType = (rows: any[], printTypeFilter: string) => {
+  if (!printTypeFilter || printTypeFilter === "all") {
+    return rows
+  }
+  
+  const filterMap: { [key: string]: string } = {
+    "a4BW": "A4 Ασπρόμαυρο",
+    "a4Color": "A4 Έγχρωμο",
+    "a3BW": "A3 Ασπρόμαυρο",
+    "a3Color": "A3 Έγχρωμο",
+    "rizochartoA3": "Ριζόχαρτο A3",
+    "rizochartoA4": "Ριζόχαρτο A4",
+    "chartoniA3": "Χαρτόνι A3",
+    "chartoniA4": "Χαρτόνι A4",
+    "autokollito": "Αυτοκόλλητο"
+  }
+  
+  const targetPrintType = filterMap[printTypeFilter]
+  if (!targetPrintType) {
+    return rows
+  }
+  
+  return rows.filter(row => row.printType === targetPrintType)
+}
+
+// Updated useEffect
+useEffect(() => {
+  // Expand each print job into individual rows
+  const expandedData = data.flatMap(expandPrintJob)
+  
+  // Apply print type filter to expanded rows
+  const filteredExpandedData = filterExpandedRowsByType(expandedData, printTypeFilter || "all")
+  
+  setSortedData(sortData(filteredExpandedData, sortConfig))
+}, [data, sortConfig, printTypeFilter])
+```
+
+**2. Updated Dashboard Page (`app/dashboard/page.tsx`)**:
+- **Passed printTypeFilter prop**: Added printTypeFilter to PrintJobsTable component
+- **Maintained existing filter logic**: The existing filter logic for raw jobs remains for other filters
+
+```typescript
+<PrintJobsTable
+  data={filteredPrintJobs}
+  page={printJobsPage}
+  pageSize={PAGE_SIZE}
+  onPageChange={setPrintJobsPage}
+  userRole={user.accessLevel}
+  onRowHover={setHoveredPrintJob}
+  printTypeFilter={printTypeFilter} // New prop
+/>
+```
+
+**Key Benefits**:
+- **Precise Filtering**: Users now see only the specific print type they selected
+- **Better User Experience**: Filter behavior matches user expectations
+- **Maintained Performance**: Filtering is applied efficiently to expanded rows
+- **Backward Compatibility**: All existing functionality remains unchanged
+
+**Technical Implementation**:
+- **Two-stage filtering**: Raw jobs are filtered first (for other filters), then expanded rows are filtered by print type
+- **Efficient mapping**: Uses a filter map to convert filter values to display names
+- **Conditional filtering**: Only applies print type filter when a specific type is selected
+- **Proper dependency management**: useEffect includes printTypeFilter in dependencies
+
+**Result**: The print type filter now works correctly, showing only the specific print type rows that users expect to see when they select a filter option.
+
+### Print Type Filter Enhancement - Specific A3/A4 Variants (December 2024)
+
+### Print Type Filter Enhancement - Specific A3/A4 Variants (December 2024)
+
+**Feature Modified**: Enhanced the print type filter to show specific A3/A4 variants for Ριζόχαρτο and Χαρτόνι instead of generic options, providing more precise filtering capabilities.
+
+**Changes Made**:
+
+**1. Updated Print Filters (`components/print-filters.tsx`)**:
+- **Filter Options**: Replaced generic options with specific A3/A4 variants
+  - Removed: `rizocharto`, `chartoni` (generic)
+  - Added: `rizochartoA3`, `rizochartoA4`, `chartoniA3`, `chartoniA4` (specific)
+- **User Interface**: Dropdown now shows:
+  - A4 Ασπρόμαυρο
+  - A4 Έγχρωμο  
+  - A3 Ασπρόμαυρο
+  - A3 Έγχρωμο
+  - Ριζόχαρτο A3
+  - Ριζόχαρτο A4
+  - Χαρτόνι A3
+  - Χαρτόνι A4
+  - Αυτοκόλλητο
+
+**2. Updated Filter Logic (`app/dashboard/page.tsx`)**:
+- **Filter Cases**: Updated switch statement to handle specific variants
+  - `rizochartoA3`: Filters for `pagesRizochartoA3 > 0`
+  - `rizochartoA4`: Filters for `pagesRizochartoA4 > 0`
+  - `chartoniA3`: Filters for `pagesChartoniA3 > 0`
+  - `chartoniA4`: Filters for `pagesChartoniA4 > 0`
+- **Export Functionality**: Updated `expandPrintJob` function to handle specific variants
+  - Each variant now exports as a separate row with correct labels
+  - Proper cost calculation for each specific variant
+
+**3. Printer Capability Integration**:
+- **Canon Colour**: Can filter by all print types (full capability)
+- **Canon B/W & Brother**: Automatically restricted to A4 Ασπρόμαυρο only
+- **Filter Disabling**: Type filter is disabled and auto-set when B/W printers are selected
+
+**Key Benefits**:
+- **Precise Filtering**: Users can filter by specific paper sizes and types
+- **Better Data Analysis**: More granular filtering for reporting and analysis
+- **Consistent with Database**: Filter options match the actual database schema
+- **Improved UX**: Clear distinction between different paper variants
+
+**Technical Implementation**:
+- Updated filter dropdown options to match database fields
+- Modified filter logic to handle specific variants
+- Updated export functionality to properly handle specific variants
+- Maintained backward compatibility with existing filter behavior
+
+**Files Modified**:
+- `components/print-filters.tsx` - Filter dropdown options
+- `app/dashboard/page.tsx` - Filter logic and export functionality
+
+**Testing Considerations**:
+- Verify all specific filter options work correctly
+- Verify export functionality includes all variants properly
+- Verify printer-specific filter restrictions work as expected
+- Verify filter combinations work correctly
+
+**Result**: Print type filter now provides precise filtering by specific A3/A4 variants, improving data analysis capabilities and user experience.
+
+### Printing Items Refined - Removed Generic Χαρτόνι & Ριζοχαρτο (December 2024)
+
+**Feature Modified**: Removed generic "Χαρτόνι" and "Ριζόχαρτο" items, keeping only the specific A3 and A4 variants for better precision and clarity.
+
+**Current Items**:
+- **Ριζοχαρτο A3**: €0,20 (Ριζόχαρτο A3)
+- **Ριζοχαρτο A4**: €0,15 (Ριζόχαρτο A4)  
+- **Χαρτόνι A3**: €0,20 (Χαρτόνι A3)
+- **Χαρτόνι A4**: €0,15 (Χαρτόνι A4)
+
+**Removed Items**:
+- ~~Ριζόχαρτο (generic)~~
+- ~~Χαρτόνι (generic)~~
+
+**Changes Made**:
+
+**1. Updated Database Schema (`lib/dummy-database.ts`)**:
+- **PrintJob Interface**: Removed generic fields, kept only A3/A4 variants
+  - Removed: `pagesRizocharto`, `pagesChartoni`, `costRizocharto`, `costChartoni`
+  - Kept: `pagesRizochartoA3`, `pagesRizochartoA4`, `pagesChartoniA3`, `pagesChartoniA4`
+  - Kept: `costRizochartoA3`, `costRizochartoA4`, `costChartoniA3`, `costChartoniA4`
+- **PrintBilling Interface**: Removed generic total fields
+  - Removed: `totalRizocharto`, `totalChartoni`
+  - Kept: `totalRizochartoA3`, `totalRizochartoA4`, `totalChartoniA3`, `totalChartoniA4`
+- **Price Tables**: Removed generic pricing entries
+  - Removed: `rizocharto: 0.10`, `chartoni: 0.10`
+  - Kept: `rizochartoA3: 0.20`, `rizochartoA4: 0.15`, `chartoniA3: 0.20`, `chartoniA4: 0.15`
+
+**2. Updated Cost Calculation (`lib/utils.ts`)**:
+- **calculatePrintJobTotal Function**: Removed generic cost fields from total calculation
+- **Enhanced Money Handling**: Updated to handle only specific A3/A4 variants
+
+**3. Updated Admin Interface (`app/admin/page.tsx`)**:
+- **Printing Type State**: Removed generic types from type definition
+- **Select Options**: Removed generic items from printing type dropdown
+- **Price Display**: Only specific A3/A4 variants show with their respective prices
+
+**4. Updated Prices Page (`app/prices/page.tsx`)**:
+- **Price Display**: Removed generic items from price list display
+- **Service Options**: Updated calculator service options to exclude generic variants
+- **Conditional Calculator**: Price calculator now only shows for non-admin users
+
+**5. Updated Python Data Collection (`python/collect.py`)**:
+- **Default Pricing**: Removed generic pricing entries from default pricing structure
+- **Cost Calculation**: Updated cost calculation to exclude generic fields
+- **Error Handling**: Updated error handling to exclude generic cost fields
+
+**Key Benefits**:
+- **Precise Pricing**: Users must select specific A3/A4 variants, eliminating ambiguity
+- **Accurate Billing**: Clear distinction between different paper sizes and types
+- **Better User Experience**: No confusion between generic and specific paper types
+- **Admin Control**: Admin users can manage charges for specific paper sizes only
+
+**Technical Implementation**:
+- Removed generic fields while maintaining specific A3/A4 variants
+- Used proper money handling functions for all calculations
+- Updated error handling to exclude generic fields
+- Updated all relevant interfaces and displays to show only specific variants
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Database schema and price tables
+- `lib/utils.ts` - Cost calculation functions
+- `app/admin/page.tsx` - Admin interface updates
+- `app/prices/page.tsx` - Price display and calculator updates
+- `python/collect.py` - Data collection service updates
+
+**Testing Considerations**:
+- Verify generic items no longer appear in admin printing charge interface
+- Verify only specific A3/A4 variants appear in price list display
+- Verify cost calculations work correctly for specific variants only
+- Verify price calculator includes only specific variants (for non-admin users)
+- Verify data collection service handles specific fields properly
+
+**Result**: System now supports only specific A3/A4 variants for Χαρτόνι and Ριζόχαρτο, eliminating ambiguity and providing more precise billing control.
+
+### Price Calculator Access Control (December 2024)
+
+**Feature Modified**: Modified the price calculator section to only be visible to non-admin users, while keeping it accessible to all other user access levels.
+
+**Changes Made**:
+
+**1. Conditional Display (`app/prices/page.tsx`)**:
+- **Access Control**: Added condition `{user && user.accessLevel !== "admin" && (...)}` around calculator section
+- **User Experience**: Admin users see only price lists, other users see price lists + calculator
+- **Maintained Functionality**: Calculator remains fully functional for authorized users
+
+**Key Benefits**:
+- **Admin Focus**: Admin users can focus on price management without calculator distraction
+- **User Empowerment**: Regular users can still calculate costs before printing
+- **Role-Based Access**: Clear separation of functionality based on user role
+- **Cleaner Interface**: Admin interface is more streamlined
+
+**Technical Implementation**:
+- Used existing user authentication context
+- Maintained all calculator functionality for authorized users
+- No changes to calculator logic or features
+
+**Files Modified**:
+- `app/prices/page.tsx` - Added conditional rendering for calculator section
+
+**Testing Considerations**:
+- Verify calculator is hidden for admin users
+- Verify calculator is visible for regular users and Υπεύθυνος users
+- Verify calculator functionality works correctly for authorized users
+- Verify price lists remain visible for all users
+
+**Result**: Price calculator is now appropriately restricted based on user access level, providing a better user experience for different user roles.
+
 ### Lamination Debts Card Dynamic Filtering Fix (December 2024)
 
 **Problem**: The "Οφειλές ΠΛΑ. ΤΟ." (lamination debts) card on the dashboard was not updating dynamically when users applied billing filters. The card continued to show the total lamination debts from all data instead of reflecting the filtered results.
@@ -1765,6 +2032,56 @@ useEffect(() => {
 **1. Missing Dependencies**:
 - Added missing Radix UI components: `@radix-ui/react-avatar`, `@radix-ui/react-checkbox`, `@radix-ui/react-collapsible`, `@radix-ui/react-context-menu`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-hover-card`, `@radix-ui/react-menubar`, `@radix-ui/react-navigation-menu`, `@radix-ui/react-progress`, `@radix-ui/react-separator`, `@radix-ui/react-switch`, `@radix-ui/react-toggle`, `@radix-ui/react-toggle-group`, `@radix-ui/react-tooltip`, `@radix-ui/react-accordion`, `@radix-ui/react-alert-dialog`, `@radix-ui/react-aspect-ratio`
 - Added missing utility libraries: `cmdk`, `embla-carousel-react`, `input-otp`, `next-themes`, `react-hook-form`, `react-resizable-panels`, `recharts`, `sonner`, `vaul`
+
+### Module Resolution Fix - @radix-ui/react-scroll-area (December 2024)
+
+**Problem**: The application was showing a "Module not found" error for `@radix-ui/react-scroll-area` even though it was listed in package.json. The error occurred when trying to import the ScrollArea component in `components/ui/scroll-area.tsx`.
+
+**Error Message**:
+```
+Error: ./components/ui/scroll-area.tsx:4:1
+Module not found: Can't resolve '@radix-ui/react-scroll-area'
+```
+
+**Root Cause**: The `@radix-ui/react-scroll-area` package was listed in package.json but was not properly installed in node_modules, likely due to a corrupted or incomplete installation.
+
+**Solution**: Reinstalled all dependencies using `pnpm install` to ensure all packages are properly installed.
+
+**Changes Made**:
+
+**1. Reinstalled Dependencies**:
+```bash
+pnpm install
+```
+
+**2. Verified Installation**:
+- Confirmed `@radix-ui/react-scroll-area` was properly installed in `node_modules/@radix-ui/react-scroll-area`
+- Verified the package.json showed the correct version (1.2.9)
+- Checked that all other Radix UI components were also properly installed
+
+**Key Benefits**:
+- **Resolved Module Error**: The ScrollArea component can now be imported without errors
+- **Complete Installation**: All dependencies are properly installed and accessible
+- **Consistent Environment**: Development server now starts without module resolution errors
+- **Future Prevention**: Proper dependency management prevents similar issues
+
+**Technical Details**:
+- Used `pnpm install` to reinstall all dependencies from package-lock.json
+- The installation process downloaded and installed 75 packages
+- All Radix UI components are now properly available for import
+- Development server starts successfully on port 3001
+
+**Files Affected**:
+- `node_modules/@radix-ui/react-scroll-area` - Now properly installed
+- All components using ScrollArea (tag-input, etc.) - Now work correctly
+
+**Verification Process**:
+1. **Installation Test**: Confirmed `@radix-ui/react-scroll-area` is in node_modules
+2. **Import Test**: Verified ScrollArea can be imported in components
+3. **Server Test**: Confirmed development server starts without errors
+4. **Component Test**: Verified tag-input component works with ScrollArea
+
+**Result**: The application now runs successfully without module resolution errors, and all UI components using ScrollArea function properly.
 
 **2. Department Field References**:
 - Fixed `app/admin/populate-data/page.tsx` to remove department field references

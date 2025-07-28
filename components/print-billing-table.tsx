@@ -26,9 +26,10 @@ interface PrintBillingTableProps {
   pageSize: number
   onPageChange: (page: number) => void
   userRole: string
+  onRowHover?: (hoveredJob: { deviceName: string; printType: string } | null) => void
 }
 
-export default function PrintBillingTable({ data, page, pageSize, onPageChange, userRole }: PrintBillingTableProps) {
+export default function PrintBillingTable({ data, page, pageSize, onPageChange, userRole, onRowHover }: PrintBillingTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
   const [sortedData, setSortedData] = useState(data)
 
@@ -169,7 +170,12 @@ export default function PrintBillingTable({ data, page, pageSize, onPageChange, 
                   : userData?.responsiblePerson || "-"
                 
                 return (
-                  <TableRow key={billing.billingId}>
+                  <TableRow 
+                    key={billing.billingId}
+                    className="hover:bg-yellow-50 cursor-pointer transition-colors duration-200"
+                    onMouseEnter={() => onRowHover?.({ deviceName: "billing", printType: "print" })}
+                    onMouseLeave={() => onRowHover?.(null)}
+                  >
                     <TableCell className="text-center font-medium">{userData?.userRole || "-"}</TableCell>
                     <TableCell className="text-center">{billing.userDisplayName}</TableCell>
                     <TableCell className="text-center">{responsiblePerson}</TableCell>

@@ -117,8 +117,16 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
           </div>
           <div className="md:col-span-1">
             <Label htmlFor="printType" className="text-gray-700">Είδος Εκτύπωσης</Label>
-            <Select value={printTypeFilter} onValueChange={setPrintTypeFilter}>
-              <SelectTrigger className="border-gray-200 focus:border-blue-500">
+            <Select 
+              value={printTypeFilter} 
+              onValueChange={setPrintTypeFilter}
+              disabled={deviceFilter === "Canon B/W" || deviceFilter === "Brother"}
+            >
+              <SelectTrigger className={`border-gray-200 focus:border-blue-500 ${
+                deviceFilter === "Canon B/W" || deviceFilter === "Brother" 
+                  ? "bg-gray-100 text-gray-500 cursor-not-allowed" 
+                  : ""
+              }`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -127,11 +135,18 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
                 <SelectItem value="a4Color">A4 Έγχρωμο</SelectItem>
                 <SelectItem value="a3BW">A3 Ασπρόμαυρο</SelectItem>
                 <SelectItem value="a3Color">A3 Έγχρωμο</SelectItem>
-                <SelectItem value="rizocharto">Ριζόχαρτο</SelectItem>
-                <SelectItem value="chartoni">Χαρτόνι</SelectItem>
+                <SelectItem value="rizochartoA3">Ριζόχαρτο A3</SelectItem>
+                <SelectItem value="rizochartoA4">Ριζόχαρτο A4</SelectItem>
+                <SelectItem value="chartoniA3">Χαρτόνι A3</SelectItem>
+                <SelectItem value="chartoniA4">Χαρτόνι A4</SelectItem>
                 <SelectItem value="autokollito">Αυτοκόλλητο</SelectItem>
               </SelectContent>
             </Select>
+            {(deviceFilter === "Canon B/W" || deviceFilter === "Brother") && (
+              <p className="text-xs text-gray-500 mt-1">
+                Μόνο A4 Ασπρόμαυρο διαθέσιμο για αυτόν τον εκτυπωτή
+              </p>
+            )}
           </div>
         </div>
       </div>

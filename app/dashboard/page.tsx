@@ -111,6 +111,10 @@ export default function DashboardPage() {
   const [laminationBillingPage, setLaminationBillingPage] = useState(1)
   const PAGE_SIZE = 10
 
+  // Hover state for highlighting statistics
+  const [hoveredPrintJob, setHoveredPrintJob] = useState<{ deviceName: string; printType: string } | null>(null)
+  const [hoveredLaminationJob, setHoveredLaminationJob] = useState<{ machine: string; type: string } | null>(null)
+
   useEffect(() => {
     if (!user) return
 
@@ -176,6 +180,13 @@ export default function DashboardPage() {
     setPrintBillingPage(1)
     setLaminationBillingPage(1)
   }, [searchTerm, dateFrom, dateTo, statusFilter, typeFilter, deviceFilter, userFilter])
+
+  // Auto-set print type filter when Canon B/W or Brother is selected
+  useEffect(() => {
+    if (deviceFilter === "Canon B/W" || deviceFilter === "Brother") {
+      setPrintTypeFilter("a4BW")
+    }
+  }, [deviceFilter])
 
   // Calculate price distribution for billing table filtering
   const calculateBillingPriceDistribution = () => {
@@ -337,10 +348,14 @@ export default function DashboardPage() {
             return item.pagesA3BW > 0
           case "a3Color":
             return item.pagesA3Color > 0
-          case "rizocharto":
-            return item.pagesRizocharto > 0
-          case "chartoni":
-            return item.pagesChartoni > 0
+          case "rizochartoA3":
+            return item.pagesRizochartoA3 > 0
+          case "rizochartoA4":
+            return item.pagesRizochartoA4 > 0
+          case "chartoniA3":
+            return item.pagesChartoniA3 > 0
+          case "chartoniA4":
+            return item.pagesChartoniA4 > 0
           case "autokollito":
             return item.pagesAutokollito > 0
           default:
@@ -650,7 +665,7 @@ export default function DashboardPage() {
   const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
 
   // Calculate print statistics
-  const calculatePrintStatistics = () => {
+  const calculatePrintStatistics = (hoveredJob?: { deviceName: string; printType: string } | null) => {
     const stats = {
       canonBW: {
         a4BW: 0
@@ -697,7 +712,7 @@ export default function DashboardPage() {
   }
 
   // Calculate lamination statistics
-  const calculateLaminationStatistics = () => {
+  const calculateLaminationStatistics = (hoveredJob?: { machine: string; type: string } | null) => {
     const stats = {
       laminator: {
         a3: 0,
@@ -728,8 +743,19 @@ export default function DashboardPage() {
     return stats
   }
 
-  const printStats = calculatePrintStatistics()
-  const laminationStats = calculateLaminationStatistics()
+  const printStats = calculatePrintStatistics(hoveredPrintJob)
+  const laminationStats = calculateLaminationStatistics(hoveredLaminationJob)
+
+  // Helper functions to determine if a statistic should be highlighted
+  const isPrintStatHighlighted = (deviceName: string, printType: string) => {
+    if (!hoveredPrintJob) return false
+    return hoveredPrintJob.deviceName === deviceName && hoveredPrintJob.printType === printType
+  }
+
+  const isLaminationStatHighlighted = (machine: string, type: string) => {
+    if (!hoveredLaminationJob) return false
+    return hoveredLaminationJob.machine === machine && hoveredLaminationJob.type === type
+  }
 
   // Generate chart data for last 6 months
 
@@ -886,6 +912,7 @@ export default function DashboardPage() {
                   pageSize={PAGE_SIZE}
                   onPageChange={setPrintBillingPage}
                   userRole={user.accessLevel}
+                  onRowHover={setHoveredPrintJob}
                 />
               </div>
             </div>
@@ -1013,27 +1040,51 @@ export default function DashboardPage() {
                                   })
                                 }
                                 
-                                if (job.pagesRizocharto > 0) {
+                                if (job.pagesRizochartoA3 > 0) {
                                   rows.push({
                                     timestamp: job.timestamp.toLocaleString("el-GR"),
                                     uid: job.uid,
                                     userDisplayName: job.userDisplayName,
                                     deviceName: job.deviceName,
-                                    printType: "Ριζόχαρτο",
-                                    quantity: job.pagesRizocharto,
-                                    cost: formatPrice(job.pagesRizocharto * 0.10)
+                                    printType: "Ριζόχαρτο A3",
+                                    quantity: job.pagesRizochartoA3,
+                                    cost: formatPrice(job.pagesRizochartoA3 * 0.10)
                                   })
                                 }
                                 
-                                if (job.pagesChartoni > 0) {
+                                if (job.pagesRizochartoA4 > 0) {
                                   rows.push({
                                     timestamp: job.timestamp.toLocaleString("el-GR"),
                                     uid: job.uid,
                                     userDisplayName: job.userDisplayName,
                                     deviceName: job.deviceName,
-                                    printType: "Χαρτόνι",
-                                    quantity: job.pagesChartoni,
-                                    cost: formatPrice(job.pagesChartoni * 0.10)
+                                    printType: "Ριζόχαρτο A4",
+                                    quantity: job.pagesRizochartoA4,
+                                    cost: formatPrice(job.pagesRizochartoA4 * 0.10)
+                                  })
+                                }
+                                
+                                if (job.pagesChartoniA3 > 0) {
+                                  rows.push({
+                                    timestamp: job.timestamp.toLocaleString("el-GR"),
+                                    uid: job.uid,
+                                    userDisplayName: job.userDisplayName,
+                                    deviceName: job.deviceName,
+                                    printType: "Χαρτόνι A3",
+                                    quantity: job.pagesChartoniA3,
+                                    cost: formatPrice(job.pagesChartoniA3 * 0.10)
+                                  })
+                                }
+                                
+                                if (job.pagesChartoniA4 > 0) {
+                                  rows.push({
+                                    timestamp: job.timestamp.toLocaleString("el-GR"),
+                                    uid: job.uid,
+                                    userDisplayName: job.userDisplayName,
+                                    deviceName: job.deviceName,
+                                    printType: "Χαρτόνι A4",
+                                    quantity: job.pagesChartoniA4,
+                                    cost: formatPrice(job.pagesChartoniA4 * 0.10)
                                   })
                                 }
                                 
@@ -1088,6 +1139,8 @@ export default function DashboardPage() {
                           pageSize={PAGE_SIZE}
                           onPageChange={setPrintJobsPage}
                           userRole={user.accessLevel}
+                          onRowHover={setHoveredPrintJob}
+                          printTypeFilter={printTypeFilter}
                         />
                       </ErrorBoundary>
                     </div>
@@ -1109,19 +1162,43 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-4 gap-2 text-center">
                           <div>
                             <div className="text-xs text-gray-600">A4 B/W</div>
-                            <div className="text-lg font-bold text-black">{printStats.canonColour.a4BW}</div>
+                            <div className={`text-lg font-bold ${
+                              isPrintStatHighlighted("Canon Colour", "A4 Ασπρόμαυρο") 
+                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                                : "text-black"
+                            }`}>
+                              {printStats.canonColour.a4BW}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">A4 Colour</div>
-                            <div className="text-lg font-bold text-black">{printStats.canonColour.a4Colour}</div>
+                            <div className={`text-lg font-bold ${
+                              isPrintStatHighlighted("Canon Colour", "A4 Έγχρωμο") 
+                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                                : "text-black"
+                            }`}>
+                              {printStats.canonColour.a4Colour}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">A3 B/W</div>
-                            <div className="text-lg font-bold text-black">{printStats.canonColour.a3BW}</div>
+                            <div className={`text-lg font-bold ${
+                              isPrintStatHighlighted("Canon Colour", "A3 Ασπρόμαυρο") 
+                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                                : "text-black"
+                            }`}>
+                              {printStats.canonColour.a3BW}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">A3 Colour</div>
-                            <div className="text-lg font-bold text-black">{printStats.canonColour.a3Colour}</div>
+                            <div className={`text-lg font-bold ${
+                              isPrintStatHighlighted("Canon Colour", "A3 Έγχρωμο") 
+                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                                : "text-black"
+                            }`}>
+                              {printStats.canonColour.a3Colour}
+                            </div>
                           </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2 mt-3 text-center">
@@ -1152,7 +1229,13 @@ export default function DashboardPage() {
                       <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
-                          <div className="text-xl font-bold text-black">{printStats.canonBW.a4BW}</div>
+                          <div className={`text-xl font-bold ${
+                            isPrintStatHighlighted("Canon B/W", "A4 Ασπρόμαυρο") 
+                              ? "text-blue-600 bg-blue-100 rounded px-1" 
+                              : "text-black"
+                          }`}>
+                            {printStats.canonBW.a4BW}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1168,7 +1251,13 @@ export default function DashboardPage() {
                       <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
-                          <div className="text-xl font-bold text-black">{printStats.brother.a4BW}</div>
+                          <div className={`text-xl font-bold ${
+                            isPrintStatHighlighted("Brother", "A4 Ασπρόμαυρο") 
+                              ? "text-blue-600 bg-blue-100 rounded px-1" 
+                              : "text-black"
+                          }`}>
+                            {printStats.brother.a4BW}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1248,6 +1337,7 @@ export default function DashboardPage() {
                           pageSize={PAGE_SIZE}
                           onPageChange={setLaminationJobsPage}
                           userRole={user.accessLevel}
+                          onRowHover={setHoveredLaminationJob}
                         />
                       </ErrorBoundary>
                     </div>
@@ -1269,19 +1359,43 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-4 gap-2 text-center">
                           <div>
                             <div className="text-xs text-gray-600">Α3</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.a3}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("laminator", "A3") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.laminator.a3}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Α4</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.a4}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("laminator", "A4") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.laminator.a4}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Α5</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.a5}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("laminator", "A5") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.laminator.a5}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Κάρτες</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.cards}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("laminator", "cards") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.laminator.cards}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1299,15 +1413,33 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-3 gap-2 text-center">
                           <div>
                             <div className="text-xs text-gray-600">Σπιράλ</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.binding.spiral}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("binding", "spiral") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.binding.spiral}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Χρωματιστά Χαρτόνια</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.binding.coloredCardboard}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("binding", "colored_cardboard") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.binding.coloredCardboard}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Πλαστικό Κάλυμμα</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.binding.plasticCover}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("binding", "plastic_cover") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.binding.plasticCover}
+                            </div>
                           </div>
                         </div>
                       </div>
