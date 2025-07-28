@@ -225,16 +225,16 @@ class PrinterCollector:
             if pricing_doc.exists:
                 prices = pricing_doc.to_dict()
             else:
-                            # Default pricing
-            prices = {
-                'a4BW': 0.05,
-                'a4Color': 0.15,
-                'a3BW': 0.10,
-                'a3Color': 0.30,
-                'rizocharto': 0.10,
-                'chartoni': 0.10,
-                'autokollito': 0.10,
-            }
+                # Default pricing
+                prices = {
+                    'a4BW': 0.05,
+                    'a4Color': 0.15,
+                    'a3BW': 0.10,
+                    'a3Color': 0.30,
+                    'rizocharto': 0.10,
+                    'chartoni': 0.10,
+                    'autokollito': 0.10,
+                }
             
             # Calculate individual costs
             cost_a4_bw = job_data['pagesA4BW'] * prices['a4BW']
@@ -248,13 +248,13 @@ class PrinterCollector:
             total_cost = cost_a4_bw + cost_a4_color + cost_a3_bw + cost_a3_color + cost_rizocharto + cost_chartoni + cost_autokollito
             
             job_data.update({
-                'costA4BW': round(cost_a4_bw, 3),
-                'costA4Color': round(cost_a4_color, 3),
-                'costA3BW': round(cost_a3_bw, 3),
-                'costA3Color': round(cost_a3_color, 3),
-                'costRizocharto': round(cost_rizocharto, 3),
-                'costChartoni': round(cost_chartoni, 3),
-                'costAutokollito': round(cost_autokollito, 3),
+                'costA4BW': round(cost_a4_bw, 2),
+                'costA4Color': round(cost_a4_color, 2),
+                'costA3BW': round(cost_a3_bw, 2),
+                'costA3Color': round(cost_a3_color, 2),
+                'costRizocharto': round(cost_rizocharto, 2),
+                'costChartoni': round(cost_chartoni, 2),
+                'costAutokollito': round(cost_autokollito, 2),
                 'totalCost': round(total_cost, 2)
             })
             

@@ -1,14 +1,15 @@
 // Enhanced dummy database with additional methods for admin functionality
+import { roundMoney, calculatePrintCost, calculatePrintJobTotal, multiplyMoney } from "./utils"
 
 export interface User {
   uid: string
   username: string
   accessLevel: "user" | "admin"
   displayName: string
-  department: string
   createdAt: Date
   userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" // New field for the role selection
   responsiblePerson?: string // New field for responsible person
+  team?: "Ενωμένοι" | "Σποριάδες" | "Καρποφόροι" | "Ολόφωτοι" | "Νικητές" | "Νικηφόροι" | "Φλόγα" | "Σύμψυχοι" // New field for team selection
 }
 
 export interface PrintJob {
@@ -16,7 +17,6 @@ export interface PrintJob {
   uid: string
   username: string
   userDisplayName: string
-  department: string
   pagesA4BW: number
   pagesA4Color: number
   pagesA3BW: number
@@ -43,7 +43,6 @@ export interface LaminationJob {
   uid: string
   username: string
   userDisplayName: string
-  department: string
   type: "A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover"
   quantity: number
   pricePerUnit: number
@@ -57,7 +56,6 @@ export interface PrintBilling {
   billingId: string
   uid: string
   userDisplayName: string
-  department: string
   period: string
   totalA4BW: number
   totalA4Color: number
@@ -81,7 +79,6 @@ export interface LaminationBilling {
   billingId: string
   uid: string
   userDisplayName: string
-  department: string
   period: string
   totalA3: number
   totalA4: number
@@ -123,11 +120,8 @@ class DummyDatabase {
 
   private initializeData() {
     // Initialize 20 users
-    const departments = [
-      "Γραφείο Α", "Γραφείο Β", "Γραφείο Γ", "Γραφείο Δ", "Γραφείο Ε", "Γραφείο ΣΤ", "Γραφείο Ζ", "Γραφείο Η", "Γραφείο Θ", "Γραφείο Ι",
-      "Γραφείο Κ", "Γραφείο Λ", "Γραφείο Μ", "Γραφείο Ν", "Γραφείο Ξ", "Γραφείο Ο", "Γραφείο Π", "Γραφείο Ρ", "Γραφείο Σ", "Γραφείο Τ"
-    ];
     const userRoles: ("Άτομο" | "Ομάδα" | "Ναός" | "Τομέας")[] = ["Άτομο", "Ομάδα", "Ναός", "Τομέας"];
+    const teams: ("Ενωμένοι" | "Σποριάδες" | "Καρποφόροι" | "Ολόφωτοι" | "Νικητές" | "Νικηφόροι" | "Φλόγα" | "Σύμψυχοι")[] = ["Ενωμένοι", "Σποριάδες", "Καρποφόροι", "Ολόφωτοι", "Νικητές", "Νικηφόροι", "Φλόγα", "Σύμψυχοι"];
     
     this.users = [
       {
@@ -135,9 +129,9 @@ class DummyDatabase {
         username: "admin",
         accessLevel: "admin",
         displayName: "Διαχειριστής",
-        department: "Διοίκηση",
         createdAt: new Date("2024-01-01"),
         userRole: "Άτομο",
+        team: "Ενωμένοι",
       },
       ...Array.from({ length: 20 }).map((_, i) => {
         const num = 400 + i;
@@ -149,10 +143,10 @@ class DummyDatabase {
           username: `${num}`,
           accessLevel: "user" as "user",
           displayName: `Χρήστης ${num}`,
-          department: departments[i % departments.length],
           createdAt: new Date(`2024-01-${(i % 28) + 1}`),
           userRole: userRole,
           responsiblePerson: isIndividual ? undefined : `Υπεύθυνος ${num}`,
+          team: isIndividual ? teams[i % teams.length] : undefined,
         };
       })
     ];
@@ -219,7 +213,6 @@ class DummyDatabase {
             uid: userId,
             username: user.username,
             userDisplayName: user.displayName,
-            department: user.department,
             pagesA4BW: Math.floor(Math.random() * 8) + 1, // 1-8
             pagesA4Color: Math.floor(Math.random() * 4),   // 0-3
             pagesA3BW: Math.floor(Math.random() * 3),      // 0-2
@@ -240,23 +233,24 @@ class DummyDatabase {
             totalCost: 0,
             status: "completed",
           };
-          // Calculate costs
+          // Calculate costs with proper money rounding
           const prices = this.priceTables.find((p) => p.id === "printing")?.prices || {};
-          printJob.costA4BW = printJob.pagesA4BW * (prices.a4BW || 0);
-          printJob.costA4Color = printJob.pagesA4Color * (prices.a4Color || 0);
-          printJob.costA3BW = printJob.pagesA3BW * (prices.a3BW || 0);
-          printJob.costA3Color = printJob.pagesA3Color * (prices.a3Color || 0);
-          printJob.costRizocharto = printJob.pagesRizocharto * (prices.rizocharto || 0);
-          printJob.costChartoni = printJob.pagesChartoni * (prices.chartoni || 0);
-          printJob.costAutokollito = printJob.pagesAutokollito * (prices.autokollito || 0);
-          printJob.totalCost =
-            printJob.costA4BW +
-            printJob.costA4Color +
-            printJob.costA3BW +
-            printJob.costA3Color +
-            printJob.costRizocharto +
-            printJob.costChartoni +
-            printJob.costAutokollito;
+          printJob.costA4BW = calculatePrintCost(printJob.pagesA4BW, prices.a4BW || 0);
+          printJob.costA4Color = calculatePrintCost(printJob.pagesA4Color, prices.a4Color || 0);
+          printJob.costA3BW = calculatePrintCost(printJob.pagesA3BW, prices.a3BW || 0);
+          printJob.costA3Color = calculatePrintCost(printJob.pagesA3Color, prices.a3Color || 0);
+          printJob.costRizocharto = calculatePrintCost(printJob.pagesRizocharto, prices.rizocharto || 0);
+          printJob.costChartoni = calculatePrintCost(printJob.pagesChartoni, prices.chartoni || 0);
+          printJob.costAutokollito = calculatePrintCost(printJob.pagesAutokollito, prices.autokollito || 0);
+          printJob.totalCost = calculatePrintJobTotal({
+            costA4BW: printJob.costA4BW,
+            costA4Color: printJob.costA4Color,
+            costA3BW: printJob.costA3BW,
+            costA3Color: printJob.costA3Color,
+            costRizocharto: printJob.costRizocharto,
+            costChartoni: printJob.costChartoni,
+            costAutokollito: printJob.costAutokollito
+          });
           this.printJobs.push(printJob);
         }
         // 3-8 lamination jobs per user per month
@@ -273,11 +267,10 @@ class DummyDatabase {
             uid: userId,
             username: user.username,
             userDisplayName: user.displayName,
-            department: user.department,
             type,
             quantity,
             pricePerUnit,
-            totalCost: quantity * pricePerUnit,
+            totalCost: multiplyMoney(pricePerUnit, quantity),
             timestamp: jobDate,
             status: "completed",
             notes: Math.random() > 0.7 ? "Επείγον" : undefined,
@@ -314,10 +307,10 @@ class DummyDatabase {
         const totalRizocharto = monthPrintJobs.reduce((sum, j) => sum + j.pagesRizocharto, 0)
         const totalChartoni = monthPrintJobs.reduce((sum, j) => sum + j.pagesChartoni, 0)
         const totalAutokollito = monthPrintJobs.reduce((sum, j) => sum + j.pagesAutokollito, 0)
-        const totalCost = monthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
+        const totalCost = roundMoney(monthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0))
 
           const isPaid = Math.random() > 0.75
-          const paidAmount = isPaid ? totalCost : Math.random() * totalCost
+          const paidAmount = isPaid ? totalCost : roundMoney(Math.random() * totalCost)
 
           // Always generate a last payment date
           // For paid bills: use the paid date
@@ -333,7 +326,6 @@ class DummyDatabase {
             billingId: `print-billing-${userId}-${period}`,
             uid: userId,
             userDisplayName: user.displayName,
-            department: user.department,
             period,
                       totalA4BW,
           totalA4Color,
@@ -346,7 +338,7 @@ class DummyDatabase {
             paid: isPaid,
             paidDate: isPaid ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) : undefined,
             paidAmount,
-            remainingBalance: totalCost - paidAmount,
+            remainingBalance: roundMoney(totalCost - paidAmount),
             dueDate: new Date(periodDate.getTime() + 30 * 24 * 60 * 60 * 1000),
             generatedAt: new Date(periodDate.getTime() + 5 * 24 * 60 * 60 * 1000),
             lastUpdated: new Date(),
@@ -370,10 +362,10 @@ class DummyDatabase {
           const totalCardLarge = monthLaminationJobs
             .filter((j) => j.type === "cards")
             .reduce((sum, j) => sum + j.quantity, 0)
-          const totalCost = monthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
+          const totalCost = roundMoney(monthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0))
 
           const isPaid = Math.random() > 0.75
-          const paidAmount = isPaid ? totalCost : Math.random() * totalCost
+          const paidAmount = isPaid ? totalCost : roundMoney(Math.random() * totalCost)
 
           // Always generate a last payment date
           // For paid bills: use the paid date
@@ -389,7 +381,6 @@ class DummyDatabase {
             billingId: `lamination-billing-${userId}-${period}`,
             uid: userId,
             userDisplayName: user.displayName,
-            department: user.department,
             period,
             totalA3,
             totalA4,
@@ -399,7 +390,7 @@ class DummyDatabase {
             paid: isPaid,
             paidDate: isPaid ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) : undefined,
             paidAmount,
-            remainingBalance: totalCost - paidAmount,
+            remainingBalance: roundMoney(totalCost - paidAmount),
             dueDate: new Date(periodDate.getTime() + 30 * 24 * 60 * 60 * 1000),
             generatedAt: new Date(periodDate.getTime() + 5 * 24 * 60 * 60 * 1000),
             lastUpdated: new Date(),

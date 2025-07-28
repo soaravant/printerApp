@@ -2,6 +2,251 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+### Department Field Removal (December 2024)
+
+**Feature Removed**: Removed the department (τμήμα) field from all user data structures and interfaces.
+
+**Changes Made**:
+
+**1. Updated User Interface (`lib/dummy-database.ts`)**:
+- Removed `department` field from User interface
+- Removed `department` field from PrintJob, LaminationJob, PrintBilling, and LaminationBilling interfaces
+- Updated sample data generation to exclude department assignments
+- Updated job creation logic to remove department references
+
+**2. Updated Admin User Creation (`app/admin/page.tsx`)**:
+- Removed department field from user creation form
+- Updated user creation logic to exclude department assignment
+- Removed department from search filtering
+- Updated user selection dropdowns to show only username instead of "department - username"
+
+**3. Updated Admin Users Tab (`components/admin-users-tab.tsx`)**:
+- Removed department display from user cards
+- Updated card description to show only user role and team information
+
+**Key Implementation Details**:
+- All department references have been completely removed from the data model
+- User cards now display: User Role • Team (if applicable)
+- Search functionality now only searches by display name and username
+- User selection dropdowns show: Display Name (Username)
+
+### Team Field Implementation (December 2024)
+
+**Feature Added**: Implemented a team field for individual users (Άτομο role) with filtering capabilities in the admin interface.
+
+**Changes Made**:
+
+**1. Updated User Interface (`lib/dummy-database.ts`)**:
+- Added `team` field to User interface with predefined team options
+- Updated sample data generation to include team assignments for individual users
+- Teams: Ενωμένοι, Σποριάδες, Καρποφόροι, Ολόφωτοι, Νικητές, Νικηφόροι, Φλόγα, Σύμψυχοι
+
+**2. Enhanced Admin User Creation (`app/admin/page.tsx`)**:
+- Added team dropdown field that appears only when user role is "Άτομο"
+- Updated user creation logic to include team assignment
+- Added team filter state and filtering logic
+
+**3. Updated Admin Users Tab (`components/admin-users-tab.tsx`)**:
+- Added team filter dropdown that shows when "Όλοι" or "Άτομο" is selected in role filter
+- Updated user cards to display team information
+- Enhanced filtering logic to support team-based filtering
+
+**Key Implementation Details**:
+- Team field is only available for users with "Άτομο" role
+- Team filter only appears when filtering by "Όλοι" or "Άτομο" roles
+- Team information is displayed in user cards with blue highlighting
+- Sample data includes team assignments for demonstration
+
+**Usage**:
+1. In admin panel, when creating a new user with role "Άτομο", a team dropdown appears
+2. In users tab, team filter dropdown appears when "Όλοι" or "Άτομο" is selected in role filter
+3. Users can filter by specific teams to see only users from that team
+4. Team information is visible in user cards for easy identification
+
+### Money Calculation Precision Fix (December 2024)
+
+### Money Calculation Precision Fix (December 2024)
+
+**Problem**: Users reported that money calculations could overflow by 1 cent due to floating-point precision errors in JavaScript and Python. The issue occurred when multiple small decimal values were added together or when calculations involved multiplication and division, leading to values like 10.999999999999998 instead of 11.00.
+
+**Root Cause**: JavaScript and Python use floating-point arithmetic which can introduce precision errors, especially when dealing with decimal numbers. Common operations like:
+- `0.1 + 0.2` can result in `0.30000000000000004`
+- `10.1 * 3` can result in `30.299999999999997`
+- Multiple additions of small values can accumulate precision errors
+
+**Solution**: Implemented comprehensive money calculation utilities that ensure all monetary values are properly rounded to 2 decimal places using consistent methods.
+
+**Changes Made**:
+
+**1. Created Money Utility Functions (`lib/utils.ts`)**:
+```typescript
+/**
+ * Rounds a number to exactly 2 decimal places for money calculations.
+ * This prevents floating-point precision errors that can cause 1 cent overflows.
+ */
+export function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+/**
+ * Adds multiple money values together with proper rounding.
+ */
+export function addMoney(...values: number[]): number {
+  const sum = values.reduce((acc, val) => acc + val, 0)
+  return roundMoney(sum)
+}
+
+/**
+ * Multiplies a money value by a quantity with proper rounding.
+ */
+export function multiplyMoney(price: number, quantity: number): number {
+  return roundMoney(price * quantity)
+}
+
+/**
+ * Subtracts one money value from another with proper rounding.
+ */
+export function subtractMoney(total: number, paid: number): number {
+  return roundMoney(total - paid)
+}
+
+/**
+ * Formats a money value for display with proper Greek formatting.
+ */
+export function formatMoney(value: number): string {
+  return `€${roundMoney(value).toFixed(2).replace('.', ',')}`
+}
+
+/**
+ * Calculates the total cost for a print job with proper rounding.
+ */
+export function calculatePrintJobTotal(costs: {
+  costA4BW: number
+  costA4Color: number
+  costA3BW: number
+  costA3Color: number
+  costRizocharto: number
+  costChartoni: number
+  costAutokollito: number
+}): number {
+  return addMoney(
+    costs.costA4BW,
+    costs.costA4Color,
+    costs.costA3BW,
+    costs.costA3Color,
+    costs.costRizocharto,
+    costs.costChartoni,
+    costs.costAutokollito
+  )
+}
+
+/**
+ * Calculates individual costs for print job components with proper rounding.
+ */
+export function calculatePrintCost(pages: number, pricePerPage: number): number {
+  return multiplyMoney(pricePerPage, pages)
+}
+```
+
+**2. Updated Dummy Database (`lib/dummy-database.ts`)**:
+- **Import Money Utilities**: Added imports for money calculation functions
+- **Print Job Cost Calculation**: Replaced direct multiplication with `calculatePrintCost()` function
+- **Total Cost Calculation**: Replaced direct addition with `calculatePrintJobTotal()` function
+- **Lamination Job Cost**: Replaced direct multiplication with `multiplyMoney()` function
+- **Billing Records**: Used `roundMoney()` for all cost aggregations and remaining balance calculations
+
+```typescript
+// Before: Direct multiplication (prone to precision errors)
+printJob.costA4BW = printJob.pagesA4BW * (prices.a4BW || 0);
+printJob.totalCost = printJob.costA4BW + printJob.costA4Color + ...;
+
+// After: Proper money calculations
+printJob.costA4BW = calculatePrintCost(printJob.pagesA4BW, prices.a4BW || 0);
+printJob.totalCost = calculatePrintJobTotal({
+  costA4BW: printJob.costA4BW,
+  costA4Color: printJob.costA4Color,
+  // ... other costs
+});
+```
+
+**3. Updated Admin Page (`app/admin/page.tsx`)**:
+- **Import Money Utilities**: Added imports for `multiplyMoney` and `roundMoney`
+- **Lamination Charge Calculation**: Replaced direct multiplication with `multiplyMoney()` function
+- **Removed Number.parseFloat()**: Eliminated unnecessary `Number.parseFloat(totalCost.toFixed(2))` calls
+
+```typescript
+// Before: Direct multiplication with manual rounding
+const totalCost = Number.parseInt(quantity) * pricePerUnit;
+totalCost: Number.parseFloat(totalCost.toFixed(2)),
+
+// After: Proper money calculation
+const totalCost = multiplyMoney(pricePerUnit, Number.parseInt(quantity));
+totalCost,
+```
+
+**4. Updated Admin Users Tab (`components/admin-users-tab.tsx`)**:
+- **Import Money Utilities**: Added import for `roundMoney`
+- **Total Unpaid Calculation**: Replaced manual rounding with `roundMoney()` function
+
+```typescript
+// Before: Manual rounding with Number.EPSILON
+{formatPrice(Math.round((printUnpaid + laminationUnpaid + Number.EPSILON) * 100) / 100)}
+
+// After: Proper money calculation
+{formatPrice(roundMoney(printUnpaid + laminationUnpaid))}
+```
+
+**5. Updated Python Data Collection (`python/collect.py`)**:
+- **Consistent Rounding**: Changed all cost calculations from 3 decimal places to 2 decimal places
+- **Fixed Indentation**: Corrected indentation issues in the pricing section
+
+```python
+# Before: 3 decimal places (unnecessary precision)
+'costA4BW': round(cost_a4_bw, 3),
+
+# After: 2 decimal places (proper money precision)
+'costA4BW': round(cost_a4_bw, 2),
+```
+
+**Key Benefits**:
+- **Prevents 1 Cent Overflows**: All money calculations now use consistent 2-decimal place rounding
+- **Eliminates Precision Errors**: Floating-point arithmetic errors are handled properly
+- **Consistent Display**: All monetary values display exactly 2 decimal places
+- **Maintainable Code**: Centralized money calculation logic in utility functions
+- **Type Safety**: Full TypeScript support with proper type definitions
+- **Cross-Platform Consistency**: Both JavaScript and Python use consistent rounding methods
+
+**Technical Implementation**:
+- **Number.EPSILON**: Used to handle edge cases in floating-point arithmetic
+- **Math.round()**: Ensures proper rounding to nearest cent
+- **Consistent Precision**: All monetary values stored and calculated with 2 decimal places
+- **Utility Functions**: Centralized logic prevents code duplication and ensures consistency
+- **Greek Formatting**: Maintains proper Greek currency display format (€X,XX)
+
+**Testing Considerations**:
+- Verify that `0.1 + 0.2` now equals `0.30` exactly
+- Test edge cases like `10.999999999999998` becoming `11.00`
+- Ensure all cost calculations in tables display correct values
+- Verify that billing totals are accurate without 1 cent discrepancies
+- Test that export functionality maintains proper precision
+
+**Usage Pattern**:
+1. **For Individual Costs**: Use `calculatePrintCost(pages, pricePerPage)`
+2. **For Total Costs**: Use `calculatePrintJobTotal(costObject)`
+3. **For Simple Multiplication**: Use `multiplyMoney(price, quantity)`
+4. **For Addition**: Use `addMoney(value1, value2, value3, ...)`
+5. **For Subtraction**: Use `subtractMoney(total, paid)`
+6. **For Display**: Use `formatMoney(value)` for Greek formatting
+7. **For General Rounding**: Use `roundMoney(value)` for any monetary value
+
+**Future Considerations**:
+- Consider implementing decimal.js or similar library for even more precise calculations
+- Add validation to ensure all monetary inputs use proper utility functions
+- Consider adding unit tests specifically for money calculation edge cases
+- Monitor for any remaining precision issues in complex calculations
+
+This fix ensures that all monetary calculations throughout the application are precise and consistent, eliminating the 1 cent overflow issue that users were experiencing.
+
 ### Vercel Deployment Setup (December 2024)
 
 **Problem**: Project needed to be prepared for Vercel deployment with proper configuration and documentation.

@@ -5,17 +5,15 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
 import { dummyDB } from "@/lib/dummy-database"
+import { multiplyMoney, roundMoney } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Slider } from "@/components/ui/slider"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
   Dialog,
   DialogContent,
@@ -27,10 +25,9 @@ import {
 import { SearchableSelect } from "@/components/searchable-select"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { useState, useEffect } from "react"
-import { Plus, CreditCard, Users, User as UserIcon, Building, Printer, Search, Download, Edit, Save, X, ArrowRight, RotateCcw } from "lucide-react"
-import type { User, LaminationJob, PriceTable } from "@/lib/dummy-database"
+import { Plus, CreditCard, Users, Building, Printer, RotateCcw } from "lucide-react"
+import type { User, LaminationJob } from "@/lib/dummy-database"
 import { AdminUsersTab } from "@/components/admin-users-tab"
-import * as XLSX from "xlsx"
 
 export default function AdminPage() {
   const { user } = useAuth()
@@ -41,27 +38,23 @@ export default function AdminPage() {
   const [usersTabSearchTerm, setUsersTabSearchTerm] = useState("")
 
   const [roleFilter, setRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Ναός, Τομέας
-  const [amountFilter, setAmountFilter] = useState("all") // all, under10, 10to50, over50
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100])
-  const [priceRangeInputs, setPriceRangeInputs] = useState<[string, string]>(["0", "100"])
+  const [teamFilter, setTeamFilter] = useState("all") // all, Ενωμένοι, Σποριάδες, etc.
   const [selectedUser, setSelectedUser] = useState("")
   const [laminationType, setLaminationType] = useState<"A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover">("A4")
   const [printingType, setPrintingType] = useState<"a4BW" | "a4Color" | "a3BW" | "a3Color" | "rizocharto" | "chartoni" | "autokollito">("a4BW")
   const [quantity, setQuantity] = useState("1")
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState("")
   const [loading, setLoading] = useState(false)
   const [showAddUserDialog, setShowAddUserDialog] = useState(false)
   const [newUser, setNewUser] = useState({
     username: "",
     password: "",
     displayName: "",
-    department: "",
     accessLevel: "user" as "user" | "admin",
     userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας",
     responsiblePerson: "",
+    team: "" as "" | "Ενωμένοι" | "Σποριάδες" | "Καρποφόροι" | "Ολόφωτοι" | "Νικητές" | "Νικηφόροι" | "Φλόγα" | "Σύμψυχοι",
   })
-
-
 
   useEffect(() => {
     const allUsers = dummyDB.getUsers()
@@ -69,54 +62,7 @@ export default function AdminPage() {
     setFilteredUsers(allUsers)
   }, [])
 
-  // Calculate price distribution for dynamic range
-  const calculatePriceDistribution = () => {
-    const allAmounts: number[] = []
-    
-    users.forEach((userData) => {
-      const printBilling = dummyDB.getPrintBilling(userData.uid)
-      const laminationBilling = dummyDB.getLaminationBilling(userData.uid)
-      const printUnpaid = printBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
-      const laminationUnpaid = laminationBilling
-        .filter((b) => !b.paid)
-        .reduce((sum, b) => sum + b.remainingBalance, 0)
-      const totalUnpaid = printUnpaid + laminationUnpaid
-      
-      if (totalUnpaid > 0) {
-        allAmounts.push(totalUnpaid)
-      }
-    })
-
-    if (allAmounts.length === 0) {
-      return {
-        min: 0,
-        max: 100,
-        distribution: {
-          "0-20": 0,
-          "20-35": 0,
-          "35-90": 0,
-          "90+": 0
-        }
-      }
-    }
-
-    const min = Math.min(...allAmounts)
-    const max = Math.max(...allAmounts)
-    
-    // Create distribution buckets
-    const distribution = {
-      "0-20": allAmounts.filter(amount => amount <= 20).length,
-      "20-35": allAmounts.filter(amount => amount > 20 && amount <= 35).length,
-      "35-90": allAmounts.filter(amount => amount > 35 && amount <= 90).length,
-      "90+": allAmounts.filter(amount => amount > 90).length
-    }
-
-    return { min, max, distribution }
-  }
-
-  const priceDistribution = calculatePriceDistribution()
-
-  // Filter users based on search term, role filter, debt filter and price range filter
+  // Filter users based on search term, role filter, and team filter
   useEffect(() => {
     let filtered = [...users]
 
@@ -125,8 +71,7 @@ export default function AdminPage() {
       filtered = filtered.filter(
         (u) =>
           u.displayName.toLowerCase().includes(usersTabSearchTerm.toLowerCase()) ||
-          u.username.toLowerCase().includes(usersTabSearchTerm.toLowerCase()) ||
-          u.department.toLowerCase().includes(usersTabSearchTerm.toLowerCase()),
+          u.username.toLowerCase().includes(usersTabSearchTerm.toLowerCase()),
       )
     }
 
@@ -135,31 +80,13 @@ export default function AdminPage() {
       filtered = filtered.filter((u) => u.userRole === roleFilter)
     }
 
-
-
-    // Apply price range filter
-    if (priceRange[0] !== priceDistribution.min || priceRange[1] !== priceDistribution.max) {
-      filtered = filtered.filter((u) => {
-        const printBilling = dummyDB.getPrintBilling(u.uid)
-        const laminationBilling = dummyDB.getLaminationBilling(u.uid)
-        const printUnpaid = printBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
-        const laminationUnpaid = laminationBilling
-          .filter((b) => !b.paid)
-          .reduce((sum, b) => sum + b.remainingBalance, 0)
-        const totalUnpaid = printUnpaid + laminationUnpaid
-
-        return totalUnpaid >= priceRange[0] && totalUnpaid <= priceRange[1]
-      })
+    // Apply team filter (only for Άτομο role or when "all" is selected)
+    if (teamFilter !== "all" && (roleFilter === "all" || roleFilter === "Άτομο")) {
+      filtered = filtered.filter((u) => u.team === teamFilter)
     }
 
     setFilteredUsers(filtered)
-  }, [usersTabSearchTerm, roleFilter, priceRange, users, priceDistribution.min, priceDistribution.max])
-
-  // Update price range when distribution changes
-  useEffect(() => {
-    setPriceRange([0, priceDistribution.max])
-    setPriceRangeInputs(["0", priceDistribution.max.toString()])
-  }, [priceDistribution.max])
+  }, [usersTabSearchTerm, roleFilter, teamFilter, users])
 
   const laminationPrices = dummyDB.getPriceTable("lamination")?.prices || {}
   const printingPrices = dummyDB.getPriceTable("printing")?.prices || {}
@@ -180,18 +107,18 @@ export default function AdminPage() {
       if (!selectedUserData) return
 
       const pricePerUnit = laminationPrices[laminationType] || 0
-      const totalCost = Number.parseInt(quantity) * pricePerUnit
+      const totalCost = multiplyMoney(pricePerUnit, Number.parseInt(quantity))
 
       const newJob: LaminationJob = {
         jobId: `lamination-job-${Date.now()}`,
         uid: selectedUser,
         username: selectedUserData.username,
         userDisplayName: selectedUserData.displayName,
-        department: selectedUserData.department,
+
         type: laminationType,
         quantity: Number.parseInt(quantity),
         pricePerUnit,
-        totalCost: Number.parseFloat(totalCost.toFixed(2)),
+        totalCost,
         timestamp: new Date(selectedDate),
         status: "completed",
       }
@@ -245,10 +172,10 @@ export default function AdminPage() {
         username: newUser.username,
         accessLevel: newUser.accessLevel,
         displayName: newUser.displayName,
-        department: newUser.department || "Γενικό",
         createdAt: new Date(),
         userRole: newUser.userRole,
         responsiblePerson: newUser.userRole === "Άτομο" ? undefined : newUser.responsiblePerson,
+        team: newUser.userRole === "Άτομο" ? (newUser.team || undefined) : undefined,
       }
 
       const updatedUsers = [...users, userToAdd]
@@ -262,7 +189,7 @@ export default function AdminPage() {
       })
 
       // Reset form and close dialog
-      setNewUser({ username: "", password: "", displayName: "", department: "", accessLevel: "user", userRole: "Άτομο", responsiblePerson: "" })
+      setNewUser({ username: "", password: "", displayName: "", accessLevel: "user", userRole: "Άτομο", responsiblePerson: "", team: "" })
       setShowAddUserDialog(false)
     } catch (error) {
       toast({
@@ -273,49 +200,7 @@ export default function AdminPage() {
     }
   }
 
-  const exportUsersXLSX = () => {
-    const headers = ["Username", "Name", "Print Debt (€)", "Lamination Debt (€)", "Total Debt (€)"]
-    const worksheetData = [
-      headers,
-      ...filteredUsers.map((userData) => {
-        const printBilling = dummyDB.getPrintBilling(userData.uid)
-        const laminationBilling = dummyDB.getLaminationBilling(userData.uid)
-        const printUnpaid = printBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
-        const laminationUnpaid = laminationBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
-        const totalUnpaid = printUnpaid + laminationUnpaid
-        return [
-          userData.username,
-          userData.displayName,
-          printUnpaid.toFixed(2),
-          laminationUnpaid.toFixed(2),
-          totalUnpaid.toFixed(2),
-        ]
-      })
-    ]
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
-    
-    // Style the header row (make it bold and add background color)
-    const headerRange = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
-    for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
-      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
-      if (!worksheet[cellAddress]) {
-        worksheet[cellAddress] = { v: headers[col] }
-      }
-      worksheet[cellAddress].s = {
-        font: { bold: true, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: "4472C4" } },
-        alignment: { horizontal: "center", vertical: "center" }
-      }
-    }
-    
-    // Set column widths
-    const columnWidths = headers.map(header => Math.max(header.length * 1.2, 12))
-    worksheet['!cols'] = columnWidths.map(width => ({ width }))
-    
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1")
-    XLSX.writeFile(workbook, `users_export_${new Date().toISOString().split("T")[0]}.xlsx`)
-  }
+
 
   const getLaminationTypeLabel = (type: string) => {
     switch (type) {
@@ -348,15 +233,11 @@ export default function AdminPage() {
     return `€${formatted}`
   }
 
-
-
-
-
   const handleResetLaminationForm = () => {
     setSelectedUser("")
     setLaminationType("A4")
     setQuantity("1")
-    setSelectedDate(new Date().toISOString().split('T')[0])
+    setSelectedDate("")
   }
 
   const handleTestToasts = () => {
@@ -443,7 +324,7 @@ export default function AdminPage() {
                             setSelectedUser("")
                             setPrintingType("a4BW")
                             setQuantity("1")
-                            setSelectedDate(new Date().toISOString().split('T')[0])
+                            setSelectedDate("")
                           }}
                         >
                           <RotateCcw className="h-4 w-4 text-blue-600" />
@@ -451,11 +332,11 @@ export default function AdminPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-8">
                     {/* Row 1: User, Date */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="user">Χρήστης</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                      <div>
+                        <Label htmlFor="user" className="text-gray-700">Χρήστης</Label>
                         <SearchableSelect
                           options={users
                             .filter((u) => u.accessLevel === "user")
@@ -471,7 +352,7 @@ export default function AdminPage() {
                         />
                       </div>
 
-                      <div className="space-y-2">
+                      <div>
                         <GreekDatePicker
                           id="date"
                           label="Ημερομηνία"
@@ -483,8 +364,8 @@ export default function AdminPage() {
 
                     {/* Row 2: Type, Quantity */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="type">Τύπος Εκτύπωσης</Label>
+                      <div>
+                        <Label htmlFor="type" className="text-gray-700">Τύπος Εκτύπωσης</Label>
                         <Select value={printingType} onValueChange={(value: any) => setPrintingType(value)}>
                           <SelectTrigger>
                             <SelectValue />
@@ -501,8 +382,8 @@ export default function AdminPage() {
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity">Ποσότητα</Label>
+                      <div>
+                        <Label htmlFor="quantity" className="text-gray-700">Ποσότητα</Label>
                         <Input
                           id="quantity"
                           type="number"
@@ -514,8 +395,8 @@ export default function AdminPage() {
                     </div>
 
                     {/* Row 3: Total Cost (full width) */}
-                    <div className="space-y-2 text-center">
-                      <Label>Συνολικό Κόστος</Label>
+                    <div className="text-center">
+                      <Label className="text-gray-700">Συνολικό Κόστος</Label>
                       <div className="text-2xl font-bold text-blue-600">
                         {formatPrice((printingPrices[printingType] || 0) * Number.parseInt(quantity || "0"))}
                       </div>
@@ -568,11 +449,11 @@ export default function AdminPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-8">
                     {/* Row 1: User, Date */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="user">Χρήστης</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                      <div>
+                        <Label htmlFor="user" className="text-gray-700">Χρήστης</Label>
                         <SearchableSelect
                           options={users
                             .filter((u) => u.accessLevel === "user")
@@ -588,7 +469,7 @@ export default function AdminPage() {
                         />
                       </div>
 
-                      <div className="space-y-2">
+                      <div>
                         <GreekDatePicker
                           id="date"
                           label="Ημερομηνία"
@@ -600,8 +481,8 @@ export default function AdminPage() {
 
                     {/* Row 2: Type, Quantity */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="type">Τύπος Πλαστικοποίησης</Label>
+                      <div>
+                        <Label htmlFor="type" className="text-gray-700">Τύπος Πλαστικοποίησης</Label>
                         <Select value={laminationType} onValueChange={(value: any) => setLaminationType(value)}>
                           <SelectTrigger>
                             <SelectValue />
@@ -618,8 +499,8 @@ export default function AdminPage() {
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity">Ποσότητα</Label>
+                      <div>
+                        <Label htmlFor="quantity" className="text-gray-700">Ποσότητα</Label>
                         <Input
                           id="quantity"
                           type="number"
@@ -631,8 +512,8 @@ export default function AdminPage() {
                     </div>
 
                     {/* Row 3: Total Cost (full width) */}
-                    <div className="space-y-2 text-center">
-                      <Label>Συνολικό Κόστος</Label>
+                    <div className="text-center">
+                      <Label className="text-gray-700">Συνολικό Κόστος</Label>
                       <div className="text-2xl font-bold text-green-600">
                         {formatPrice((laminationPrices[laminationType] || 0) * Number.parseInt(quantity || "0"))}
                       </div>
@@ -674,10 +555,6 @@ export default function AdminPage() {
                           <Label htmlFor="displayName">Όνομα</Label>
                           <Input id="displayName" value={newUser.displayName} onChange={e => setNewUser({ ...newUser, displayName: e.target.value })} />
                         </div>
-                        <div>
-                          <Label htmlFor="department">Τμήμα</Label>
-                          <Input id="department" value={newUser.department} onChange={e => setNewUser({ ...newUser, department: e.target.value })} />
-                        </div>
 
                         <div>
                           <Label htmlFor="userRole">Ρόλος</Label>
@@ -704,6 +581,26 @@ export default function AdminPage() {
                             />
                           </div>
                         )}
+                        {newUser.userRole === "Άτομο" && (
+                          <div>
+                            <Label htmlFor="team">Ομάδα</Label>
+                            <Select value={newUser.team} onValueChange={team => setNewUser({ ...newUser, team: team as "Ενωμένοι" | "Σποριάδες" | "Καρποφόροι" | "Ολόφωτοι" | "Νικητές" | "Νικηφόροι" | "Φλόγα" | "Σύμψυχοι" })}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Επιλέξτε ομάδα" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Ενωμένοι">Ενωμένοι</SelectItem>
+                                <SelectItem value="Σποριάδες">Σποριάδες</SelectItem>
+                                <SelectItem value="Καρποφόροι">Καρποφόροι</SelectItem>
+                                <SelectItem value="Ολόφωτοι">Ολόφωτοι</SelectItem>
+                                <SelectItem value="Νικητές">Νικητές</SelectItem>
+                                <SelectItem value="Νικηφόροι">Νικηφόροι</SelectItem>
+                                <SelectItem value="Φλόγα">Φλόγα</SelectItem>
+                                <SelectItem value="Σύμψυχοι">Σύμψυχοι</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         <div>
                           <Label htmlFor="role">Access Level</Label>
                           <Select value={newUser.accessLevel} onValueChange={accessLevel => setNewUser({ ...newUser, accessLevel: accessLevel as "user" | "admin" })}>
@@ -727,11 +624,8 @@ export default function AdminPage() {
                   setUsersTabSearchTerm={setUsersTabSearchTerm}
                   roleFilter={roleFilter}
                   setRoleFilter={setRoleFilter}
-                  priceRange={priceRange}
-                  setPriceRange={setPriceRange}
-                  priceRangeInputs={priceRangeInputs}
-                  setPriceRangeInputs={setPriceRangeInputs}
-                  priceDistribution={priceDistribution}
+                  teamFilter={teamFilter}
+                  setTeamFilter={setTeamFilter}
                   filteredUsers={filteredUsers}
                   formatPrice={formatPrice}
                   dummyDB={dummyDB}

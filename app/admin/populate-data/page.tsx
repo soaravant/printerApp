@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { ProtectedRoute } from "@/components/protected-route"
-import { dataStore } from "@/lib/data-store"
+import { dummyDB } from "@/lib/dummy-database"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Database, CheckCircle, AlertCircle } from "lucide-react"
-import type { User, PrintJob, BillingRecord, PriceTable } from "@/lib/data-store"
+import type { User, PrintJob, PrintBilling, PriceTable } from "@/lib/dummy-database"
 
 export default function PopulateDataPage() {
   const [loading, setLoading] = useState(false)
@@ -19,23 +19,32 @@ export default function PopulateDataPage() {
     {
       uid: "user-408",
       username: "408",
-      role: "user",
+      accessLevel: "user",
       displayName: "Χρήστης 408",
       department: "Γραφείο Α",
+      createdAt: new Date(),
+      userRole: "Άτομο",
+      team: "Ενωμένοι",
     },
     {
       uid: "user-409",
       username: "409",
-      role: "user",
+      accessLevel: "user",
       displayName: "Χρήστης 409",
       department: "Γραφείο Β",
+      createdAt: new Date(),
+      userRole: "Άτομο",
+      team: "Σποριάδες",
     },
     {
       uid: "admin-001",
       username: "admin",
-              accessLevel: "admin",
+      accessLevel: "admin",
       displayName: "Διαχειριστής",
       department: "Πληροφορική",
+      createdAt: new Date(),
+      userRole: "Άτομο",
+      team: "Ενωμένοι",
     },
   ]
 
@@ -47,6 +56,9 @@ export default function PopulateDataPage() {
       a4Color: 0.15,
       a3BW: 0.1,
       a3Color: 0.3,
+      rizocharto: 0.1,
+      chartoni: 0.1,
+      autokollito: 0.1,
     },
     isActive: true,
     createdAt: new Date(),
@@ -102,7 +114,7 @@ export default function PopulateDataPage() {
     return jobs
   }
 
-  const generateBillingRecords = (user: User, jobs: PrintJob[]): BillingRecord[] => {
+  const generateBillingRecords = (user: User, jobs: PrintJob[]): PrintBilling[] => {
     const billingMap = new Map<string, BillingRecord>()
 
     jobs.forEach((job) => {
