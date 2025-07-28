@@ -350,8 +350,59 @@ export default function DashboardPage() {
     }
     setFilteredPrintJobs(filteredPJ)
 
-    // Filter Lamination Billing
+    // Filter Lamination Billing with billing-specific filters
     let filteredLB = [...laminationBilling]
+    
+    // Apply billing search filter
+    if (billingSearchTerm) {
+      filteredLB = filteredLB.filter(
+        (item) =>
+          item.period.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+          item.userDisplayName.toLowerCase().includes(billingSearchTerm.toLowerCase()),
+      )
+    }
+
+    // Apply billing debt filter
+    if (billingDebtFilter !== "all") {
+      filteredLB = filteredLB.filter((item) => {
+        if (billingDebtFilter === "paid") return item.paid
+        if (billingDebtFilter === "unpaid") return !item.paid
+        return true
+      })
+    }
+
+    // Apply billing price range filter
+    if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
+      filteredLB = filteredLB.filter((item) => {
+        return item.remainingBalance >= billingPriceRange[0] && item.remainingBalance <= billingPriceRange[1]
+      })
+    }
+
+    // Apply billing amount filter
+    if (billingAmountFilter !== "all") {
+      filteredLB = filteredLB.filter((item) => {
+        switch (billingAmountFilter) {
+          case "under10":
+            return item.remainingBalance < 10
+          case "10to50":
+            return item.remainingBalance >= 10 && item.remainingBalance <= 50
+          case "over50":
+            return item.remainingBalance > 50
+          default:
+            return true
+        }
+      })
+    }
+
+    // Apply billing role filter
+    if (billingRoleFilter !== "all") {
+      filteredLB = filteredLB.filter((item) => {
+        const userData = dummyDB.getUserById(item.uid)
+        return userData?.userRole === billingRoleFilter
+      })
+    }
+
+    // Apply legacy filters for backward compatibility
     if (searchTerm) {
       filteredLB = filteredLB.filter(
         (item) =>
@@ -544,6 +595,35 @@ export default function DashboardPage() {
     .reduce((sum, b) => sum + b.remainingBalance, 0)
   const totalUnpaid = printUnpaid + laminationUnpaid
 
+  // Calculate totals without filters for percentage calculations
+  const totalPrintBilling = user.accessLevel === "admin" ? printBilling : printBilling
+  const totalLaminationBilling = user.accessLevel === "admin" ? laminationBilling : laminationBilling
+  
+  const totalPrintUnpaid = totalPrintBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
+  const totalLaminationUnpaid = totalLaminationBilling
+    .filter((b) => !b.paid)
+    .reduce((sum, b) => sum + b.remainingBalance, 0)
+
+  // Check if any filters are applied
+  const hasFilters = billingSearchTerm || 
+                    billingDebtFilter !== "all" || 
+                    billingPriceRange[0] !== billingPriceDistribution.min || 
+                    billingPriceRange[1] !== billingPriceDistribution.max ||
+                    billingAmountFilter !== "all" || 
+                    billingRoleFilter !== "all" ||
+                    searchTerm || 
+                    statusFilter !== "all" || 
+                    userFilter !== "all"
+
+  // Calculate percentages for debt cards
+  // Each type shows percentage of its own total (without filters)
+  const printUnpaidPercentage = totalPrintUnpaid > 0 ? (printUnpaid / totalPrintUnpaid) * 100 : 0
+  const laminationUnpaidPercentage = totalLaminationUnpaid > 0 ? (laminationUnpaid / totalLaminationUnpaid) * 100 : 0
+  
+  // Calculate total percentage (combined debts)
+  const totalCombinedUnpaid = totalPrintUnpaid + totalLaminationUnpaid
+  const totalUnpaidPercentage = totalCombinedUnpaid > 0 ? (totalUnpaid / totalCombinedUnpaid) * 100 : 0
+
   const currentMonth = new Date().toISOString().slice(0, 7)
   const currentMonthPrintJobs = relevantPrintJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
   const currentMonthLaminationJobs = relevantLaminationJobs.filter(
@@ -677,47 +757,50 @@ export default function DashboardPage() {
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Total Debts Card - Yellow Theme */}
-              <div className="bg-yellow-50 rounded-lg border border-yellow-200 shadow-sm h-full">
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
-                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
-                    <div className="flex items-center gap-3">
-                      <Receipt className="h-8 w-8 text-yellow-700" />
-                      <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Οφειλών</h3>
-                    </div>
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
+                <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                  <div className="flex items-center gap-3">
+                    <Receipt className="h-8 w-8 text-yellow-700" />
+                    <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Οφειλών</h3>
                   </div>
-                  <div className="p-6 flex-1 flex items-center">
-                    <div className="text-3xl font-bold text-red-600">{formatPrice(totalUnpaid)}</div>
-                  </div>
+                </div>
+                <div className={`p-6 flex-1 flex ${hasFilters && totalUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+                  <div className="text-3xl font-bold text-red-600">{formatPrice(totalUnpaid)}</div>
+                  {hasFilters && totalUnpaidPercentage < 100 && (
+                    <div className="text-sm text-gray-500 pb-0.5">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
+                  )}
                 </div>
               </div>
 
               {/* Print Debts Card - Blue Theme */}
-              <div className="bg-blue-50 rounded-lg border border-blue-200 shadow-sm h-full">
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
-                  <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
-                    <div className="flex items-center gap-3">
-                      <Printer className="h-6 w-6 text-blue-700" />
-                      <h3 className="text-lg font-semibold text-blue-900">Οφειλές ΤΟ. ΦΩ.</h3>
-                    </div>
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
+                <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
+                  <div className="flex items-center gap-3">
+                    <Printer className="h-6 w-6 text-blue-700" />
+                    <h3 className="text-lg font-semibold text-blue-900">Οφειλές ΤΟ. ΦΩ.</h3>
                   </div>
-                  <div className="p-6 flex-1 flex items-center">
-                    <div className="text-3xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
-                  </div>
+                </div>
+                <div className={`p-6 flex-1 flex ${hasFilters && printUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+                  <div className="text-3xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
+                  {hasFilters && printUnpaidPercentage < 100 && (
+                    <div className="text-sm text-gray-500 pb-0.5">({printUnpaidPercentage.toFixed(1)}% του {formatPrice(totalPrintUnpaid)})</div>
+                  )}
                 </div>
               </div>
 
               {/* Lamination Debts Card - Green Theme */}
-              <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm h-full">
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
-                  <div className="bg-green-100 px-6 py-4 border-b border-green-200">
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="h-6 w-6 text-green-700" />
-                      <h3 className="text-lg font-semibold text-green-900">Οφειλές ΠΛΑ. ΤΟ.</h3>
-                    </div>
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
+                <div className="bg-green-100 px-6 py-4 border-b border-green-200">
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="h-6 w-6 text-green-700" />
+                    <h3 className="text-lg font-semibold text-green-900">Οφειλές ΠΛΑ. ΤΟ.</h3>
                   </div>
-                  <div className="p-6 flex-1 flex items-center">
-                    <div className="text-3xl font-bold text-green-600">{formatPrice(laminationUnpaid)}</div>
-                  </div>
+                </div>
+                <div className={`p-6 flex-1 flex ${hasFilters && laminationUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+                  <div className="text-3xl font-bold text-green-600">{formatPrice(laminationUnpaid)}</div>
+                  {hasFilters && laminationUnpaidPercentage < 100 && (
+                    <div className="text-sm text-gray-500 pb-0.5">({laminationUnpaidPercentage.toFixed(1)}% του {formatPrice(totalLaminationUnpaid)})</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -738,6 +821,7 @@ export default function DashboardPage() {
               setBillingRoleFilter={setBillingRoleFilter}
               billingPriceDistribution={billingPriceDistribution}
               printBilling={printBilling}
+              users={dummyDB.getUsers()}
               clearFilters={clearFilters}
             />
             
@@ -1014,14 +1098,14 @@ export default function DashboardPage() {
                 <div className="mt-6">
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                     {/* Canon Colour Statistics */}
-                    <div className="md:col-span-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                    <div className="md:col-span-4 bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <Printer className="h-5 w-5 text-blue-700" />
                           <h3 className="text-sm font-semibold text-blue-900">Canon Colour</h3>
                         </div>
                       </div>
-                      <div className="bg-white p-4">
+                      <div className="p-4">
                         <div className="grid grid-cols-4 gap-2 text-center">
                           <div>
                             <div className="text-xs text-gray-600">A4 B/W</div>
@@ -1058,14 +1142,14 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Canon B/W Statistics */}
-                    <div className="md:col-span-2 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                    <div className="md:col-span-2 bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <Printer className="h-5 w-5 text-blue-700" />
                           <h3 className="text-sm font-semibold text-blue-900">Canon B/W</h3>
                         </div>
                       </div>
-                      <div className="bg-white p-4">
+                      <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
                           <div className="text-xl font-bold text-black">{printStats.canonBW.a4BW}</div>
@@ -1074,14 +1158,14 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Brother Statistics */}
-                    <div className="md:col-span-2 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                    <div className="md:col-span-2 bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <Printer className="h-5 w-5 text-blue-700" />
                           <h3 className="text-sm font-semibold text-blue-900">Brother</h3>
                         </div>
                       </div>
-                      <div className="bg-white p-4">
+                      <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
                           <div className="text-xl font-bold text-black">{printStats.brother.a4BW}</div>
@@ -1090,14 +1174,14 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Total Print Statistics */}
-                    <div className="md:col-span-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                    <div className="md:col-span-4 bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <BarChart3 className="h-5 w-5 text-blue-700" />
                           <h3 className="text-sm font-semibold text-blue-900">Σύνολο</h3>
                         </div>
                       </div>
-                      <div className="bg-white p-4">
+                      <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">Συνολικές Εκτυπώσεις</div>
                           <div className="text-2xl font-bold text-black">{printStats.total}</div>

@@ -82,7 +82,6 @@ export function resetDummyData() {
 export function addTestUser(
   username: string,
   displayName: string,
-  department: string,
   accessLevel: "user" | "admin" = "user",
 ) {
   try {
@@ -99,8 +98,9 @@ export function addTestUser(
       username,
       accessLevel,
       displayName,
-      department,
       createdAt: new Date(),
+      userRole: "Άτομο",
+      team: "Ενωμένοι",
     }
 
     const updatedUsers = [...users, newUser]

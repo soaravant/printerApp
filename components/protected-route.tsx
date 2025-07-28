@@ -21,7 +21,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
         return
       }
 
-      if (requireAdmin && user.accessLevel !== "admin") {
+      if (requireAdmin && user.accessLevel !== "admin" && user.accessLevel !== "Υπεύθυνος") {
         router.push("/dashboard")
         return
       }
@@ -36,7 +36,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     )
   }
 
-      if (!user || (requireAdmin && user.accessLevel !== "admin")) {
+  if (!user || (requireAdmin && user.accessLevel !== "admin" && user.accessLevel !== "Υπεύθυνος")) {
     return null
   }
 

@@ -143,7 +143,14 @@ export function SearchableSelect({
             </div>
           </div>
           
-          <div className="max-h-48 overflow-y-auto">
+          <div 
+            className="max-h-48 overflow-y-auto"
+            onWheel={(e: React.WheelEvent) => {
+              e.preventDefault()
+              const target = e.currentTarget
+              target.scrollTop += e.deltaY
+            }}
+          >
             {filteredOptions.length === 0 ? (
               <div className="p-3 text-center text-gray-500 text-sm">
                 Δεν βρέθηκαν αποτελέσματα

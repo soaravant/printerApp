@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Filter, RotateCcw } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { getDynamicFilterOptions } from "@/lib/utils"
 
 interface BillingFiltersProps {
   billingSearchTerm: string
@@ -22,6 +23,7 @@ interface BillingFiltersProps {
   setBillingRoleFilter: (v: string) => void
   billingPriceDistribution: any
   printBilling: any[]
+  users: any[]
   clearFilters: () => void
 }
 
@@ -40,6 +42,7 @@ export const BillingFilters: React.FC<BillingFiltersProps> = ({
   setBillingRoleFilter,
   billingPriceDistribution,
   printBilling,
+  users,
   clearFilters,
 }) => {
   return (
@@ -94,8 +97,8 @@ export const BillingFilters: React.FC<BillingFiltersProps> = ({
                   <SelectItem value="all">Όλοι</SelectItem>
                   <SelectItem value="Άτομο">Άτομο</SelectItem>
                   <SelectItem value="Ομάδα">Ομάδα</SelectItem>
-                  <SelectItem value="Ναός">Ναός</SelectItem>
                   <SelectItem value="Τομέας">Τομέας</SelectItem>
+                  <SelectItem value="Ναός">Ναός</SelectItem>
                 </SelectContent>
               </Select>
             </div>

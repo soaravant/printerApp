@@ -4,9 +4,13 @@
 export interface User {
   uid: string
   username: string
-  accessLevel: "user" | "admin"
+  accessLevel: "user" | "admin" | "Υπεύθυνος"
   displayName: string
-  department: string
+  userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας"
+  responsiblePerson?: string
+  team?: string
+  members?: string[]
+  responsiblePersons?: string[]
 }
 
 export interface PrintJob {

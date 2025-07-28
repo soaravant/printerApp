@@ -134,3 +134,47 @@ export function calculatePrintJobTotal(costs: {
 export function calculatePrintCost(pages: number, pricePerPage: number): number {
   return multiplyMoney(pricePerPage, pages)
 }
+
+// Utility functions for dynamic filter options
+export const getDynamicFilterOptions = (users: any[]) => {
+  const teams = new Set<string>()
+  const naoi = new Set<string>()
+  const tomeis = new Set<string>()
+
+  users.forEach(user => {
+    // Extract teams from user data
+    if (user.team) {
+      teams.add(user.team)
+    }
+    
+    // Extract ναοί from user data (users with userRole "Ναός")
+    if (user.userRole === "Ναός") {
+      naoi.add(user.displayName)
+    }
+    
+    // Extract τομείς from user data (users with userRole "Τομέας")
+    if (user.userRole === "Τομέας") {
+      tomeis.add(user.displayName)
+    }
+    
+    // Also extract from memberOf arrays for individual users
+    if (user.memberOf && Array.isArray(user.memberOf)) {
+      user.memberOf.forEach((member: string) => {
+        if (member.includes("Ναός")) {
+          naoi.add(member)
+        } else if (member.includes("Τομέας")) {
+          tomeis.add(member)
+        } else {
+          // Assume it's a team if it doesn't contain "Ναός" or "Τομέας"
+          teams.add(member)
+        }
+      })
+    }
+  })
+
+  return {
+    teams: Array.from(teams).sort(),
+    naoi: Array.from(naoi).sort(),
+    tomeis: Array.from(tomeis).sort()
+  }
+}

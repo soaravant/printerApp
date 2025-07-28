@@ -5,7 +5,7 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
 import { dummyDB } from "@/lib/dummy-database"
-import { multiplyMoney, roundMoney } from "@/lib/utils"
+import { multiplyMoney, roundMoney, getDynamicFilterOptions } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,6 +28,7 @@ import { useState, useEffect } from "react"
 import { Plus, CreditCard, Users, Building, Printer, RotateCcw } from "lucide-react"
 import type { User, LaminationJob } from "@/lib/dummy-database"
 import { AdminUsersTab } from "@/components/admin-users-tab"
+import { TagInput } from "@/components/ui/tag-input"
 
 export default function AdminPage() {
   const { user } = useAuth()
@@ -50,11 +51,34 @@ export default function AdminPage() {
     username: "",
     password: "",
     displayName: "",
-    accessLevel: "user" as "user" | "admin",
+    accessLevel: "user" as "user" | "admin" | "Υπεύθυνος",
     userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας",
-    responsiblePerson: "",
-    team: "" as "" | "Ενωμένοι" | "Σποριάδες" | "Καρποφόροι" | "Ολόφωτοι" | "Νικητές" | "Νικηφόροι" | "Φλόγα" | "Σύμψυχοι",
+    memberOf: [] as string[],
+    responsiblePersons: [] as string[],
+    responsibleFor: [] as string[],
   })
+
+  // Get available options for tag system
+  const getAvailableMembers = () => {
+    const allUsers = dummyDB.getUsers()
+    return allUsers
+      .filter(u => u.userRole !== "Άτομο")
+      .map(u => u.displayName)
+  }
+
+  const getAvailableResponsiblePersons = () => {
+    const allUsers = dummyDB.getUsers()
+    return allUsers
+      .filter(u => u.accessLevel === "Υπεύθυνος" || u.accessLevel === "admin")
+      .map(u => u.displayName)
+  }
+
+  const getAvailableResponsibleFor = () => {
+    const allUsers = dummyDB.getUsers()
+    return allUsers
+      .filter(u => u.userRole !== "Άτομο")
+      .map(u => u.displayName)
+  }
 
   useEffect(() => {
     const allUsers = dummyDB.getUsers()
@@ -62,7 +86,7 @@ export default function AdminPage() {
     setFilteredUsers(allUsers)
   }, [])
 
-  // Filter users based on search term, role filter, and team filter
+  // Filter and sort users based on search term, role filter, and team filter
   useEffect(() => {
     let filtered = [...users]
 
@@ -84,6 +108,25 @@ export default function AdminPage() {
     if (teamFilter !== "all" && (roleFilter === "all" || roleFilter === "Άτομο")) {
       filtered = filtered.filter((u) => u.team === teamFilter)
     }
+
+    // Sort users: first by access level, then by role with specific order
+    filtered.sort((a, b) => {
+      // First sort by access level: admin, Υπεύθυνος, user
+      const accessLevelOrder = { admin: 0, Υπεύθυνος: 1, user: 2 }
+      const aLevel = accessLevelOrder[a.accessLevel as keyof typeof accessLevelOrder] ?? 3
+      const bLevel = accessLevelOrder[b.accessLevel as keyof typeof accessLevelOrder] ?? 3
+      
+      if (aLevel !== bLevel) {
+        return aLevel - bLevel
+      }
+      
+      // If same access level, sort by role: Ομάδα, Τομέας, Ναός, Άτομο
+      const roleOrder = { Ομάδα: 0, Τομέας: 1, Ναός: 2, Άτομο: 3 }
+      const aRole = roleOrder[a.userRole as keyof typeof roleOrder] ?? 4
+      const bRole = roleOrder[b.userRole as keyof typeof roleOrder] ?? 4
+      
+      return aRole - bRole
+    })
 
     setFilteredUsers(filtered)
   }, [usersTabSearchTerm, roleFilter, teamFilter, users])
@@ -146,11 +189,143 @@ export default function AdminPage() {
     }
   }
 
+  // Function to validate that all Τομείς and Ναοί have Υπεύθυνοι
+  const validateResponsiblePersons = (userRole: string, responsiblePersons: string[]) => {
+    if ((userRole === "Τομέας" || userRole === "Ναός") && responsiblePersons.length === 0) {
+      return {
+        isValid: false,
+        message: `Οι ${userRole === "Τομέας" ? "Τομείς" : "Ναοί"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο`
+      }
+    }
+    return { isValid: true }
+  }
+
+  // Function to get available Υπεύθυνοι for assignment
+  const getAvailableYpefthynoi = () => {
+    return users
+      .filter(u => u.accessLevel === "Υπεύθυνος")
+      .map(u => u.displayName)
+  }
+
+  // Function to check if all Τομείς and Ναοί have Υπεύθυνοι
+  const checkResponsiblePersonsCompliance = () => {
+    const tomeisWithoutYpefthynos = users.filter(u => 
+      u.userRole === "Τομέας" && (!u.responsiblePersons || u.responsiblePersons.length === 0)
+    )
+    const naoiWithoutYpefthynos = users.filter(u => 
+      u.userRole === "Ναός" && (!u.responsiblePersons || u.responsiblePersons.length === 0)
+    )
+    
+    return {
+      tomeisWithoutYpefthynos,
+      naoiWithoutYpefthynos,
+      hasIssues: tomeisWithoutYpefthynos.length > 0 || naoiWithoutYpefthynos.length > 0
+    }
+  }
+
+  // Function to check if all Άτομο users have proper team assignments
+  const checkTeamAssignments = () => {
+    const { teams } = getDynamicFilterOptions(users)
+    
+    const atomoUsersWithoutTeam = users.filter(u => 
+      u.userRole === "Άτομο" && u.accessLevel === "user" && 
+      (!u.memberOf || !u.memberOf.some(member => teams.includes(member)))
+    )
+    
+    const atomoUsersWithMultipleTeams = users.filter(u => 
+      u.userRole === "Άτομο" && u.accessLevel === "user" && 
+      u.memberOf && u.memberOf.filter(member => teams.includes(member)).length > 1
+    )
+    
+    return {
+      atomoUsersWithoutTeam,
+      atomoUsersWithMultipleTeams,
+      hasIssues: atomoUsersWithoutTeam.length > 0 || atomoUsersWithMultipleTeams.length > 0
+    }
+  }
+
   const handleAddUser = async () => {
     if (!newUser.username || !newUser.password || !newUser.displayName) {
       toast({
         title: "Σφάλμα Επικύρωσης",
         description: "Παρακαλώ συμπληρώστε username, password και όνομα",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate username format based on access level
+    if (newUser.accessLevel === "admin") {
+      if (newUser.username !== "admin") {
+        toast({
+          title: "Σφάλμα Username",
+          description: "Ο διαχειριστής πρέπει να έχει username 'admin'",
+          variant: "destructive",
+        })
+        return
+      }
+    } else {
+      // For non-admin users, username must be numeric
+      if (!/^\d+$/.test(newUser.username)) {
+        toast({
+          title: "Σφάλμα Username",
+          description: "Το username πρέπει να είναι αριθμός (π.χ. 401, 402, 403)",
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
+    // Ensure users with "user" access level have a team assigned through memberOf field
+    if (newUser.accessLevel === "user" && newUser.memberOf.length === 0) {
+      toast({
+        title: "Σφάλμα Επικύρωσης",
+        description: "Παρακαλώ επιλέξτε τουλάχιστον μία ομάδα/ναό/τομέα για χρήστες με επίπεδο πρόσβασης 'Χρήστης'",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Ensure Άτομο users have exactly one team in their members array
+    if (newUser.userRole === "Άτομο" && newUser.accessLevel === "user") {
+      const { teams } = getDynamicFilterOptions(users)
+      const teamsInMembers = newUser.memberOf.filter(member => teams.includes(member))
+      
+      if (teamsInMembers.length === 0) {
+        toast({
+          title: "Σφάλμα Επικύρωσης",
+          description: "Οι χρήστες τύπου 'Άτομο' πρέπει να ανήκουν σε ακριβώς μία ομάδα",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      if (teamsInMembers.length > 1) {
+        toast({
+          title: "Σφάλμα Επικύρωσης",
+          description: "Οι χρήστες τύπου 'Άτομο' μπορούν να ανήκουν μόνο σε μία ομάδα",
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
+    // Enforce role restrictions for admin and Υπεύθυνος
+    if ((newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος") && newUser.userRole !== "Άτομο") {
+      toast({
+        title: "Σφάλμα Ρόλου",
+        description: "Διαχειριστές και Υπεύθυνοι μπορούν να έχουν μόνο ρόλο 'Άτομο'",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate that Τομείς and Ναοί have Υπεύθυνοι assigned
+    const responsibleValidation = validateResponsiblePersons(newUser.userRole, newUser.responsiblePersons)
+    if (!responsibleValidation.isValid) {
+      toast({
+        title: "Σφάλμα Επικύρωσης",
+        description: responsibleValidation.message,
         variant: "destructive",
       })
       return
@@ -167,6 +342,16 @@ export default function AdminPage() {
     }
 
     try {
+      // Auto-assign team field based on members array for Άτομο users
+      let teamField: string | undefined = undefined
+      if (newUser.userRole === "Άτομο" && newUser.accessLevel === "user") {
+        const { teams } = getDynamicFilterOptions(users)
+        const teamInMembers = newUser.memberOf.find(member => teams.includes(member))
+        if (teamInMembers) {
+          teamField = teamInMembers
+        }
+      }
+
       const userToAdd: User = {
         uid: `user-${Date.now()}`,
         username: newUser.username,
@@ -174,8 +359,10 @@ export default function AdminPage() {
         displayName: newUser.displayName,
         createdAt: new Date(),
         userRole: newUser.userRole,
-        responsiblePerson: newUser.userRole === "Άτομο" ? undefined : newUser.responsiblePerson,
-        team: newUser.userRole === "Άτομο" ? (newUser.team || undefined) : undefined,
+        team: teamField,
+        memberOf: newUser.memberOf,
+        responsiblePersons: newUser.responsiblePersons,
+        responsibleFor: newUser.responsibleFor,
       }
 
       const updatedUsers = [...users, userToAdd]
@@ -189,7 +376,7 @@ export default function AdminPage() {
       })
 
       // Reset form and close dialog
-      setNewUser({ username: "", password: "", displayName: "", accessLevel: "user", userRole: "Άτομο", responsiblePerson: "", team: "" })
+      setNewUser({ username: "", password: "", displayName: "", accessLevel: "user", userRole: "Άτομο", memberOf: [], responsiblePersons: [], responsibleFor: [] })
       setShowAddUserDialog(false)
     } catch (error) {
       toast({
@@ -343,7 +530,7 @@ export default function AdminPage() {
                             .map((user) => ({
                               value: user.uid,
                               label: user.displayName,
-                              description: `${user.department} - ${user.username}`
+                              description: `${user.displayName} (${user.username})`
                             }))}
                           value={selectedUser}
                           onValueChange={setSelectedUser}
@@ -460,7 +647,7 @@ export default function AdminPage() {
                             .map((user) => ({
                               value: user.uid,
                               label: user.displayName,
-                              description: `${user.department} - ${user.username}`
+                              description: `${user.displayName} (${user.username})`
                             }))}
                           value={selectedUser}
                           onValueChange={setSelectedUser}
@@ -527,6 +714,97 @@ export default function AdminPage() {
               </TabsContent>
 
               <TabsContent value="users" className="mt-8">
+                {/* Compliance Warnings - Only show when there are issues */}
+                {(() => {
+                  const compliance = checkResponsiblePersonsCompliance()
+                  const teamIssues = checkTeamAssignments()
+                  
+      if (compliance.hasIssues || teamIssues.hasIssues) {
+        return (
+          <div className="mb-6 space-y-4">
+            {compliance.hasIssues && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-medium text-red-800">
+                      Προσοχή: Λείπουν Υπεύθυνοι
+                    </h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      {compliance.tomeisWithoutYpefthynos.length > 0 && (
+                        <div className="mb-2">
+                          <strong>Τομείς χωρίς Υπεύθυνο:</strong>
+                          <ul className="ml-4 mt-1">
+                            {compliance.tomeisWithoutYpefthynos.map(user => (
+                              <li key={user.uid}>• {user.displayName}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {compliance.naoiWithoutYpefthynos.length > 0 && (
+                        <div>
+                          <strong>Ναοί χωρίς Υπεύθυνο:</strong>
+                          <ul className="ml-4 mt-1">
+                            {compliance.naoiWithoutYpefthynos.map(user => (
+                              <li key={user.uid}>• {user.displayName}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {teamIssues.hasIssues && (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-medium text-orange-800">
+                      Προσοχή: Προβλήματα με Ομάδες
+                    </h3>
+                    <div className="mt-2 text-sm text-orange-700">
+                      {teamIssues.atomoUsersWithoutTeam.length > 0 && (
+                        <div className="mb-2">
+                          <strong>Άτομα χωρίς ομάδα:</strong>
+                          <ul className="ml-4 mt-1">
+                            {teamIssues.atomoUsersWithoutTeam.map(user => (
+                              <li key={user.uid}>• {user.displayName}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {teamIssues.atomoUsersWithMultipleTeams.length > 0 && (
+                        <div>
+                          <strong>Άτομα με πολλαπλές ομάδες:</strong>
+                          <ul className="ml-4 mt-1">
+                            {teamIssues.atomoUsersWithMultipleTeams.map(user => (
+                              <li key={user.uid}>• {user.displayName}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      }
+      return null
+    })()}
+                
                 <div className="flex justify-start mb-4">
                   <Dialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog}>
                     <DialogTrigger asChild>
@@ -545,7 +823,22 @@ export default function AdminPage() {
                       <div className="space-y-4">
                         <div>
                           <Label htmlFor="username">Username</Label>
-                          <Input id="username" value={newUser.username} onChange={e => setNewUser({ ...newUser, username: e.target.value })} />
+                          <Input 
+                            id="username" 
+                            value={newUser.username} 
+                            onChange={e => setNewUser({ ...newUser, username: e.target.value })} 
+                            placeholder={newUser.accessLevel === "admin" ? "admin" : "π.χ. 401, 402, 403"}
+                          />
+                          {newUser.accessLevel === "admin" && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Ο διαχειριστής πρέπει να έχει username "admin"
+                            </p>
+                          )}
+                          {newUser.accessLevel !== "admin" && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Το username πρέπει να είναι αριθμός
+                            </p>
+                          )}
                         </div>
                         <div>
                           <Label htmlFor="password">Password</Label>
@@ -558,8 +851,12 @@ export default function AdminPage() {
 
                         <div>
                           <Label htmlFor="userRole">Ρόλος</Label>
-                          <Select value={newUser.userRole} onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" })}>
-                            <SelectTrigger>
+                          <Select 
+                            value={newUser.userRole} 
+                            onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" })}
+                            disabled={newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος"}
+                          >
+                            <SelectTrigger className={newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος" ? "bg-gray-100 text-gray-500" : ""}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -569,50 +866,94 @@ export default function AdminPage() {
                               <SelectItem value="Τομέας">Τομέας</SelectItem>
                             </SelectContent>
                           </Select>
+                          {(newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος") && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Ρόλος κλειδωμένος σε "Άτομο" για Διαχειριστές και Υπεύθυνους
+                            </p>
+                          )}
                         </div>
-                        {newUser.userRole !== "Άτομο" && (
+
+
+
+                        
+                        {newUser.userRole === "Άτομο" && (
                           <div>
-                            <Label htmlFor="responsiblePerson">Υπεύθυνος</Label>
-                            <Input 
-                              id="responsiblePerson" 
-                              value={newUser.responsiblePerson} 
-                              onChange={e => setNewUser({ ...newUser, responsiblePerson: e.target.value })} 
-                              placeholder="Εισάγετε το όνομα του υπευθύνου"
+                            <Label>Μέλος (Ομάδα/Ναός/Τομέας)</Label>
+                            <TagInput
+                              tags={newUser.memberOf}
+                              onTagsChange={(memberOf) => setNewUser({ ...newUser, memberOf })}
+                              placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
+                              availableOptions={getAvailableMembers()}
+                              maxTags={5}
                             />
                           </div>
                         )}
-                        {newUser.userRole === "Άτομο" && (
+                        
+                        {(newUser.userRole === "Τομέας" || newUser.userRole === "Ναός") && (
                           <div>
-                            <Label htmlFor="team">Ομάδα</Label>
-                            <Select value={newUser.team} onValueChange={team => setNewUser({ ...newUser, team: team as "Ενωμένοι" | "Σποριάδες" | "Καρποφόροι" | "Ολόφωτοι" | "Νικητές" | "Νικηφόροι" | "Φλόγα" | "Σύμψυχοι" })}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Επιλέξτε ομάδα" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Ενωμένοι">Ενωμένοι</SelectItem>
-                                <SelectItem value="Σποριάδες">Σποριάδες</SelectItem>
-                                <SelectItem value="Καρποφόροι">Καρποφόροι</SelectItem>
-                                <SelectItem value="Ολόφωτοι">Ολόφωτοι</SelectItem>
-                                <SelectItem value="Νικητές">Νικητές</SelectItem>
-                                <SelectItem value="Νικηφόροι">Νικηφόροι</SelectItem>
-                                <SelectItem value="Φλόγα">Φλόγα</SelectItem>
-                                <SelectItem value="Σύμψυχοι">Σύμψυχοι</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <Label className="flex items-center gap-2">
+                              Υπεύθυνοι
+                              <span className="text-red-500">*</span>
+                            </Label>
+                            <TagInput
+                              tags={newUser.responsiblePersons}
+                              onTagsChange={(responsiblePersons) => setNewUser({ ...newUser, responsiblePersons })}
+                              placeholder="Προσθήκη Υπευθύνου..."
+                              availableOptions={getAvailableResponsiblePersons()}
+                              maxTags={3}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Οι {newUser.userRole === "Τομέας" ? "Τομείς" : "Ναοί"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο
+                            </p>
                           </div>
                         )}
-                        <div>
-                          <Label htmlFor="role">Access Level</Label>
-                          <Select value={newUser.accessLevel} onValueChange={accessLevel => setNewUser({ ...newUser, accessLevel: accessLevel as "user" | "admin" })}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="user">Χρήστης</SelectItem>
-                              <SelectItem value="admin">Διαχειριστής</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        
+                        {newUser.userRole === "Ομάδα" && (
+                          <div>
+                            <Label>Υπεύθυνοι</Label>
+                            <TagInput
+                              tags={newUser.responsiblePersons}
+                              onTagsChange={(responsiblePersons) => setNewUser({ ...newUser, responsiblePersons })}
+                              placeholder="Προσθήκη Υπευθύνου..."
+                              availableOptions={getAvailableResponsiblePersons()}
+                              maxTags={3}
+                            />
+                          </div>
+                        )}
+                        
+                        {newUser.accessLevel === "Υπεύθυνος" && (
+                          <div>
+                            <Label>Υπεύθυνος για:</Label>
+                            <TagInput
+                              tags={newUser.responsibleFor}
+                              onTagsChange={(responsibleFor) => setNewUser({ ...newUser, responsibleFor })}
+                              placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
+                              availableOptions={getAvailableResponsibleFor()}
+                              maxTags={5}
+                            />
+                          </div>
+                        )}
+                                                  <div>
+                            <Label htmlFor="role">Access Level</Label>
+                            <Select value={newUser.accessLevel} onValueChange={accessLevel => {
+                              const newAccessLevel = accessLevel as "user" | "admin" | "Υπεύθυνος"
+                              setNewUser({ 
+                                ...newUser, 
+                                accessLevel: newAccessLevel,
+                                // Automatically set role to "Άτομο" for admin and Υπεύθυνος
+                                userRole: (newAccessLevel === "admin" || newAccessLevel === "Υπεύθυνος") ? "Άτομο" : newUser.userRole
+                              })
+                            }}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                                                         <SelectContent>
+                             <SelectItem value="user">Χρήστης</SelectItem>
+                             <SelectItem value="Υπεύθυνος">Υπεύθυνος</SelectItem>
+                             <SelectItem value="admin">Διαχειριστής</SelectItem>
+                           </SelectContent>
+                            </Select>
+                          </div>
                         <Button onClick={handleAddUser} className="w-full">Προσθήκη</Button>
                       </div>
                     </DialogContent>

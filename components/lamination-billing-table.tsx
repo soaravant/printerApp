@@ -165,7 +165,7 @@ export default function LaminationBillingTable({ data, page, pageSize, onPageCha
                 <TableRow key={billing.billingId}>
                   <TableCell className="text-center font-medium">{billing.period}</TableCell>
                   {userRole === "admin" && <TableCell className="text-center">{billing.userDisplayName}</TableCell>}
-                  {userRole === "admin" && <TableCell className="text-center">{billing.department}</TableCell>}
+                  {/* Department field removed - no longer exists in LaminationBilling interface */}
                   <TableCell className="text-center">{billing.totalA3}</TableCell>
                   <TableCell className="text-center">{billing.totalA4}</TableCell>
                   <TableCell className="text-center">{billing.totalCardSmall}</TableCell>
