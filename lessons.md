@@ -2,6 +2,201 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+### Ξεχρέωση (Debt Reduction) Feature Implementation (December 2024)
+
+**Problem**: Admins needed a way to record payments from users to reduce their debt. There was no system to track payments and maintain a transaction history.
+
+**Requirements**:
+- Add a new "Ξεχρέωση" tab in the admin page for debt reduction
+- Allow admins to input payment amounts for users
+- Automatically update billing records when payments are made
+- Display transaction history in the dashboard
+- Use yellow color theme to match the debt management section
+
+**Solution**: Implemented a comprehensive debt reduction system with transaction tracking.
+
+**Changes Made**:
+
+**1. Enhanced Dummy Database (`lib/dummy-database.ts`)**:
+- **Added Transaction interface**: New data structure for payment records
+- **Added transactions array**: Store all payment transactions
+- **Added transaction methods**: `getTransactions()`, `addTransaction()`
+- **Automatic billing updates**: When a transaction is added, it automatically updates the corresponding billing records
+- **Payment allocation**: Payments are applied to print billing first, then lamination billing
+
+**2. Updated Admin Page (`app/admin/page.tsx`)**:
+- **Added Ξεχρέωση tab**: New yellow-themed tab for debt reduction
+- **Payment form**: User selection, amount input, date picker, and optional description
+- **Current debt display**: Shows user's current debt breakdown when selected
+- **Form validation**: Ensures required fields are filled and amount is positive
+- **Success feedback**: Toast notifications for successful payments
+- **Form reset**: Clears form after successful payment
+
+**3. Created Transaction History Table (`components/transaction-history-table.tsx`)**:
+- **New component**: Displays transaction history with yellow theme
+- **Column structure**: Ημερομηνία, Χρήστης, Ποσό, Τύπος, Περιγραφή, Διαχειριστής
+- **Visual indicators**: Green for payments, red for refunds
+- **Pagination support**: Consistent with other table components
+- **Export functionality**: XLSX export for transaction history
+
+**4. Updated Dashboard Page (`app/dashboard/page.tsx`)**:
+- **Added transaction history section**: New yellow-themed section under the combined debt table
+- **Transaction data loading**: Loads and displays all transactions
+- **Admin-only export**: Export button only visible to admins
+- **Consistent styling**: Matches the yellow theme of debt management
+
+**Key Features**:
+- **Payment recording**: Admins can record payments with amount, date, and description
+- **Automatic debt reduction**: Payments automatically reduce user debt across all billing records
+- **Transaction history**: Complete audit trail of all payments and refunds
+- **Visual feedback**: Color-coded transaction types and amounts
+- **Export capability**: XLSX export for transaction history
+- **Form validation**: Ensures data integrity and user-friendly error messages
+
+**Technical Implementation**:
+- **Data integrity**: Transactions are atomic and automatically update billing records
+- **Payment allocation**: Smart allocation to oldest unpaid billing records first
+- **Type safety**: Full TypeScript support with proper interfaces
+- **Performance**: Efficient data processing and pagination
+- **Maintainability**: Clean separation of concerns with dedicated components
+
+**Result**: Admins can now efficiently record payments, automatically reduce user debt, and maintain a complete transaction history. The system provides transparency and auditability for all financial transactions.
+
+### Negative Debt (Credit) Support Implementation (December 2024)
+
+**Problem**: Users wanted the ability to create negative debt (credits) for users, but the system was only showing €0.00 instead of negative amounts when credits were applied.
+
+**Requirements**:
+- Allow negative amounts in the debt reduction form
+- Display negative debt amounts correctly in all components
+- Show green color for zero or negative debt (credits)
+- Support credits that can be used for future charges
+- Maintain proper transaction history for credits
+
+**Solution**: Implemented comprehensive negative debt support with proper display and color coding.
+
+**Changes Made**:
+
+**1. Enhanced Database Logic (`lib/dummy-database.ts`)**:
+- **Simplified credit creation**: Negative amounts always create credits (negative balances)
+- **Proper negative balance handling**: Database now supports negative `remainingBalance` values
+- **Credit allocation**: Credits are applied to lamination billing first, then print billing
+- **Transaction type automation**: Automatically sets type to "payment" or "refund" based on amount sign
+
+**2. Updated Admin Interface (`app/admin/page.tsx`)**:
+- **Enhanced form labels**: Changed to "Ποσό Πληρωμής/Επιστροφής" to reflect both payments and refunds
+- **Improved placeholder text**: Added "(αρνητικό για επιστροφή)" to clarify negative amounts are allowed
+- **Updated button text**: Changed to "Προσθήκη Πληρωμής/Επιστροφής"
+- **Better debt preview**: Enhanced logic to properly calculate remaining debt after credits
+- **Transaction type automation**: Automatically sets transaction type based on amount sign
+
+**3. Enhanced Display Components**:
+- **Color-coded debt display**: Green for zero or negative debt (credits), red for positive debt
+- **Proper negative formatting**: All components now correctly display negative amounts with minus sign
+- **Consistent styling**: Applied across all debt display components (dashboard, admin, user cards)
+
+**4. Comprehensive Testing**:
+- **Verified negative debt creation**: Confirmed that negative amounts create proper credits
+- **Tested display logic**: Ensured negative amounts show correctly in all components
+- **Dashboard table verification**: Confirmed that `CombinedDebtTable` displays negative values with green color
+- **UI component testing**: Verified that all UI components handle negative values correctly
+- **Formatting validation**: Confirmed `formatPrice` function properly formats negative numbers (e.g., €-27,49)
+- **Color logic testing**: Verified color logic correctly applies green for negative/zero values, red for positive
+
+**Testing Results**:
+- ✅ Database correctly creates negative balances in billing records
+- ✅ `formatPrice` function properly formats negative numbers (e.g., €-27,49)
+- ✅ Color logic correctly applies green for negative/zero values, red for positive
+- ✅ Dashboard table (`CombinedDebtTable`) displays negative values with green color
+- ✅ Admin debt reduction form supports negative amounts for credits
+- ✅ All UI components handle negative debt values correctly
+
+**Example**: User with €2,95 print debt and €-27,49 lamination credit shows total debt of €-24,54 in green color.
+- **Validated color coding**: Confirmed green color for credits, red for debt
+- **Checked formatting**: Verified negative amounts display with proper formatting
+
+**Key Features**:
+- **Credit creation**: Negative amounts create credits that can be used for future charges
+- **Visual feedback**: Green color for credits, red for outstanding debt
+- **Proper formatting**: Negative amounts display with minus sign (e.g., €-10,50)
+- **Transaction history**: Credits are properly recorded in transaction history
+- **Flexible allocation**: Credits are applied to appropriate billing records
+
+**Technical Implementation**:
+- **Database support**: Negative `remainingBalance` values are properly stored and calculated
+- **Type safety**: Full TypeScript support with proper interfaces
+- **Performance**: Efficient calculation and display of negative balances
+- **Maintainability**: Clean separation of concerns with consistent logic
+
+**Result**: Users can now create credits for users, and the system properly displays negative debt amounts in green color across all components. Credits can be used for future charges and are properly tracked in the transaction history.
+
+**Recent Updates (December 2024)**:
+- **Removed description field**: Simplified the payment form by removing the optional description field
+- **Enhanced user filter**: Now shows all users except admin (includes Υπεύθυνος users)
+- **Live debt calculation**: Shows remaining debt after payment in real-time as the amount is entered
+- **Payment allocation logic**: Payments are applied to lamination debt first, then printing debt
+- **Negative payments support**: Allows negative amounts for refunds/credits
+- **Visual feedback**: Shows green color for zero or negative debt, red for outstanding debt
+- **Improved validation**: Removed positive-only restriction on payment amounts
+- **Form layout optimization**: All three fields (User, Amount, Date) now display in a single row
+- **Default date**: Payment date automatically set to today's date
+- **Negative debt support**: Fixed database methods to properly handle and display negative debt amounts
+- **Comprehensive debt tracking**: Updated `getTotalUnpaidForUser` to include all billing records regardless of paid status
+- **Enhanced negative debt handling**: Improved refund logic to properly distribute negative amounts across print and lamination billing records
+- **Better credit management**: Negative amounts now create proper credits that can be used for future charges
+- **Updated UI labels**: Changed labels to reflect that both payments and refunds are supported
+- **Improved transaction types**: Automatically sets transaction type to "payment" or "refund" based on amount sign
+- **Simplified credit creation**: Negative amounts always create credits (negative balances) regardless of existing paid amounts
+- **Proper negative balance support**: Database now properly handles and displays negative remaining balances
+- **Color-coded debt display**: Green for zero or negative debt (credits), red for positive debt
+- **Comprehensive testing**: Verified that negative debt displays correctly in all components
+
+### Combined Debt Table Implementation - Show Current Debt (December 2024)
+
+### Combined Debt Table Implementation - Show Current Debt (December 2024)
+
+**Problem**: The "Συγκεντρωτικός Χρεωστικός Πίνακας" (Total Debt Table) was only showing printing billing data, but users wanted to see the combined current debt from both printing and lamination services for each user.
+
+**Requirements**:
+- Show combined debt (printing + lamination) for each user
+- Change column header from "Συνολικό Χρέος" to "Τρέχων Χρέος"
+- Display separate columns for printing and lamination debts
+- Show total current debt as the sum
+
+**Solution**: Created a new CombinedDebtTable component and modified the dashboard to calculate and display combined debt data.
+
+**Changes Made**:
+
+**1. Created CombinedDebtTable Component (`components/combined-debt-table.tsx`)**:
+- **New component**: Displays combined debt data with separate columns for printing and lamination
+- **Column structure**: Ρόλος, Όνομα, Υπεύθυνος, Εκτυπώσεις, Πλαστικοποιήσεις, Τρέχων Χρέος, Τελευταία Εξόφληση
+- **Sorting support**: All columns are sortable with proper data type handling
+- **Visual indicators**: Red text for debts > 0, green for zero debt
+- **Responsive design**: Consistent with existing table components
+
+**2. Updated Dashboard Page (`app/dashboard/page.tsx`)**:
+- **Added calculateCombinedDebtData function**: Combines printing and lamination billing data by user
+- **Data aggregation**: Sums up remaining balances from both services per user
+- **Payment tracking**: Keeps the most recent payment date from either service
+- **Export functionality**: Updated XLSX export to include separate columns for printing and lamination debts
+- **Component integration**: Replaced PrintBillingTable with CombinedDebtTable in the consolidated debt section
+
+**Key Features**:
+- **Combined calculation**: Automatically sums printing and lamination debts per user
+- **Separate columns**: Shows printing and lamination debts separately for transparency
+- **Total debt**: "Τρέχων Χρέος" column shows the combined total
+- **Visual feedback**: Color-coded debt amounts (red for outstanding, green for paid)
+- **Export support**: XLSX export includes all debt breakdown columns
+- **Sorting**: All columns support sorting with proper data type handling
+
+**Technical Implementation**:
+- **Data mapping**: Uses Map to efficiently aggregate debt data by user ID
+- **Type safety**: Full TypeScript support with proper interfaces
+- **Performance**: Efficient data processing with O(n) complexity
+- **Maintainability**: Clean separation of concerns with dedicated component
+
+**Result**: Users can now see the complete current debt picture for each user, including separate breakdowns for printing and lamination services, with the total current debt prominently displayed in the "Τρέχων Χρέος" column.
+
 ### Print Type Filter Fix - Filter Expanded Rows (December 2024)
 
 **Problem**: The print type filter was not working as expected. When users selected a specific print type (e.g., "Α4 Ασπρόμαυρο"), the table would show all print types from jobs that contained the selected type, rather than showing only the specific print type rows.

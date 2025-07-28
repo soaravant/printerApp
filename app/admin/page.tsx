@@ -25,8 +25,8 @@ import {
 import { SearchableSelect } from "@/components/searchable-select"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { useState, useEffect } from "react"
-import { Plus, CreditCard, Users, Building, Printer, RotateCcw } from "lucide-react"
-import type { User, LaminationJob } from "@/lib/dummy-database"
+import { Plus, CreditCard, Users, Building, Printer, RotateCcw, Euro } from "lucide-react"
+import type { User, LaminationJob, Transaction } from "@/lib/dummy-database"
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import { TagInput } from "@/components/ui/tag-input"
 
@@ -57,6 +57,12 @@ export default function AdminPage() {
     responsiblePersons: [] as string[],
     responsibleFor: [] as string[],
   })
+
+  // Debt reduction state
+  const [debtReductionUser, setDebtReductionUser] = useState("")
+  const [debtReductionAmount, setDebtReductionAmount] = useState("")
+  const [debtReductionDate, setDebtReductionDate] = useState(new Date().toISOString().split('T')[0])
+  const [debtReductionLoading, setDebtReductionLoading] = useState(false)
 
   // Get available options for tag system
   const getAvailableMembers = () => {
@@ -186,6 +192,69 @@ export default function AdminPage() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDebtReduction = async () => {
+    if (!debtReductionUser || !debtReductionAmount || !debtReductionDate) {
+      toast({
+        title: "Σφάλμα Επικύρωσης",
+        description: "Παρακαλώ επιλέξτε χρήστη, συμπληρώστε το ποσό και την ημερομηνία",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const amount = parseFloat(debtReductionAmount)
+    if (isNaN(amount)) {
+      toast({
+        title: "Σφάλμα Ποσού",
+        description: "Το ποσό πρέπει να είναι έγκυρος αριθμός",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setDebtReductionLoading(true)
+    try {
+      const selectedUserData = users.find((u) => u.uid === debtReductionUser)
+      if (!selectedUserData) return
+
+      const newTransaction: Transaction = {
+        transactionId: `transaction-${Date.now()}`,
+        uid: debtReductionUser,
+        userDisplayName: selectedUserData.displayName,
+        amount: amount,
+        timestamp: new Date(debtReductionDate),
+        type: amount >= 0 ? "payment" : "refund",
+        description: amount >= 0 ? `Πληρωμή από ${selectedUserData.displayName}` : `Επιστροφή για ${selectedUserData.displayName}`,
+        adminId: user?.uid || "unknown",
+        adminDisplayName: user?.displayName || "Unknown Admin",
+      }
+
+      dummyDB.addTransaction(newTransaction)
+
+      toast({
+        title: "Επιτυχία",
+        description: `Προστέθηκε πληρωμή €${amount.toFixed(2).replace('.', ',')} για τον χρήστη ${selectedUserData.displayName}`,
+        variant: "success",
+      })
+
+      // Trigger refresh to update dashboard
+      triggerRefresh()
+
+      // Reset form
+      setDebtReductionUser("")
+      setDebtReductionAmount("")
+      setDebtReductionDate("")
+    } catch (error) {
+      toast({
+        title: "Σφάλμα Συστήματος",
+        description: "Αποτυχία προσθήκης πληρωμής. Παρακαλώ δοκιμάστε ξανά.",
+        variant: "destructive",
+      })
+    } finally {
+      setDebtReductionLoading(false)
     }
   }
 
@@ -463,7 +532,7 @@ export default function AdminPage() {
             </div>
 
             <Tabs defaultValue="users" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-white mb-8 p-2 h-16">
+              <TabsList className="grid w-full grid-cols-4 bg-white mb-8 p-2 h-16">
                 <TabsTrigger 
                   value="users" 
                   className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-yellow-500 data-[state=active]:text-yellow-700 data-[state=active]:bg-transparent hover:bg-yellow-50 hover:text-yellow-700 transition-colors text-base font-medium py-3"
@@ -484,6 +553,13 @@ export default function AdminPage() {
                 >
                   <CreditCard className="h-5 w-5" />
                   Χρέωση ΠΛΑ. ΤΟ.
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="debt-reduction" 
+                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-yellow-500 data-[state=active]:text-yellow-700 data-[state=active]:bg-transparent hover:bg-yellow-50 hover:text-yellow-700 transition-colors text-base font-medium py-3"
+                >
+                  <Euro className="h-5 w-5" />
+                  Ξεχρέωση
                 </TabsTrigger>
 
               </TabsList>
@@ -710,6 +786,196 @@ export default function AdminPage() {
 
                     <Button onClick={handleAddLamination} disabled={loading} className="w-full bg-green-600 hover:bg-green-700 text-white">
                       {loading ? "Προσθήκη..." : "Προσθήκη Χρέους Πλαστικοποιητή"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="debt-reduction" className="mt-8">
+                <Card className="border-yellow-200">
+                  <CardHeader className="bg-yellow-100">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <Euro className="h-6 w-6 text-yellow-800 flex-shrink-0" />
+                        <div>
+                          <CardTitle className="text-yellow-800">
+                            Ξεχρέωση Χρήστη
+                          </CardTitle>
+                          <CardDescription className="text-yellow-600">Προσθέστε πληρωμή για μείωση χρέους χρήστη</CardDescription>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          aria-label="Επαναφορά φόρμας"
+                          className="w-10 h-10 rounded-full border border-yellow-300 bg-white hover:bg-yellow-50 transition flex items-center justify-center"
+                          onClick={() => {
+                            setDebtReductionUser("")
+                            setDebtReductionAmount("")
+                            setDebtReductionDate("")
+                          }}
+                        >
+                          <RotateCcw className="h-4 w-4 text-yellow-600" />
+                        </button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-8">
+                    {/* Row 1: User, Amount, Date */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                      <div>
+                        <Label htmlFor="debt-user" className="text-gray-700">Χρήστης</Label>
+                        <SearchableSelect
+                          options={users
+                            .filter((u) => u.accessLevel !== "admin")
+                            .map((user) => ({
+                              value: user.uid,
+                              label: user.displayName,
+                              description: `${user.displayName} (${user.username})`
+                            }))}
+                          value={debtReductionUser}
+                          onValueChange={setDebtReductionUser}
+                          placeholder="Επιλέξτε χρήστη"
+                          searchPlaceholder="Αναζήτηση χρήστη..."
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="debt-amount" className="text-gray-700">Ποσό Πληρωμής/Επιστροφής (€)</Label>
+                        <Input
+                          id="debt-amount"
+                          type="number"
+                          step="0.01"
+                          value={debtReductionAmount}
+                          onChange={(e) => setDebtReductionAmount(e.target.value)}
+                          placeholder="0,00 (αρνητικό για επιστροφή)"
+                        />
+                      </div>
+
+                      <div>
+                        <GreekDatePicker
+                          id="debt-date"
+                          label="Ημερομηνία Πληρωμής"
+                          value={debtReductionDate}
+                          onChange={setDebtReductionDate}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 3: Current Debt Info (if user selected) */}
+                    {debtReductionUser && (() => {
+                      const selectedUserData = users.find((u) => u.uid === debtReductionUser)
+                      const userDebt = dummyDB.getTotalUnpaidForUser(debtReductionUser)
+                      const paymentAmount = parseFloat(debtReductionAmount) || 0
+                      
+                      // Calculate remaining debt after payment/refund
+                      let remainingLamination = userDebt.lamination
+                      let remainingPrint = userDebt.print
+                      
+                      if (paymentAmount > 0) {
+                        // Positive payment - reduce debt (lamination first, then printing)
+                        if (remainingLamination > 0) {
+                          const laminationPayment = Math.min(paymentAmount, remainingLamination)
+                          remainingLamination -= laminationPayment
+                          const remainingPayment = paymentAmount - laminationPayment
+                          
+                          // Then pay printing debt with remaining amount
+                          if (remainingPayment > 0 && remainingPrint > 0) {
+                            remainingPrint -= remainingPayment
+                          }
+                        } else {
+                          // No lamination debt, pay printing debt
+                          remainingPrint -= paymentAmount
+                        }
+                      } else if (paymentAmount < 0) {
+                        // Negative payment (refund) - create credit
+                        const refundAmount = Math.abs(paymentAmount)
+                        
+                        // First try to refund from print billing
+                        if (remainingPrint < 0) {
+                          // User already has print credit, add to it
+                          remainingPrint -= refundAmount
+                        } else if (remainingPrint > 0) {
+                          // User has print debt, reduce it
+                          const refundToPrint = Math.min(refundAmount, remainingPrint)
+                          remainingPrint -= refundToPrint
+                          const remainingRefund = refundAmount - refundToPrint
+                          
+                          // Apply remaining refund to lamination
+                          if (remainingRefund > 0) {
+                            if (remainingLamination < 0) {
+                              // User already has lamination credit, add to it
+                              remainingLamination -= remainingRefund
+                            } else if (remainingLamination > 0) {
+                              // User has lamination debt, reduce it
+                              const refundToLamination = Math.min(remainingRefund, remainingLamination)
+                              remainingLamination -= refundToLamination
+                              const finalRemainingRefund = remainingRefund - refundToLamination
+                              
+                              // If there's still refund remaining, create credit
+                              if (finalRemainingRefund > 0) {
+                                remainingLamination -= finalRemainingRefund
+                              }
+                            } else {
+                              // No lamination debt, create credit
+                              remainingLamination -= remainingRefund
+                            }
+                          }
+                        } else {
+                          // No print debt, apply refund to lamination
+                          if (remainingLamination < 0) {
+                            // User already has lamination credit, add to it
+                            remainingLamination -= refundAmount
+                          } else if (remainingLamination > 0) {
+                            // User has lamination debt, reduce it
+                            const refundToLamination = Math.min(refundAmount, remainingLamination)
+                            remainingLamination -= refundToLamination
+                            const finalRemainingRefund = refundAmount - refundToLamination
+                            
+                            // If there's still refund remaining, create credit
+                            if (finalRemainingRefund > 0) {
+                              remainingLamination -= finalRemainingRefund
+                            }
+                          } else {
+                            // No lamination debt, create credit
+                            remainingLamination -= refundAmount
+                          }
+                        }
+                      }
+                      
+                      const remainingTotal = remainingLamination + remainingPrint
+                      
+                      return (
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <Label className="text-gray-700 mb-2 block">
+                            {paymentAmount !== 0 ? "Υπολειπόμενο Χρέος μετά την Πληρωμή" : "Τρέχον Χρέος"}
+                          </Label>
+                          <div className="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                              <div className="text-sm text-gray-600">Εκτυπώσεις</div>
+                              <div className={`text-lg font-bold ${remainingPrint <= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {formatPrice(remainingPrint)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-gray-600">Πλαστικοποιήσεις</div>
+                              <div className={`text-lg font-bold ${remainingLamination <= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {formatPrice(remainingLamination)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-gray-600">Σύνολο</div>
+                              <div className={`text-xl font-bold ${remainingTotal <= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {formatPrice(remainingTotal)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                    <Button onClick={handleDebtReduction} disabled={debtReductionLoading} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white">
+                      {debtReductionLoading ? "Προσθήκη..." : "Προσθήκη Πληρωμής/Επιστροφής"}
                     </Button>
                   </CardContent>
                 </Card>

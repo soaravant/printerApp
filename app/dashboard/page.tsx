@@ -5,7 +5,7 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
 import { dummyDB } from "@/lib/dummy-database"
-import type { PrintJob, LaminationJob, PrintBilling, LaminationBilling, User } from "@/lib/dummy-database"
+import type { PrintJob, LaminationJob, PrintBilling, LaminationBilling, User, Transaction } from "@/lib/dummy-database"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -48,8 +48,16 @@ const PrintBillingTable = dynamic(() => import("@/components/print-billing-table
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση χρεώσεων εκτυπώσεων...</div>,
   ssr: false,
 })
+const CombinedDebtTable = dynamic(() => import("@/components/combined-debt-table"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση συγκεντρωτικού πίνακα...</div>,
+  ssr: false,
+})
 const LaminationBillingTable = dynamic(() => import("@/components/lamination-billing-table"), {
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση χρεώσεων πλαστικοποιήσεων...</div>,
+  ssr: false,
+})
+const TransactionHistoryTable = dynamic(() => import("@/components/transaction-history-table"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση ιστορικού συναλλαγών...</div>,
   ssr: false,
 })
 
@@ -74,6 +82,7 @@ export default function DashboardPage() {
   const [printBilling, setPrintBilling] = useState<PrintBilling[]>([])
   const [laminationBilling, setLaminationBilling] = useState<LaminationBilling[]>([])
   const [allUsers, setAllUsers] = useState<User[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
 
   // Unified filtering states
   const [searchTerm, setSearchTerm] = useState("")
@@ -109,6 +118,7 @@ export default function DashboardPage() {
   const [laminationJobsPage, setLaminationJobsPage] = useState(1)
   const [printBillingPage, setPrintBillingPage] = useState(1)
   const [laminationBillingPage, setLaminationBillingPage] = useState(1)
+  const [transactionHistoryPage, setTransactionHistoryPage] = useState(1)
   const PAGE_SIZE = 10
 
   // Hover state for highlighting statistics
@@ -131,6 +141,7 @@ export default function DashboardPage() {
       setPrintBilling(allPrintBilling)
       setLaminationBilling(allLaminationBilling)
       setAllUsers(users)
+      setTransactions(dummyDB.getTransactions())
     } else {
       // Regular user sees only their data
       const pJobs = dummyDB.getPrintJobs(user.uid)
@@ -763,6 +774,82 @@ export default function DashboardPage() {
   // Get unique devices for filter
   const uniqueDevices = [...new Set(printJobs.map((job) => job.deviceName).filter(Boolean))]
 
+  // Calculate combined debt data for the total debt table
+  const calculateCombinedDebtData = () => {
+    const userDebtMap = new Map<string, {
+      uid: string
+      userDisplayName: string
+      userRole: string
+      responsiblePerson: string
+      printDebt: number
+      laminationDebt: number
+      totalDebt: number
+      lastPayment: Date | null
+    }>()
+
+    // Process print billing data
+    filteredPrintBilling.forEach(billing => {
+      const userData = dummyDB.getUserById(billing.uid)
+      const responsiblePerson = userData?.userRole === "Άτομο" 
+        ? userData.displayName 
+        : userData?.responsiblePerson || "-"
+      
+      const existing = userDebtMap.get(billing.uid)
+      if (existing) {
+        existing.printDebt += billing.remainingBalance
+        existing.totalDebt += billing.remainingBalance
+        // Keep the most recent payment date
+        if (billing.lastPayment && (!existing.lastPayment || billing.lastPayment > existing.lastPayment)) {
+          existing.lastPayment = billing.lastPayment
+        }
+      } else {
+        userDebtMap.set(billing.uid, {
+          uid: billing.uid,
+          userDisplayName: billing.userDisplayName,
+          userRole: userData?.userRole || "-",
+          responsiblePerson: responsiblePerson,
+          printDebt: billing.remainingBalance,
+          laminationDebt: 0,
+          totalDebt: billing.remainingBalance,
+          lastPayment: billing.lastPayment || null
+        })
+      }
+    })
+
+    // Process lamination billing data
+    filteredLaminationBilling.forEach(billing => {
+      const userData = dummyDB.getUserById(billing.uid)
+      const responsiblePerson = userData?.userRole === "Άτομο" 
+        ? userData.displayName 
+        : userData?.responsiblePerson || "-"
+      
+      const existing = userDebtMap.get(billing.uid)
+      if (existing) {
+        existing.laminationDebt += billing.remainingBalance
+        existing.totalDebt += billing.remainingBalance
+        // Keep the most recent payment date
+        if (billing.lastPayment && (!existing.lastPayment || billing.lastPayment > existing.lastPayment)) {
+          existing.lastPayment = billing.lastPayment
+        }
+      } else {
+        userDebtMap.set(billing.uid, {
+          uid: billing.uid,
+          userDisplayName: billing.userDisplayName,
+          userRole: userData?.userRole || "-",
+          responsiblePerson: responsiblePerson,
+          printDebt: 0,
+          laminationDebt: billing.remainingBalance,
+          totalDebt: billing.remainingBalance,
+          lastPayment: billing.lastPayment || null
+        })
+      }
+    })
+
+    return Array.from(userDebtMap.values())
+  }
+
+  const combinedDebtData = calculateCombinedDebtData()
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
@@ -868,26 +955,23 @@ export default function DashboardPage() {
                     <Button
                       onClick={() =>
                         exportTableXLSX(
-                          filteredPrintBilling.map((b) => {
-                            const userData = dummyDB.getUserById(b.uid)
-                            const responsiblePerson = userData?.userRole === "Άτομο" 
-                              ? userData.displayName 
-                              : userData?.responsiblePerson || "-"
-                            
-                            return {
-                              userRole: userData?.userRole || "-",
-                              userDisplayName: b.userDisplayName,
-                              responsiblePerson: responsiblePerson,
-                              remainingBalance: formatPrice(b.remainingBalance),
-                              lastPayment: b.lastPayment ? b.lastPayment.toLocaleDateString("el-GR") : "-",
-                            }
-                          }),
-                          "print_billing",
+                          combinedDebtData.map((item) => ({
+                            userRole: item.userRole,
+                            userDisplayName: item.userDisplayName,
+                            responsiblePerson: item.responsiblePerson,
+                            printDebt: formatPrice(item.printDebt),
+                            laminationDebt: formatPrice(item.laminationDebt),
+                            totalDebt: formatPrice(item.totalDebt),
+                            lastPayment: item.lastPayment ? item.lastPayment.toLocaleDateString("el-GR") : "-",
+                          })),
+                          "combined_debt",
                           [
                             { key: "userRole", label: "Ρόλος" },
                             { key: "userDisplayName", label: "Όνομα" },
                             { key: "responsiblePerson", label: "Υπεύθυνος" },
-                            { key: "remainingBalance", label: "Συνολικό Χρέος" },
+                            { key: "printDebt", label: "Εκτυπώσεις" },
+                            { key: "laminationDebt", label: "Πλαστικοποιήσεις" },
+                            { key: "totalDebt", label: "Τρέχων Χρέος" },
                             { key: "lastPayment", label: "Τελευταία Εξόφληση" }
                           ],
                           "EAB308",
@@ -906,8 +990,8 @@ export default function DashboardPage() {
               </div>
               
               <div className="p-6">
-                <PrintBillingTable
-                  data={filteredPrintBilling}
+                <CombinedDebtTable
+                  data={combinedDebtData}
                   page={printBillingPage}
                   pageSize={PAGE_SIZE}
                   onPageChange={setPrintBillingPage}
@@ -917,7 +1001,65 @@ export default function DashboardPage() {
               </div>
             </div>
 
-
+            {/* Transaction History Table */}
+            <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden mb-8">
+              <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <Receipt className="h-6 w-6 text-yellow-700" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-yellow-900">Ιστορικό Συναλλαγών</h3>
+                      <p className="text-sm text-yellow-700">Ιστορικό πληρωμών και εξοφλήσεων</p>
+                    </div>
+                  </div>
+                  {user.accessLevel === "admin" && (
+                    <Button
+                      onClick={() =>
+                        exportTableXLSX(
+                          transactions.map((transaction) => ({
+                            timestamp: transaction.timestamp.toLocaleDateString("el-GR"),
+                            userDisplayName: transaction.userDisplayName,
+                            amount: formatPrice(transaction.amount),
+                            type: transaction.type === "payment" ? "Πληρωμή" : "Επιστροφή",
+                            description: transaction.description || "-",
+                            adminDisplayName: transaction.adminDisplayName,
+                          })),
+                          "transaction_history",
+                          [
+                            { key: "timestamp", label: "Ημερομηνία" },
+                            { key: "userDisplayName", label: "Χρήστης" },
+                            { key: "amount", label: "Ποσό" },
+                            { key: "type", label: "Τύπος" },
+                            { key: "description", label: "Περιγραφή" },
+                            { key: "adminDisplayName", label: "Διαχειριστής" }
+                          ],
+                          "EAB308",
+                          "Ιστορικό Συναλλαγών"
+                        )
+                      }
+                      variant="outline"
+                      size="sm"
+                      className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Εξαγωγή XLSX
+                    </Button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <ErrorBoundary fallback={<div>Φόρτωση ιστορικού συναλλαγών...</div>}>
+                  <TransactionHistoryTable
+                    data={transactions}
+                    page={transactionHistoryPage}
+                    pageSize={PAGE_SIZE}
+                    onPageChange={setTransactionHistoryPage}
+                    userRole={user.accessLevel}
+                  />
+                </ErrorBoundary>
+              </div>
+            </div>
 
             {/* Tabs for Print and Lamination */}
             <Tabs defaultValue="printing" className="w-full mb-8 mt-12" onValueChange={setActiveTab}>

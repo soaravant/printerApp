@@ -115,6 +115,18 @@ export interface PriceTable {
   updatedAt: Date
 }
 
+export interface Transaction {
+  transactionId: string
+  uid: string
+  userDisplayName: string
+  amount: number
+  timestamp: Date
+  type: "payment" | "refund"
+  description?: string
+  adminId: string
+  adminDisplayName: string
+}
+
 class DummyDatabase {
   private users: User[] = []
   private printJobs: PrintJob[] = []
@@ -122,6 +134,7 @@ class DummyDatabase {
   private printBilling: PrintBilling[] = []
   private laminationBilling: LaminationBilling[] = []
   private priceTables: PriceTable[] = []
+  private transactions: Transaction[] = []
 
   constructor() {
     this.initializeData()
@@ -1558,10 +1571,10 @@ class DummyDatabase {
   // Statistics methods
   getTotalUnpaidForUser(uid: string): { print: number; lamination: number; total: number } {
     const printUnpaid = this.printBilling
-      .filter((b) => b.uid === uid && !b.paid)
+      .filter((b) => b.uid === uid)
       .reduce((sum, b) => sum + b.remainingBalance, 0)
     const laminationUnpaid = this.laminationBilling
-      .filter((b) => b.uid === uid && !b.paid)
+      .filter((b) => b.uid === uid)
       .reduce((sum, b) => sum + b.remainingBalance, 0)
 
     return {
@@ -1578,12 +1591,81 @@ class DummyDatabase {
     }
   }
 
+  // Transaction methods
+  getTransactions(uid?: string): Transaction[] {
+    if (uid) {
+      return this.transactions.filter((t) => t.uid === uid)
+    }
+    return [...this.transactions]
+  }
+
+  addTransaction(transaction: Transaction): void {
+    this.transactions.push(transaction)
+    
+    // Update billing records to reflect the payment
+    const userPrintBilling = this.printBilling.filter(b => b.uid === transaction.uid)
+    const userLaminationBilling = this.laminationBilling.filter(b => b.uid === transaction.uid)
+    
+    let remainingAmount = transaction.amount
+    
+    if (remainingAmount > 0) {
+      // Positive payment - reduce debt
+      // First, apply payment to print billing
+      for (const billing of userPrintBilling) {
+        if (remainingAmount <= 0) break
+        
+        const paymentAmount = Math.min(remainingAmount, billing.remainingBalance)
+        billing.paidAmount += paymentAmount
+        billing.remainingBalance -= paymentAmount
+        billing.lastPayment = transaction.timestamp
+        
+        if (billing.remainingBalance <= 0) {
+          billing.paid = true
+          billing.paidDate = transaction.timestamp
+        }
+        
+        remainingAmount -= paymentAmount
+      }
+      
+      // Then, apply remaining payment to lamination billing
+      for (const billing of userLaminationBilling) {
+        if (remainingAmount <= 0) break
+        
+        const paymentAmount = Math.min(remainingAmount, billing.remainingBalance)
+        billing.paidAmount += paymentAmount
+        billing.remainingBalance -= paymentAmount
+        billing.lastPayment = transaction.timestamp
+        
+        if (billing.remainingBalance <= 0) {
+          billing.paid = true
+          billing.paidDate = transaction.timestamp
+        }
+        
+        remainingAmount -= paymentAmount
+      }
+    } else if (remainingAmount < 0) {
+      // Negative payment - create credit (negative balance)
+      const creditAmount = Math.abs(remainingAmount)
+      
+      // Create a credit by reducing the remaining balance (making it negative)
+      // Apply to lamination billing first, then print billing
+      if (userLaminationBilling.length > 0) {
+        userLaminationBilling[0].remainingBalance -= creditAmount
+        userLaminationBilling[0].lastPayment = transaction.timestamp
+      } else if (userPrintBilling.length > 0) {
+        userPrintBilling[0].remainingBalance -= creditAmount
+        userPrintBilling[0].lastPayment = transaction.timestamp
+      }
+    }
+  }
+
   // Reset method to clear all data and regenerate
   reset(): void {
     this.printJobs = []
     this.laminationJobs = []
     this.printBilling = []
     this.laminationBilling = []
+    this.transactions = []
     this.initializeData()
   }
 }

@@ -34,6 +34,7 @@
 - [x] **System Monitoring**: View printer status and system health indicators
 - [x] **Data Export**: Export data to CSV format for external reporting
 - [x] **Lamination Charges**: Add manual lamination charges to user accounts
+- [x] **Debt Reduction**: Record payments and reduce user debt with transaction history
 
 ### Data Collection & Integration
 - [x] **Automated Data Collection**: Python service to collect print job data from network printers
