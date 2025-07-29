@@ -26,7 +26,7 @@ import { SearchableSelect } from "@/components/searchable-select"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { useState, useEffect } from "react"
 import { Plus, CreditCard, Users, Building, Printer, RotateCcw, Euro } from "lucide-react"
-import type { User, LaminationJob, Transaction } from "@/lib/dummy-database"
+import type { User, LaminationJob, Income } from "@/lib/dummy-database"
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import { TagInput } from "@/components/ui/tag-input"
 
@@ -215,33 +215,42 @@ export default function AdminPage() {
       return
     }
 
+    if (amount <= 0) {
+      toast({
+        title: "Σφάλμα Ποσού",
+        description: "Το ποσό πρέπει να είναι θετικό",
+        variant: "destructive",
+      })
+      return
+    }
+
     setDebtReductionLoading(true)
     try {
       const selectedUserData = users.find((u) => u.uid === debtReductionUser)
       if (!selectedUserData) return
 
-      const newTransaction: Transaction = {
-        transactionId: `transaction-${Date.now()}`,
+      const newIncome: Income = {
+        incomeId: `income-${Date.now()}`,
         uid: debtReductionUser,
         userDisplayName: selectedUserData.displayName,
         amount: amount,
         timestamp: new Date(debtReductionDate),
-        type: amount >= 0 ? "payment" : "refund",
-        description: amount >= 0 ? `Πληρωμή από ${selectedUserData.displayName}` : `Επιστροφή για ${selectedUserData.displayName}`,
-        adminId: user?.uid || "unknown",
-        adminDisplayName: user?.displayName || "Unknown Admin",
       }
 
-      dummyDB.addTransaction(newTransaction)
+      dummyDB.addIncome(newIncome)
 
       toast({
         title: "Επιτυχία",
-        description: `Προστέθηκε πληρωμή €${amount.toFixed(2).replace('.', ',')} για τον χρήστη ${selectedUserData.displayName}`,
+        description: `Προστέθηκε έσοδο €${amount.toFixed(2).replace('.', ',')} για τον χρήστη ${selectedUserData.displayName}`,
         variant: "success",
       })
 
       // Trigger refresh to update dashboard
       triggerRefresh()
+
+      // Refresh users list to get updated debt fields
+      const updatedUsers = dummyDB.getUsers()
+      setUsers(updatedUsers)
 
       // Reset form
       setDebtReductionUser("")
@@ -250,7 +259,7 @@ export default function AdminPage() {
     } catch (error) {
       toast({
         title: "Σφάλμα Συστήματος",
-        description: "Αποτυχία προσθήκης πληρωμής. Παρακαλώ δοκιμάστε ξανά.",
+        description: "Αποτυχία προσθήκης εσόδου. Παρακαλώ δοκιμάστε ξανά.",
         variant: "destructive",
       })
     } finally {
@@ -841,14 +850,15 @@ export default function AdminPage() {
                       </div>
 
                       <div>
-                        <Label htmlFor="debt-amount" className="text-gray-700">Ποσό Πληρωμής/Επιστροφής (€)</Label>
+                        <Label htmlFor="debt-amount" className="text-gray-700">Ποσό Πληρωμής (€)</Label>
                         <Input
                           id="debt-amount"
                           type="number"
                           step="0.01"
+                          min="0"
                           value={debtReductionAmount}
                           onChange={(e) => setDebtReductionAmount(e.target.value)}
-                          placeholder="0,00 (αρνητικό για επιστροφή)"
+                          placeholder="0,00"
                         />
                       </div>
 
@@ -865,81 +875,37 @@ export default function AdminPage() {
                     {/* Row 3: Current Debt Info (if user selected) */}
                     {debtReductionUser && (() => {
                       const selectedUserData = users.find((u) => u.uid === debtReductionUser)
-                      const userDebt = dummyDB.getTotalUnpaidForUser(debtReductionUser)
+                      const currentPrintDebt = selectedUserData?.printDebt || 0
+                      const currentLaminationDebt = selectedUserData?.laminationDebt || 0
+                      const currentTotalDebt = selectedUserData?.totalDebt || 0
                       const paymentAmount = parseFloat(debtReductionAmount) || 0
                       
-                      // Calculate remaining debt after payment/refund
-                      let remainingLamination = userDebt.lamination
-                      let remainingPrint = userDebt.print
+                      // Calculate remaining debt after payment (allowing negative values for credit)
+                      let remainingLamination = currentLaminationDebt
+                      let remainingPrint = currentPrintDebt
                       
                       if (paymentAmount > 0) {
-                        // Positive payment - reduce debt (lamination first, then printing)
-                        if (remainingLamination > 0) {
-                          const laminationPayment = Math.min(paymentAmount, remainingLamination)
-                          remainingLamination -= laminationPayment
-                          const remainingPayment = paymentAmount - laminationPayment
-                          
-                          // Then pay printing debt with remaining amount
-                          if (remainingPayment > 0 && remainingPrint > 0) {
-                            remainingPrint -= remainingPayment
-                          }
-                        } else {
-                          // No lamination debt, pay printing debt
-                          remainingPrint -= paymentAmount
-                        }
-                      } else if (paymentAmount < 0) {
-                        // Negative payment (refund) - create credit
-                        const refundAmount = Math.abs(paymentAmount)
+                        // Apply payment to debts (lamination first, then printing)
+                        let remainingPayment = paymentAmount
                         
-                        // First try to refund from print billing
-                        if (remainingPrint < 0) {
-                          // User already has print credit, add to it
-                          remainingPrint -= refundAmount
-                        } else if (remainingPrint > 0) {
-                          // User has print debt, reduce it
-                          const refundToPrint = Math.min(refundAmount, remainingPrint)
-                          remainingPrint -= refundToPrint
-                          const remainingRefund = refundAmount - refundToPrint
-                          
-                          // Apply remaining refund to lamination
-                          if (remainingRefund > 0) {
-                            if (remainingLamination < 0) {
-                              // User already has lamination credit, add to it
-                              remainingLamination -= remainingRefund
-                            } else if (remainingLamination > 0) {
-                              // User has lamination debt, reduce it
-                              const refundToLamination = Math.min(remainingRefund, remainingLamination)
-                              remainingLamination -= refundToLamination
-                              const finalRemainingRefund = remainingRefund - refundToLamination
-                              
-                              // If there's still refund remaining, create credit
-                              if (finalRemainingRefund > 0) {
-                                remainingLamination -= finalRemainingRefund
-                              }
-                            } else {
-                              // No lamination debt, create credit
-                              remainingLamination -= remainingRefund
-                            }
-                          }
-                        } else {
-                          // No print debt, apply refund to lamination
-                          if (remainingLamination < 0) {
-                            // User already has lamination credit, add to it
-                            remainingLamination -= refundAmount
-                          } else if (remainingLamination > 0) {
-                            // User has lamination debt, reduce it
-                            const refundToLamination = Math.min(refundAmount, remainingLamination)
-                            remainingLamination -= refundToLamination
-                            const finalRemainingRefund = refundAmount - refundToLamination
-                            
-                            // If there's still refund remaining, create credit
-                            if (finalRemainingRefund > 0) {
-                              remainingLamination -= finalRemainingRefund
-                            }
-                          } else {
-                            // No lamination debt, create credit
-                            remainingLamination -= refundAmount
-                          }
+                        // First pay lamination debt
+                        if (remainingLamination > 0) {
+                          const laminationPayment = Math.min(remainingPayment, remainingLamination)
+                          remainingLamination -= laminationPayment
+                          remainingPayment -= laminationPayment
+                        }
+                        
+                        // Then pay printing debt with remaining amount
+                        if (remainingPayment > 0 && remainingPrint > 0) {
+                          const printPayment = Math.min(remainingPayment, remainingPrint)
+                          remainingPrint -= printPayment
+                          remainingPayment -= printPayment
+                        }
+                        
+                        // If there's still payment remaining, create credit
+                        if (remainingPayment > 0) {
+                          // Apply remaining payment as credit to lamination first
+                          remainingLamination -= remainingPayment
                         }
                       }
                       
@@ -970,12 +936,22 @@ export default function AdminPage() {
                               </div>
                             </div>
                           </div>
+                          {paymentAmount > 0 && (
+                            <div className="mt-3 text-center">
+                              <div className="text-sm text-gray-600">
+                                                              {remainingTotal < 0 ? 
+                                `Θα δημιουργηθεί πίστωση €${Math.abs(remainingTotal).toFixed(2).replace('.', ',')}` :
+                                `Θα μειωθεί το χρέος κατά €${Math.min(paymentAmount, currentTotalDebt).toFixed(2).replace('.', ',')}`
+                              }
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })()}
 
                     <Button onClick={handleDebtReduction} disabled={debtReductionLoading} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white">
-                      {debtReductionLoading ? "Προσθήκη..." : "Προσθήκη Πληρωμής/Επιστροφής"}
+                      {debtReductionLoading ? "Προσθήκη..." : "Προσθήκη Πληρωμής"}
                     </Button>
                   </CardContent>
                 </Card>

@@ -4,23 +4,23 @@ import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import type { Transaction } from "@/lib/dummy-database"
+import type { Income } from "@/lib/dummy-database"
 
-interface TransactionHistoryTableProps {
-  data: Transaction[]
+interface IncomeTableProps {
+  data: Income[]
   page: number
   pageSize: number
   onPageChange: (page: number) => void
   userRole: string
 }
 
-export default function TransactionHistoryTable({ 
+export default function IncomeTable({ 
   data, 
   page, 
   pageSize, 
   onPageChange, 
   userRole 
-}: TransactionHistoryTableProps) {
+}: IncomeTableProps) {
   const totalPages = Math.ceil(data.length / pageSize)
   const startIndex = (page - 1) * pageSize
   const endIndex = startIndex + pageSize
@@ -38,44 +38,24 @@ export default function TransactionHistoryTable({
               <TableHead className="text-yellow-900 font-semibold">Ημερομηνία</TableHead>
               <TableHead className="text-yellow-900 font-semibold">Χρήστης</TableHead>
               <TableHead className="text-yellow-900 font-semibold">Ποσό</TableHead>
-              <TableHead className="text-yellow-900 font-semibold">Τύπος</TableHead>
-              <TableHead className="text-yellow-900 font-semibold">Περιγραφή</TableHead>
-              <TableHead className="text-yellow-900 font-semibold">Διαχειριστής</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                  Δεν βρέθηκαν συναλλαγές
+                <TableCell colSpan={3} className="text-center text-gray-500 py-8">
+                  Δεν βρέθηκαν έσοδα
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedData.map((transaction) => (
-                <TableRow key={transaction.transactionId} className="hover:bg-yellow-50">
+              paginatedData.map((income) => (
+                <TableRow key={income.incomeId} className="hover:bg-yellow-50">
                   <TableCell className="font-medium">
-                    {formatDate(transaction.timestamp)}
+                    {formatDate(income.timestamp)}
                   </TableCell>
-                  <TableCell>{transaction.userDisplayName}</TableCell>
-                  <TableCell className={`font-bold ${
-                    transaction.type === "payment" ? "text-green-600" : "text-red-600"
-                  }`}>
-                    {transaction.type === "payment" ? "+" : "-"}{formatPrice(transaction.amount)}
-                  </TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      transaction.type === "payment" 
-                        ? "bg-green-100 text-green-800" 
-                        : "bg-red-100 text-red-800"
-                    }`}>
-                      {transaction.type === "payment" ? "Πληρωμή" : "Επιστροφή"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-gray-600">
-                    {transaction.description || "-"}
-                  </TableCell>
-                  <TableCell className="text-sm text-gray-600">
-                    {transaction.adminDisplayName}
+                  <TableCell>{income.userDisplayName}</TableCell>
+                  <TableCell className="font-bold text-green-600">
+                    {formatPrice(income.amount)}
                   </TableCell>
                 </TableRow>
               ))
@@ -88,7 +68,7 @@ export default function TransactionHistoryTable({
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-700">
-            Εμφάνιση {startIndex + 1}-{Math.min(endIndex, data.length)} από {data.length} συναλλαγές
+            Εμφάνιση {startIndex + 1}-{Math.min(endIndex, data.length)} από {data.length} έσοδα
           </div>
           <div className="flex items-center space-x-2">
             <Button

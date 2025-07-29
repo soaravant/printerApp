@@ -5,7 +5,7 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
 import { dummyDB } from "@/lib/dummy-database"
-import type { PrintJob, LaminationJob, PrintBilling, LaminationBilling, User, Transaction } from "@/lib/dummy-database"
+import type { PrintJob, LaminationJob, PrintBilling, LaminationBilling, User, Income } from "@/lib/dummy-database"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -56,8 +56,8 @@ const LaminationBillingTable = dynamic(() => import("@/components/lamination-bil
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση χρεώσεων πλαστικοποιήσεων...</div>,
   ssr: false,
 })
-const TransactionHistoryTable = dynamic(() => import("@/components/transaction-history-table"), {
-  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση ιστορικού συναλλαγών...</div>,
+const IncomeTable = dynamic(() => import("@/components/income-table"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση εσόδων...</div>,
   ssr: false,
 })
 
@@ -82,7 +82,7 @@ export default function DashboardPage() {
   const [printBilling, setPrintBilling] = useState<PrintBilling[]>([])
   const [laminationBilling, setLaminationBilling] = useState<LaminationBilling[]>([])
   const [allUsers, setAllUsers] = useState<User[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [income, setIncome] = useState<Income[]>([])
 
   // Unified filtering states
   const [searchTerm, setSearchTerm] = useState("")
@@ -118,7 +118,7 @@ export default function DashboardPage() {
   const [laminationJobsPage, setLaminationJobsPage] = useState(1)
   const [printBillingPage, setPrintBillingPage] = useState(1)
   const [laminationBillingPage, setLaminationBillingPage] = useState(1)
-  const [transactionHistoryPage, setTransactionHistoryPage] = useState(1)
+  const [incomePage, setIncomePage] = useState(1)
   const PAGE_SIZE = 10
 
   // Hover state for highlighting statistics
@@ -141,7 +141,7 @@ export default function DashboardPage() {
       setPrintBilling(allPrintBilling)
       setLaminationBilling(allLaminationBilling)
       setAllUsers(users)
-      setTransactions(dummyDB.getTransactions())
+      setIncome(dummyDB.getFreshIncome())
     } else {
       // Regular user sees only their data
       const pJobs = dummyDB.getPrintJobs(user.uid)
@@ -153,6 +153,7 @@ export default function DashboardPage() {
       setLaminationJobs(lJobs)
       setPrintBilling(pBilling)
       setLaminationBilling(lBilling)
+      setIncome(dummyDB.getFreshIncome(user.uid))
     }
   }, [user, refreshTrigger]) // Add refreshTrigger to dependencies
 
@@ -609,26 +610,17 @@ export default function DashboardPage() {
 
   if (!user) return null
 
-  // Calculate totals based on filtered data or user-specific data
-  const relevantPrintBilling = user.accessLevel === "admin" ? filteredPrintBilling : filteredPrintBilling
-  const relevantLaminationBilling = user.accessLevel === "admin" ? filteredLaminationBilling : filteredLaminationBilling
-  const relevantPrintJobs = user.accessLevel === "admin" ? filteredPrintJobs : filteredPrintJobs
-  const relevantLaminationJobs = user.accessLevel === "admin" ? filteredLaminationJobs : filteredLaminationJobs
-
-  const printUnpaid = relevantPrintBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
-  const laminationUnpaid = relevantLaminationBilling
-    .filter((b) => !b.paid)
-    .reduce((sum, b) => sum + b.remainingBalance, 0)
+  // Calculate totals based on user debt fields
+  const allUsersData = dummyDB.getUsers()
+  const relevantUsers = user.accessLevel === "admin" ? allUsersData : allUsersData.filter(u => u.uid === user.uid)
+  
+  const printUnpaid = relevantUsers.reduce((sum, u) => sum + (u.printDebt || 0), 0)
+  const laminationUnpaid = relevantUsers.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
   const totalUnpaid = printUnpaid + laminationUnpaid
 
   // Calculate totals without filters for percentage calculations
-  const totalPrintBilling = user.accessLevel === "admin" ? printBilling : printBilling
-  const totalLaminationBilling = user.accessLevel === "admin" ? laminationBilling : laminationBilling
-  
-  const totalPrintUnpaid = totalPrintBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
-  const totalLaminationUnpaid = totalLaminationBilling
-    .filter((b) => !b.paid)
-    .reduce((sum, b) => sum + b.remainingBalance, 0)
+  const totalPrintUnpaid = allUsersData.reduce((sum, u) => sum + (u.printDebt || 0), 0)
+  const totalLaminationUnpaid = allUsersData.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
 
   // Check if any filters are applied
   const hasFilters = billingSearchTerm || 
@@ -651,10 +643,8 @@ export default function DashboardPage() {
   const totalUnpaidPercentage = totalCombinedUnpaid > 0 ? (totalUnpaid / totalCombinedUnpaid) * 100 : 0
 
   const currentMonth = new Date().toISOString().slice(0, 7)
-  const currentMonthPrintJobs = relevantPrintJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
-  const currentMonthLaminationJobs = relevantLaminationJobs.filter(
-    (j) => j.timestamp.toISOString().slice(0, 7) === currentMonth,
-  )
+  const currentMonthPrintJobs = printJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
+  const currentMonthLaminationJobs = laminationJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
   const currentMonthPrintCost = currentMonthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
   const currentMonthLaminationCost = currentMonthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
 
@@ -787,62 +777,50 @@ export default function DashboardPage() {
       lastPayment: Date | null
     }>()
 
-    // Process print billing data
-    filteredPrintBilling.forEach(billing => {
-      const userData = dummyDB.getUserById(billing.uid)
-      const responsiblePerson = userData?.userRole === "Άτομο" 
-        ? userData.displayName 
-        : userData?.responsiblePerson || "-"
+    // Get all users and their debt information
+    allUsersData.forEach(user => {
+      // Skip admin users from the debt table
+      if (user.accessLevel === "admin") return
       
-      const existing = userDebtMap.get(billing.uid)
-      if (existing) {
-        existing.printDebt += billing.remainingBalance
-        existing.totalDebt += billing.remainingBalance
-        // Keep the most recent payment date
-        if (billing.lastPayment && (!existing.lastPayment || billing.lastPayment > existing.lastPayment)) {
-          existing.lastPayment = billing.lastPayment
-        }
-      } else {
-        userDebtMap.set(billing.uid, {
-          uid: billing.uid,
-          userDisplayName: billing.userDisplayName,
-          userRole: userData?.userRole || "-",
-          responsiblePerson: responsiblePerson,
-          printDebt: billing.remainingBalance,
-          laminationDebt: 0,
-          totalDebt: billing.remainingBalance,
-          lastPayment: billing.lastPayment || null
-        })
-      }
-    })
-
-    // Process lamination billing data
-    filteredLaminationBilling.forEach(billing => {
-      const userData = dummyDB.getUserById(billing.uid)
-      const responsiblePerson = userData?.userRole === "Άτομο" 
-        ? userData.displayName 
-        : userData?.responsiblePerson || "-"
+      const responsiblePerson = user.userRole === "Άτομο" 
+        ? user.displayName 
+        : user.responsiblePerson || "-"
       
-      const existing = userDebtMap.get(billing.uid)
-      if (existing) {
-        existing.laminationDebt += billing.remainingBalance
-        existing.totalDebt += billing.remainingBalance
-        // Keep the most recent payment date
-        if (billing.lastPayment && (!existing.lastPayment || billing.lastPayment > existing.lastPayment)) {
-          existing.lastPayment = billing.lastPayment
+      // Get user's current debt from their debt fields
+      const printDebt = user.printDebt || 0
+      const laminationDebt = user.laminationDebt || 0
+      const totalDebt = user.totalDebt || 0
+      
+      // Find the most recent payment date from billing records
+      let lastPayment: Date | null = null
+      
+      const userPrintBilling = filteredPrintBilling.filter(b => b.uid === user.uid)
+      const userLaminationBilling = filteredLaminationBilling.filter(b => b.uid === user.uid)
+      
+      // Check print billing for last payment
+      userPrintBilling.forEach(billing => {
+        if (billing.lastPayment && (!lastPayment || billing.lastPayment > lastPayment)) {
+          lastPayment = billing.lastPayment
         }
-      } else {
-        userDebtMap.set(billing.uid, {
-          uid: billing.uid,
-          userDisplayName: billing.userDisplayName,
-          userRole: userData?.userRole || "-",
-          responsiblePerson: responsiblePerson,
-          printDebt: 0,
-          laminationDebt: billing.remainingBalance,
-          totalDebt: billing.remainingBalance,
-          lastPayment: billing.lastPayment || null
-        })
-      }
+      })
+      
+      // Check lamination billing for last payment
+      userLaminationBilling.forEach(billing => {
+        if (billing.lastPayment && (!lastPayment || billing.lastPayment > lastPayment)) {
+          lastPayment = billing.lastPayment
+        }
+      })
+      
+      userDebtMap.set(user.uid, {
+        uid: user.uid,
+        userDisplayName: user.displayName,
+        userRole: user.userRole,
+        responsiblePerson: responsiblePerson,
+        printDebt: printDebt,
+        laminationDebt: laminationDebt,
+        totalDebt: totalDebt,
+        lastPayment: lastPayment
+      })
     })
 
     return Array.from(userDebtMap.values())
@@ -874,11 +852,13 @@ export default function DashboardPage() {
                 <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
                   <div className="flex items-center gap-3">
                     <Receipt className="h-8 w-8 text-yellow-700" />
-                    <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Οφειλών</h3>
+                    <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Χρέους/Πίστωσης</h3>
                   </div>
                 </div>
                 <div className={`p-6 flex-1 flex ${hasFilters && totalUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
-                  <div className="text-3xl font-bold text-red-600">{formatPrice(totalUnpaid)}</div>
+                  <div className={`text-3xl font-bold ${totalUnpaid > 0 ? 'text-red-600' : totalUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                    {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
+                  </div>
                   {hasFilters && totalUnpaidPercentage < 100 && (
                     <div className="text-sm text-gray-500 pb-0.5">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
                   )}
@@ -890,11 +870,13 @@ export default function DashboardPage() {
                 <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
                   <div className="flex items-center gap-3">
                     <Printer className="h-6 w-6 text-blue-700" />
-                    <h3 className="text-lg font-semibold text-blue-900">Οφειλές ΤΟ. ΦΩ.</h3>
+                    <h3 className="text-lg font-semibold text-blue-900">Χρέος/Πίστωση ΤΟ. ΦΩ.</h3>
                   </div>
                 </div>
                 <div className={`p-6 flex-1 flex ${hasFilters && printUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
-                  <div className="text-3xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
+                  <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-red-600' : printUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                    {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
+                  </div>
                   {hasFilters && printUnpaidPercentage < 100 && (
                     <div className="text-sm text-gray-500 pb-0.5">({printUnpaidPercentage.toFixed(1)}% του {formatPrice(totalPrintUnpaid)})</div>
                   )}
@@ -906,11 +888,13 @@ export default function DashboardPage() {
                 <div className="bg-green-100 px-6 py-4 border-b border-green-200">
                   <div className="flex items-center gap-3">
                     <CreditCard className="h-6 w-6 text-green-700" />
-                    <h3 className="text-lg font-semibold text-green-900">Οφειλές ΠΛΑ. ΤΟ.</h3>
+                    <h3 className="text-lg font-semibold text-green-900">Χρέος/Πίστωση ΠΛΑ. ΤΟ.</h3>
                   </div>
                 </div>
                 <div className={`p-6 flex-1 flex ${hasFilters && laminationUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
-                  <div className="text-3xl font-bold text-green-600">{formatPrice(laminationUnpaid)}</div>
+                  <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-red-600' : laminationUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                    {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
+                  </div>
                   {hasFilters && laminationUnpaidPercentage < 100 && (
                     <div className="text-sm text-gray-500 pb-0.5">({laminationUnpaidPercentage.toFixed(1)}% του {formatPrice(totalLaminationUnpaid)})</div>
                   )}
@@ -947,8 +931,8 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-3">
                     <BarChart3 className="h-6 w-6 text-yellow-700" />
                     <div>
-                      <h3 className="text-lg font-semibold text-yellow-900">Συγκεντρωτικός Χρεωστικός Πίνακας</h3>
-                      <p className="text-sm text-yellow-700">Συγκεντρωμένα δεδομένα χρεώσεων και πληρωμών</p>
+                      <h3 className="text-lg font-semibold text-yellow-900">Συγκεντρωτικός Πίνακας Χρέους/Πίστωσης</h3>
+                      <p className="text-sm text-yellow-700">Συγκεντρωμένα δεδομένα χρεώσεων, πληρωμών και πιστώσεων</p>
                     </div>
                   </div>
                   {user.accessLevel === "admin" && (
@@ -959,9 +943,7 @@ export default function DashboardPage() {
                             userRole: item.userRole,
                             userDisplayName: item.userDisplayName,
                             responsiblePerson: item.responsiblePerson,
-                            printDebt: formatPrice(item.printDebt),
-                            laminationDebt: formatPrice(item.laminationDebt),
-                            totalDebt: formatPrice(item.totalDebt),
+                            currentDebt: `${item.printDebt > 0 ? formatPrice(item.printDebt) : item.printDebt < 0 ? `-${formatPrice(Math.abs(item.printDebt))}` : formatPrice(item.printDebt)} | ${item.laminationDebt > 0 ? formatPrice(item.laminationDebt) : item.laminationDebt < 0 ? `-${formatPrice(Math.abs(item.laminationDebt))}` : formatPrice(item.laminationDebt)} | ${item.totalDebt > 0 ? formatPrice(item.totalDebt) : item.totalDebt < 0 ? `-${formatPrice(Math.abs(item.totalDebt))}` : formatPrice(item.totalDebt)}`,
                             lastPayment: item.lastPayment ? item.lastPayment.toLocaleDateString("el-GR") : "-",
                           })),
                           "combined_debt",
@@ -969,13 +951,11 @@ export default function DashboardPage() {
                             { key: "userRole", label: "Ρόλος" },
                             { key: "userDisplayName", label: "Όνομα" },
                             { key: "responsiblePerson", label: "Υπεύθυνος" },
-                            { key: "printDebt", label: "Εκτυπώσεις" },
-                            { key: "laminationDebt", label: "Πλαστικοποιήσεις" },
-                            { key: "totalDebt", label: "Τρέχων Χρέος" },
+                            { key: "currentDebt", label: "Τρέχον Χρέος/Πίστωση (ΤΟ. ΦΩ. | ΠΛΑ. ΤΟ. | Σύνολο)" },
                             { key: "lastPayment", label: "Τελευταία Εξόφληση" }
                           ],
                           "EAB308",
-                          "Συγκεντρωτικός Χρεωστικός Πίνακας"
+                          "Συγκεντρωτικός Πίνακας Χρέους/Πίστωσης"
                         )
                       }
                       variant="outline"
@@ -1001,40 +981,34 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Transaction History Table */}
+            {/* Income Table */}
             <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden mb-8">
               <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3">
                     <Receipt className="h-6 w-6 text-yellow-700" />
                     <div>
-                      <h3 className="text-lg font-semibold text-yellow-900">Ιστορικό Συναλλαγών</h3>
-                      <p className="text-sm text-yellow-700">Ιστορικό πληρωμών και εξοφλήσεων</p>
+                      <h3 className="text-lg font-semibold text-yellow-900">Έσοδα</h3>
+                      <p className="text-sm text-yellow-700">Ιστορικό εσόδων από πληρωμές</p>
                     </div>
                   </div>
                   {user.accessLevel === "admin" && (
                     <Button
                       onClick={() =>
                         exportTableXLSX(
-                          transactions.map((transaction) => ({
-                            timestamp: transaction.timestamp.toLocaleDateString("el-GR"),
-                            userDisplayName: transaction.userDisplayName,
-                            amount: formatPrice(transaction.amount),
-                            type: transaction.type === "payment" ? "Πληρωμή" : "Επιστροφή",
-                            description: transaction.description || "-",
-                            adminDisplayName: transaction.adminDisplayName,
+                          income.map((incomeRecord) => ({
+                            timestamp: incomeRecord.timestamp.toLocaleDateString("el-GR"),
+                            userDisplayName: incomeRecord.userDisplayName,
+                            amount: formatPrice(incomeRecord.amount),
                           })),
-                          "transaction_history",
+                          "income_history",
                           [
                             { key: "timestamp", label: "Ημερομηνία" },
                             { key: "userDisplayName", label: "Χρήστης" },
-                            { key: "amount", label: "Ποσό" },
-                            { key: "type", label: "Τύπος" },
-                            { key: "description", label: "Περιγραφή" },
-                            { key: "adminDisplayName", label: "Διαχειριστής" }
+                            { key: "amount", label: "Ποσό" }
                           ],
                           "EAB308",
-                          "Ιστορικό Συναλλαγών"
+                          "Έσοδα"
                         )
                       }
                       variant="outline"
@@ -1049,12 +1023,12 @@ export default function DashboardPage() {
               </div>
               
               <div className="p-6">
-                <ErrorBoundary fallback={<div>Φόρτωση ιστορικού συναλλαγών...</div>}>
-                  <TransactionHistoryTable
-                    data={transactions}
-                    page={transactionHistoryPage}
+                <ErrorBoundary fallback={<div>Φόρτωση εσόδων...</div>}>
+                  <IncomeTable
+                    data={income}
+                    page={incomePage}
                     pageSize={PAGE_SIZE}
-                    onPageChange={setTransactionHistoryPage}
+                    onPageChange={setIncomePage}
                     userRole={user.accessLevel}
                   />
                 </ErrorBoundary>

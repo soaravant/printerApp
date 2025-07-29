@@ -13,6 +13,9 @@ export interface User {
   memberOf?: string[] // New field for Άτομο users to show which Ομάδα/Ναός/Τομέας they belong to
   responsiblePersons?: string[] // New field for Ομάδα/Ναός/Τομέας users to show who is responsible
   responsibleFor?: string[] // New field for Υπεύθυνος users to show which Ομάδα/Ναός/Τομέας they are responsible for
+  printDebt?: number // Current print debt (can be negative for credit)
+  laminationDebt?: number // Current lamination debt (can be negative for credit)
+  totalDebt?: number // Total debt (can be negative for credit)
 }
 
 export interface PrintJob {
@@ -115,16 +118,12 @@ export interface PriceTable {
   updatedAt: Date
 }
 
-export interface Transaction {
-  transactionId: string
+export interface Income {
+  incomeId: string
   uid: string
   userDisplayName: string
   amount: number
   timestamp: Date
-  type: "payment" | "refund"
-  description?: string
-  adminId: string
-  adminDisplayName: string
 }
 
 class DummyDatabase {
@@ -134,7 +133,7 @@ class DummyDatabase {
   private printBilling: PrintBilling[] = []
   private laminationBilling: LaminationBilling[] = []
   private priceTables: PriceTable[] = []
-  private transactions: Transaction[] = []
+  private income: Income[] = []
 
   constructor() {
     this.initializeData()
@@ -1464,6 +1463,166 @@ class DummyDatabase {
         }
       }
     }
+    
+    // Generate income history based on billing records
+    this.generateIncomeHistory()
+    
+    // Initialize debt fields for all users
+    this.initializeUserDebtFields()
+  }
+  
+  private initializeUserDebtFields(): void {
+    for (const user of this.users) {
+      this.updateUserDebtFields(user.uid)
+    }
+  }
+
+  private generateIncomeHistory() {
+    
+    // Generate income for the last 6 months
+    const now = new Date()
+    
+    for (let monthOffset = 0; monthOffset < 6; monthOffset++) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
+      const period = monthDate.toISOString().slice(0, 7)
+      
+      // Get all billing records for this period
+      const monthPrintBilling = this.printBilling.filter(b => b.period === period)
+      const monthLaminationBilling = this.laminationBilling.filter(b => b.period === period)
+      
+      // Generate income for each user with billing in this period
+      const usersWithBilling = new Set([
+        ...monthPrintBilling.map(b => b.uid),
+        ...monthLaminationBilling.map(b => b.uid)
+      ])
+      
+      for (const userId of usersWithBilling) {
+        const user = this.users.find(u => u.uid === userId)!
+        const userPrintBilling = monthPrintBilling.filter(b => b.uid === userId)
+        const userLaminationBilling = monthLaminationBilling.filter(b => b.uid === userId)
+        
+        // Calculate total debt for this user in this period
+        const totalPrintDebt = userPrintBilling.reduce((sum, b) => sum + b.totalCost, 0)
+        const totalLaminationDebt = userLaminationBilling.reduce((sum, b) => sum + b.totalCost, 0)
+        const totalDebt = totalPrintDebt + totalLaminationDebt
+        
+        if (totalDebt === 0) continue
+        
+        // Generate income pattern based on user role and debt amount
+        const incomePattern = this.generateIncomePattern(user, totalDebt, monthDate)
+        
+        // Create income records based on income pattern
+        for (const income of incomePattern) {
+          const incomeRecord: Income = {
+            incomeId: `income-${userId}-${period}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            uid: userId,
+            userDisplayName: user.displayName,
+            amount: income.amount,
+            timestamp: income.timestamp,
+          }
+          
+          this.income.push(incomeRecord)
+        }
+      }
+    }
+    
+    // Sort income by timestamp (newest first)
+    this.income.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+  }
+  
+  private generateIncomePattern(user: User, totalDebt: number, billingDate: Date): Array<{
+    amount: number
+    timestamp: Date
+  }> {
+    const income: Array<{ amount: number; timestamp: Date }> = []
+    
+    // Different income patterns based on user role and debt amount
+    const userRole = user.userRole
+    const isHighDebt = totalDebt > 50
+    const isLowDebt = totalDebt < 10
+    
+    // Base income probability and timing
+    let incomeProbability = 0.8 // 80% chance of income
+    let incomeDelay = 15 // Average days after billing
+    
+    // Adjust based on user role
+    switch (userRole) {
+      case "Άτομο":
+        incomeProbability = 0.9 // Individuals pay more reliably
+        incomeDelay = 10
+        break
+      case "Ομάδα":
+        incomeProbability = 0.7
+        incomeDelay = 20
+        break
+      case "Ναός":
+        incomeProbability = 0.6
+        incomeDelay = 25
+        break
+      case "Τομέας":
+        incomeProbability = 0.5
+        incomeDelay = 30
+        break
+    }
+    
+    // Adjust based on debt amount
+    if (isHighDebt) {
+      incomeProbability *= 0.8 // Less likely to receive high amounts immediately
+      incomeDelay += 10
+    } else if (isLowDebt) {
+      incomeProbability *= 1.2 // More likely to receive small amounts
+      incomeDelay -= 5
+    }
+    
+    // Generate income scenarios
+    if (Math.random() < incomeProbability) {
+      // Full income scenario
+      if (Math.random() < 0.7) {
+        // Single full payment
+        const incomeDate = new Date(billingDate.getTime() + (incomeDelay + Math.random() * 10) * 24 * 60 * 60 * 1000)
+        income.push({
+          amount: totalDebt,
+          timestamp: incomeDate,
+        })
+      } else {
+        // Multiple partial payments
+        const numPayments = Math.floor(Math.random() * 3) + 2 // 2-4 payments
+        let remainingDebt = totalDebt
+        
+        for (let i = 0; i < numPayments && remainingDebt > 0; i++) {
+          const incomeAmount = i === numPayments - 1 
+            ? remainingDebt 
+            : roundMoney(remainingDebt * (0.3 + Math.random() * 0.4)) // 30-70% of remaining
+          
+          const incomeDate = new Date(billingDate.getTime() + (incomeDelay + i * 7 + Math.random() * 5) * 24 * 60 * 60 * 1000)
+          
+          income.push({
+            amount: incomeAmount,
+            timestamp: incomeDate,
+          })
+          
+          remainingDebt -= incomeAmount
+        }
+      }
+    } else {
+      // No income or late income scenario
+      if (Math.random() < 0.3) {
+        // Late income (after 60+ days)
+        const lateIncomeDate = new Date(billingDate.getTime() + (60 + Math.random() * 30) * 24 * 60 * 60 * 1000)
+        const lateIncomeAmount = roundMoney(totalDebt * (0.5 + Math.random() * 0.3)) // 50-80% of debt
+        
+        income.push({
+          amount: lateIncomeAmount,
+          timestamp: lateIncomeDate,
+        })
+      }
+      // 70% chance of no income at all
+    }
+    
+    // Sort income by timestamp
+    income.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+    
+    return income
   }
 
   // User methods
@@ -1497,6 +1656,8 @@ class DummyDatabase {
 
   addPrintJob(job: PrintJob): void {
     this.printJobs.push(job)
+    // Update user's debt fields after adding a job
+    this.updateUserDebtFields(job.uid)
   }
 
   // Lamination job methods
@@ -1513,6 +1674,8 @@ class DummyDatabase {
 
   addLaminationJob(job: LaminationJob): void {
     this.laminationJobs.push(job)
+    // Update user's debt fields after adding a job
+    this.updateUserDebtFields(job.uid)
   }
 
   // Billing methods
@@ -1591,72 +1754,85 @@ class DummyDatabase {
     }
   }
 
-  // Transaction methods
-  getTransactions(uid?: string): Transaction[] {
+  // Income methods
+  getIncome(uid?: string): Income[] {
     if (uid) {
-      return this.transactions.filter((t) => t.uid === uid)
+      return this.income.filter((i) => i.uid === uid)
     }
-    return [...this.transactions]
+    return [...this.income]
   }
 
-  addTransaction(transaction: Transaction): void {
-    this.transactions.push(transaction)
+  addIncome(incomeRecord: Income): void {
+    this.income.push(incomeRecord)
     
-    // Update billing records to reflect the payment
-    const userPrintBilling = this.printBilling.filter(b => b.uid === transaction.uid)
-    const userLaminationBilling = this.laminationBilling.filter(b => b.uid === transaction.uid)
+    // Update billing records to reflect the income
+    const userPrintBilling = this.printBilling.filter(b => b.uid === incomeRecord.uid)
+    const userLaminationBilling = this.laminationBilling.filter(b => b.uid === incomeRecord.uid)
     
-    let remainingAmount = transaction.amount
+    let remainingAmount = incomeRecord.amount
     
     if (remainingAmount > 0) {
-      // Positive payment - reduce debt
-      // First, apply payment to print billing
-      for (const billing of userPrintBilling) {
-        if (remainingAmount <= 0) break
-        
-        const paymentAmount = Math.min(remainingAmount, billing.remainingBalance)
-        billing.paidAmount += paymentAmount
-        billing.remainingBalance -= paymentAmount
-        billing.lastPayment = transaction.timestamp
-        
-        if (billing.remainingBalance <= 0) {
-          billing.paid = true
-          billing.paidDate = transaction.timestamp
-        }
-        
-        remainingAmount -= paymentAmount
-      }
-      
-      // Then, apply remaining payment to lamination billing
+      // Positive income - reduce debt
+      // First, apply income to lamination billing
       for (const billing of userLaminationBilling) {
         if (remainingAmount <= 0) break
         
-        const paymentAmount = Math.min(remainingAmount, billing.remainingBalance)
-        billing.paidAmount += paymentAmount
-        billing.remainingBalance -= paymentAmount
-        billing.lastPayment = transaction.timestamp
+        const incomeAmount = Math.min(remainingAmount, billing.remainingBalance)
+        billing.paidAmount += incomeAmount
+        billing.remainingBalance -= incomeAmount
+        billing.lastPayment = incomeRecord.timestamp
         
         if (billing.remainingBalance <= 0) {
           billing.paid = true
-          billing.paidDate = transaction.timestamp
+          billing.paidDate = incomeRecord.timestamp
         }
         
-        remainingAmount -= paymentAmount
+        remainingAmount -= incomeAmount
       }
-    } else if (remainingAmount < 0) {
-      // Negative payment - create credit (negative balance)
-      const creditAmount = Math.abs(remainingAmount)
       
-      // Create a credit by reducing the remaining balance (making it negative)
-      // Apply to lamination billing first, then print billing
-      if (userLaminationBilling.length > 0) {
-        userLaminationBilling[0].remainingBalance -= creditAmount
-        userLaminationBilling[0].lastPayment = transaction.timestamp
-      } else if (userPrintBilling.length > 0) {
-        userPrintBilling[0].remainingBalance -= creditAmount
-        userPrintBilling[0].lastPayment = transaction.timestamp
+      // Then, apply remaining income to print billing
+      for (const billing of userPrintBilling) {
+        if (remainingAmount <= 0) break
+        
+        const incomeAmount = Math.min(remainingAmount, billing.remainingBalance)
+        billing.paidAmount += incomeAmount
+        billing.remainingBalance -= incomeAmount
+        billing.lastPayment = incomeRecord.timestamp
+        
+        if (billing.remainingBalance <= 0) {
+          billing.paid = true
+          billing.paidDate = incomeRecord.timestamp
+        }
+        
+        remainingAmount -= incomeAmount
+      }
+      
+      // If there's still remaining amount, create credit by reducing remaining balance further
+      if (remainingAmount > 0) {
+        // Apply remaining amount as credit to lamination billing first
+        if (userLaminationBilling.length > 0) {
+          userLaminationBilling[0].remainingBalance -= remainingAmount
+          userLaminationBilling[0].lastPayment = incomeRecord.timestamp
+        } else if (userPrintBilling.length > 0) {
+          userPrintBilling[0].remainingBalance -= remainingAmount
+          userPrintBilling[0].lastPayment = incomeRecord.timestamp
+        }
       }
     }
+    
+    // Update user's debt fields
+    this.updateUserDebtFields(incomeRecord.uid)
+  }
+  
+  private updateUserDebtFields(uid: string): void {
+    const user = this.users.find(u => u.uid === uid)
+    if (!user) return
+    
+    const userDebt = this.getTotalUnpaidForUser(uid)
+    
+    user.printDebt = userDebt.print
+    user.laminationDebt = userDebt.lamination
+    user.totalDebt = userDebt.total
   }
 
   // Reset method to clear all data and regenerate
@@ -1665,8 +1841,21 @@ class DummyDatabase {
     this.laminationJobs = []
     this.printBilling = []
     this.laminationBilling = []
-    this.transactions = []
+    this.income = []
     this.initializeData()
+  }
+
+  // Method to regenerate income data dynamically
+  regenerateIncome(): void {
+    this.income = []
+    this.generateIncomeHistory()
+  }
+
+  // Method to get fresh income data (regenerates if needed)
+  getFreshIncome(uid?: string): Income[] {
+    // Regenerate income to ensure fresh data
+    this.regenerateIncome()
+    return this.getIncome(uid)
   }
 }
 

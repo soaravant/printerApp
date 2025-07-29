@@ -7,16 +7,14 @@ import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
 import { useState, useEffect } from "react"
 
-// Shared column definition for consistent widths
+// Shared column definition with minimum widths
 const CombinedDebtColGroup = () => (
   <colgroup>
-    <col style={{ width: "12%" }} />
-    <col style={{ width: "20%" }} />
-    <col style={{ width: "20%" }} />
-    <col style={{ width: "12%" }} />
-    <col style={{ width: "12%" }} />
-    <col style={{ width: "12%" }} />
-    <col style={{ width: "12%" }} />
+    <col style={{ minWidth: "120px" }} />
+    <col style={{ minWidth: "150px" }} />
+    <col style={{ minWidth: "150px" }} />
+    <col style={{ minWidth: "200px" }} />
+    <col style={{ minWidth: "180px" }} />
   </colgroup>
 )
 
@@ -108,7 +106,7 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
   return (
     <div className="border rounded-lg">
       {/* Fixed (non-scrolling) header */}
-      <Table className="min-w-full table-fixed">
+      <Table className="min-w-full">
         <CombinedDebtColGroup />
         <TableHeader className="bg-gray-100">
           <TableRow>
@@ -116,7 +114,7 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
               sortKey="userRole"
               currentSort={sortConfig}
               onSort={handleSort}
-              className="font-medium"
+              className="font-medium text-center"
             >
               Ρόλος
             </SortableTableHeader>
@@ -124,6 +122,7 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
               sortKey="userDisplayName"
               currentSort={sortConfig}
               onSort={handleSort}
+              className="text-center"
             >
               Όνομα
             </SortableTableHeader>
@@ -131,35 +130,25 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
               sortKey="responsiblePerson"
               currentSort={sortConfig}
               onSort={handleSort}
+              className="text-center"
             >
               Υπεύθυνος
-            </SortableTableHeader>
-            <SortableTableHeader
-              sortKey="printDebt"
-              currentSort={sortConfig}
-              onSort={handleSort}
-            >
-              Εκτυπώσεις
-            </SortableTableHeader>
-            <SortableTableHeader
-              sortKey="laminationDebt"
-              currentSort={sortConfig}
-              onSort={handleSort}
-            >
-              Πλαστικοποιήσεις
             </SortableTableHeader>
             <SortableTableHeader
               sortKey="totalDebt"
               currentSort={sortConfig}
               onSort={handleSort}
             >
-              Τρέχων Χρέος
+              <div className="text-center">
+                <div>Τρέχον Χρέος/Πίστωση</div>
+                <div className="text-xs font-normal text-gray-600">ΤΟ. ΦΩ. | ΠΛΑ. ΤΟ. | Σύνολο</div>
+              </div>
             </SortableTableHeader>
             <SortableTableHeader
               sortKey="lastPayment"
               currentSort={sortConfig}
               onSort={handleSort}
-              className="whitespace-nowrap"
+              className="whitespace-nowrap text-center"
             >
               Τελευταία Εξόφληση
             </SortableTableHeader>
@@ -169,12 +158,12 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
 
       {/* Scrollable body only */}
       <div className="max-h-[400px] overflow-y-auto">
-        <Table className="min-w-full table-fixed">
+        <Table className="min-w-full">
           <CombinedDebtColGroup />
           <TableBody>
             {sortedData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                   Δεν βρέθηκαν αποτελέσματα
                 </TableCell>
               </TableRow>
@@ -189,14 +178,22 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
                   <TableCell className="text-center font-medium">{item.userRole}</TableCell>
                   <TableCell className="text-center">{item.userDisplayName}</TableCell>
                   <TableCell className="text-center">{item.responsiblePerson}</TableCell>
-                  <TableCell className={`text-center ${item.printDebt > 0 ? "text-red-600 font-semibold" : "text-green-600"}`}>
-                    {formatPrice(item.printDebt)}
-                  </TableCell>
-                  <TableCell className={`text-center ${item.laminationDebt > 0 ? "text-red-600 font-semibold" : "text-green-600"}`}>
-                    {formatPrice(item.laminationDebt)}
-                  </TableCell>
-                  <TableCell className={`text-center ${item.totalDebt > 0 ? "text-red-600 font-semibold" : "text-green-600"}`}>
-                    {formatPrice(item.totalDebt)}
+                  <TableCell className={`text-center ${item.totalDebt > 0 ? "text-red-600 font-semibold" : item.totalDebt < 0 ? "text-green-600 font-semibold" : "text-gray-600"}`}>
+                    <div className="text-center">
+                      <div className="text-sm">
+                        <span className={item.printDebt > 0 ? "text-red-600" : item.printDebt < 0 ? "text-green-600" : "text-gray-600"}>
+                          {item.printDebt > 0 ? formatPrice(item.printDebt) : item.printDebt < 0 ? `-${formatPrice(Math.abs(item.printDebt))}` : formatPrice(item.printDebt)}
+                        </span>
+                        {" | "}
+                        <span className={item.laminationDebt > 0 ? "text-red-600" : item.laminationDebt < 0 ? "text-green-600" : "text-gray-600"}>
+                          {item.laminationDebt > 0 ? formatPrice(item.laminationDebt) : item.laminationDebt < 0 ? `-${formatPrice(Math.abs(item.laminationDebt))}` : formatPrice(item.laminationDebt)}
+                        </span>
+                        {" | "}
+                        <span className={item.totalDebt > 0 ? "text-red-600" : item.totalDebt < 0 ? "text-green-600" : "text-gray-600"}>
+                          {item.totalDebt > 0 ? formatPrice(item.totalDebt) : item.totalDebt < 0 ? `-${formatPrice(Math.abs(item.totalDebt))}` : formatPrice(item.totalDebt)}
+                        </span>
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">
                     {item.lastPayment ? (

@@ -29,9 +29,9 @@ export function SortableTableHeader({
       )}
       onClick={() => onSort(sortKey)}
     >
-      <div className="flex items-center justify-center gap-1">
-        <span>{children}</span>
-        <div className="flex flex-col">
+      <div className="flex items-center justify-center gap-1 relative">
+        <span className="text-center">{children}</span>
+        <div className="flex flex-col absolute right-1">
           {!isActive ? (
             <ChevronsUpDown className="h-3 w-3 text-gray-400" />
           ) : direction === 'asc' ? (
