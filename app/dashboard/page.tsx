@@ -774,12 +774,28 @@ export default function DashboardPage() {
 
   // Calculate totals based on user debt fields
   const allUsersData = dummyDB.getUsers()
+  
+  // For the top 3 cards, show personal debts for Υπεύθυνος and Χρήστης users
+  const personalDebtUsers = user.accessLevel === "admin" 
+    ? allUsersData 
+    : allUsersData.filter(u => u.uid === user.uid) // Both Υπεύθυνος and Χρήστης see only their personal data
+  
+  // For the debt table, show different data based on access level
   const relevantUsers = user.accessLevel === "admin" 
     ? allUsersData 
-    : allUsersData.filter(u => u.uid === user.uid) // Υπεύθυνος and Χρήστης see only their personal data
+    : user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0
+      ? allUsersData.filter(u => {
+          // For individual users, check if they belong to any of the responsibleFor groups
+          if (u.userRole === "Άτομο") {
+            return u.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
+          }
+          // For groups, check if the group is in the responsibleFor list
+          return user.responsibleFor?.includes(u.displayName) || false
+        })
+      : allUsersData.filter(u => u.uid === user.uid) // Regular users (Χρήστης) see only their personal data
   
-  const printUnpaid = relevantUsers.reduce((sum, u) => sum + (u.printDebt || 0), 0)
-  const laminationUnpaid = relevantUsers.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
+  const printUnpaid = personalDebtUsers.reduce((sum, u) => sum + (u.printDebt || 0), 0)
+  const laminationUnpaid = personalDebtUsers.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
   const totalUnpaid = printUnpaid + laminationUnpaid
 
   // Calculate totals without filters for percentage calculations
@@ -950,10 +966,107 @@ export default function DashboardPage() {
       lastPayment: Date | null
     }>()
 
-    // Get all users and their debt information
-    allUsersData.forEach(userData => {
+    // For Υπεύθυνος users, first add all teams they are responsible for (even with zero debt)
+    if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+      user.responsibleFor.forEach(teamName => {
+        // Find the team entity itself (not its members)
+        const teamEntity = allUsersData.find(u => u.displayName === teamName && u.userRole === "Ομάδα")
+        
+        if (teamEntity) {
+          // Apply role filter to team entries
+          if (billingRoleFilter !== "all" && teamEntity.userRole !== billingRoleFilter) {
+            return // Skip this team if it doesn't match the role filter
+          }
+          
+          // Apply responsibleFor filter to team entries
+          if (billingResponsibleForFilter !== "all") {
+            // For teams, check if the team name matches the selected responsibleFor filter
+            if (teamEntity.displayName !== billingResponsibleForFilter) {
+              return // Skip this team if it doesn't match the responsibleFor filter
+            }
+          }
+          
+          // Use the team's own debt values, not the sum of member debts
+          const teamPrintDebt = teamEntity.printDebt || 0
+          const teamLaminationDebt = teamEntity.laminationDebt || 0
+          const teamTotalDebt = teamEntity.totalDebt || 0
+          
+          // Apply debt status filter to team entries
+          if (billingDebtFilter !== "all") {
+            const hasUnpaidDebt = (teamPrintDebt > 0) || (teamLaminationDebt > 0)
+            if (billingDebtFilter === "paid" && hasUnpaidDebt) {
+              return // Skip this team if it doesn't match the debt status filter
+            }
+            if (billingDebtFilter === "unpaid" && !hasUnpaidDebt) {
+              return // Skip this team if it doesn't match the debt status filter
+            }
+          }
+          
+          // Apply amount filter to team entries
+          if (billingAmountFilter !== "all") {
+            switch (billingAmountFilter) {
+              case "under10":
+                if (teamTotalDebt >= 10) return // Skip this team
+                break
+              case "10to50":
+                if (teamTotalDebt < 10 || teamTotalDebt > 50) return // Skip this team
+                break
+              case "over50":
+                if (teamTotalDebt <= 50) return // Skip this team
+                break
+            }
+          }
+          
+          // Apply price range filter to team entries
+          if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
+            if (teamTotalDebt < billingPriceRange[0] || teamTotalDebt > billingPriceRange[1]) {
+              return // Skip this team if it doesn't match the price range filter
+            }
+          }
+          
+          // Find the most recent payment date for this team from its own billing records
+          let lastPayment: Date | null = null
+          const teamPrintBilling = filteredPrintBilling.filter(b => b.uid === teamEntity.uid)
+          const teamLaminationBilling = filteredLaminationBilling.filter(b => b.uid === teamEntity.uid)
+          
+          teamPrintBilling.forEach(billing => {
+            if (billing.lastPayment && (!lastPayment || billing.lastPayment > lastPayment)) {
+              lastPayment = billing.lastPayment
+            }
+          })
+          
+          teamLaminationBilling.forEach(billing => {
+            if (billing.lastPayment && (!lastPayment || billing.lastPayment > lastPayment)) {
+              lastPayment = billing.lastPayment
+            }
+          })
+          
+          // Add team to the map
+          userDebtMap.set(`team-${teamName}`, {
+            uid: `team-${teamName}`,
+            userDisplayName: teamName,
+            userRole: "Ομάδα",
+            responsiblePerson: user.displayName,
+            printDebt: teamPrintDebt,
+            laminationDebt: teamLaminationDebt,
+            totalDebt: teamTotalDebt,
+            lastPayment: lastPayment
+          })
+        }
+      })
+    }
+
+    // Get all users and their debt information (skip team entries that were already added)
+    // Use relevantUsers instead of allUsersData to respect the base filtering for Υπεύθυνος users
+    relevantUsers.forEach(userData => {
       // Skip admin users from the debt table
       if (userData.accessLevel === "admin") return
+      
+      // Skip if this is a team entry that was already added for Υπεύθυνος users
+      // Note: Since we're now using relevantUsers, this check is less necessary but kept for safety
+      if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.includes(userData.displayName) && userData.userRole === "Ομάδα") {
+        return
+      }
       
       const responsiblePerson = userData.userRole === "Άτομο" 
         ? userData.displayName 
@@ -1000,20 +1113,8 @@ export default function DashboardPage() {
         shouldInclude = false
       }
       
-      // Apply base responsibleFor filter for Υπεύθυνος users (always active)
-      if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
-        // For individual users, check if they belong to any of the responsibleFor groups
-        if (userData.userRole === "Άτομο") {
-          if (!userData.memberOf?.some(group => user.responsibleFor?.includes(group))) {
-            shouldInclude = false
-          }
-        } else {
-          // For groups, check if the group is in the responsibleFor list
-          if (!user.responsibleFor?.includes(userData.displayName)) {
-            shouldInclude = false
-          }
-        }
-      }
+      // Note: Base responsibleFor filtering is already handled by relevantUsers
+      // This section is kept for the specific responsibleFor filter (when a specific tag is selected)
       
       // Apply debt status filter (check if user has any unpaid debt)
       if (billingDebtFilter !== "all") {

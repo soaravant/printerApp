@@ -24,25 +24,25 @@ export function Navigation() {
       href: "/dashboard",
       label: "Πίνακας Ελέγχου",
       icon: Printer,
-      roles: ["user", "admin", "Υπεύθυνος"],
+      roles: ["user", "admin", "Υπεύθυνος", "Χρήστης"],
     },
     {
       href: "/admin",
       label: "Διαχείριση",
       icon: Settings,
-      roles: ["admin", "Υπεύθυνος"],
+      roles: ["admin"],
     },
     {
       href: "/prices",
       label: "Τιμές",
       icon: Euro,
-      roles: ["admin"],
+      roles: ["admin", "Υπεύθυνος", "Χρήστης"],
     },
     {
       href: `/profile/${user.uid}`,
       label: "Προφίλ",
       icon: UserIcon,
-      roles: ["user", "admin", "Υπεύθυνος"],
+      roles: ["user", "admin", "Υπεύθυνος", "Χρήστης"],
     },
   ]
 

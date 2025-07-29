@@ -194,23 +194,39 @@ export const BillingFilters: React.FC<BillingFiltersProps> = ({
                     const NUM_BUCKETS = 16;
                     
                     // Calculate filtered data based only on search and role (not price range)
-                    const filteredUsersForCounts = users.filter(user => {
-                      if (user.accessLevel === "admin") return false;
+                    // Apply the same responsibleFor filtering logic as the dashboard
+                    const filteredUsersForCounts = users.filter(userData => {
+                      if (userData.accessLevel === "admin") return false;
                       
                       // Apply search filter
                       if (billingSearchTerm) {
-                        const responsiblePerson = user.userRole === "Άτομο" 
-                          ? user.displayName 
-                          : user.responsiblePerson || "-";
-                        const matchesSearch = user.displayName.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
-                                             user.userRole.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+                        const responsiblePerson = userData.userRole === "Άτομο" 
+                          ? userData.displayName 
+                          : userData.responsiblePerson || "-";
+                        const matchesSearch = userData.displayName.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+                                             userData.userRole.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
                                              responsiblePerson.toLowerCase().includes(billingSearchTerm.toLowerCase());
                         if (!matchesSearch) return false;
                       }
                       
                       // Apply role filter
-                      if (billingRoleFilter !== "all" && user.userRole !== billingRoleFilter) {
+                      if (billingRoleFilter !== "all" && userData.userRole !== billingRoleFilter) {
                         return false;
+                      }
+                      
+                      // Apply base responsibleFor filter for Υπεύθυνος users (always active)
+                      if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+                        // For individual users, check if they belong to any of the responsibleFor groups
+                        if (userData.userRole === "Άτομο") {
+                          if (!userData.memberOf?.some((group: string) => user.responsibleFor?.includes(group))) {
+                            return false;
+                          }
+                        } else {
+                          // For groups, check if the group is in the responsibleFor list
+                          if (!user.responsibleFor?.includes(userData.displayName)) {
+                            return false;
+                          }
+                        }
                       }
                       
                       return true;
@@ -294,12 +310,47 @@ export const BillingFilters: React.FC<BillingFiltersProps> = ({
                       return `${formatEuro(start)} - ${formatEuro(end)}`;
                     });
                     
-                    // Calculate counts based on the combined debt data (which already has proper filtering applied)
-                    const filteredUsersForCounts = combinedDebtData;
+                    // Use the same filteredUsersForCounts as the histogram for consistency
+                    const filteredUsersForCounts = users.filter(userData => {
+                      if (userData.accessLevel === "admin") return false;
+                      
+                      // Apply search filter
+                      if (billingSearchTerm) {
+                        const responsiblePerson = userData.userRole === "Άτομο" 
+                          ? userData.displayName 
+                          : userData.responsiblePerson || "-";
+                        const matchesSearch = userData.displayName.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+                                             userData.userRole.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+                                             responsiblePerson.toLowerCase().includes(billingSearchTerm.toLowerCase());
+                        if (!matchesSearch) return false;
+                      }
+                      
+                      // Apply role filter
+                      if (billingRoleFilter !== "all" && userData.userRole !== billingRoleFilter) {
+                        return false;
+                      }
+                      
+                      // Apply base responsibleFor filter for Υπεύθυνος users (always active)
+                      if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+                        // For individual users, check if they belong to any of the responsibleFor groups
+                        if (userData.userRole === "Άτομο") {
+                          if (!userData.memberOf?.some((group: string) => user.responsibleFor?.includes(group))) {
+                            return false;
+                          }
+                        } else {
+                          // For groups, check if the group is in the responsibleFor list
+                          if (!user.responsibleFor?.includes(userData.displayName)) {
+                            return false;
+                          }
+                        }
+                      }
+                      
+                      return true;
+                    });
                     
                     const intervalCounts = intervals.map(([start, end], i) =>
-                      filteredUsersForCounts.filter((user: any) => {
-                        const amount = user.totalDebt || 0;
+                      filteredUsersForCounts.filter((userData: any) => {
+                        const amount = userData.totalDebt || 0;
                         if (i === 0) return amount <= end;
                         if (i === 3) return amount >= start;
                         return amount > start - 0.01 && amount <= end;

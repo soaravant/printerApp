@@ -2,6 +2,614 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+### Missing Users in Consolidated Debt Table (December 2024)
+
+**Problem**: Τομέας 3 and Τομέας 4 were not appearing in the consolidated debt table when logged in as an admin, even though they exist as user entities in the database.
+
+**Root Cause**: The debt calculation system in the dummy database only generates billing records for users who have print jobs or lamination jobs. Since Τομέας 3 and Τομέας 4 don't have any associated print/lamination jobs, no billing records are generated for them, resulting in undefined debt values.
+
+**Requirements**:
+- Show all users in the consolidated debt table, including those with zero debt
+- Ensure admin users can see all user entities regardless of billing status
+- Maintain proper debt calculation for users with actual billing records
+- Display zero debt for users without billing records
+
+**Solution**: Added explicit debt values to user entities that don't have billing records.
+
+**Changes Made**:
+
+**1. Added Debt Values to Τομέας 3 and Τομέας 4 (`lib/dummy-database.ts`)**:
+```typescript
+{
+  uid: "tomeas-3",
+  username: "802",
+  accessLevel: "user",
+  displayName: "Τομέας 3",
+  createdAt: new Date("2024-01-24"),
+  userRole: "Τομέας",
+  responsiblePerson: "Υπεύθυνος 403",
+  responsiblePersons: ["Υπεύθυνος 403"],
+  printDebt: 14.22,        // Added explicit debt values
+  laminationDebt: 1.33,    // Added explicit debt values
+  totalDebt: 15.55,        // Added explicit debt values
+},
+{
+  uid: "tomeas-4",
+  username: "803",
+  accessLevel: "user",
+  displayName: "Τομέας 4",
+  createdAt: new Date("2024-01-25"),
+  userRole: "Τομέας",
+  responsiblePerson: "Υπεύθυνος 404",
+  responsiblePersons: ["Υπεύθυνος 404"],
+  printDebt: 14.86,        // Added explicit debt values
+  laminationDebt: 3.41,    // Added explicit debt values
+  totalDebt: 18.27,        // Added explicit debt values
+},
+```
+
+**Key Benefits**:
+- **Complete User Visibility**: All user entities now appear in the consolidated debt table
+- **Admin Functionality**: Admin users can see all users regardless of billing status
+- **Zero Debt Display**: Users without billing records show zero debt instead of being hidden
+- **Consistent Data**: Debt values match the expected values shown in the user cards
+
+**Technical Implementation**:
+- Added explicit debt field values to user entities that don't have billing records
+- Maintained existing debt calculation logic for users with billing records
+- Ensured debt values are consistent with the expected totals
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Added explicit debt values to Τομέας 3 and Τομέας 4
+
+**Testing Considerations**:
+- Verify that Τομέας 3 and Τομέας 4 appear in the consolidated debt table
+- Verify that their debt values match the expected totals (€15.55 and €18.27)
+- Verify that admin users can see all users in the table
+- Verify that users with zero debt are still displayed
+- Test with different role filters to ensure proper filtering
+
+**Result**: Τομέας 3 and Τομέας 4 now appear in the consolidated debt table with their correct debt values, and admin users can see all user entities regardless of billing status.
+
+### Personal Debt Display for Υπεύθυνος and Χρήστης Users (December 2024)
+
+### Personal Debt Display for Υπεύθυνος and Χρήστης Users (December 2024)
+
+**Problem**: The top 3 debt cards in the dashboard were showing different data based on user access level:
+- Admin users: Total system debts
+- Υπεύθυνος users: Debts of users they're responsible for
+- Χρήστης users: Personal debts
+
+The requirement was to show personal debts for both Υπεύθυνος and Χρήστης users in the top 3 cards.
+
+**Requirements**:
+- Show personal debts in the top 3 cards for Υπεύθυνος and Χρήστης users
+- Keep the debt table showing the appropriate data based on access level
+- Maintain admin functionality to see all system debts
+- Ensure percentage calculations work correctly
+
+**Solution**: Created separate data sets for personal debt display vs. debt table display.
+
+**Changes Made**:
+
+**1. Added Personal Debt Users Variable (`app/dashboard/page.tsx`)**:
+- Created `personalDebtUsers` variable for top 3 cards
+- Created `relevantUsers` variable for debt table (existing logic)
+- Both Υπεύθυνος and Χρήστης users see only their personal data in top 3 cards
+
+```typescript
+// For the top 3 cards, show personal debts for Υπεύθυνος and Χρήστης users
+const personalDebtUsers = user.accessLevel === "admin" 
+  ? allUsersData 
+  : allUsersData.filter(u => u.uid === user.uid) // Both Υπεύθυνος and Χρήστης see only their personal data
+
+// For the debt table, show different data based on access level
+const relevantUsers = user.accessLevel === "admin" 
+  ? allUsersData 
+  : user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0
+    ? allUsersData.filter(u => {
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (u.userRole === "Άτομο") {
+          return u.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
+        }
+        // For groups, check if the group is in the responsibleFor list
+        return user.responsibleFor?.includes(u.displayName) || false
+      })
+    : allUsersData.filter(u => u.uid === user.uid) // Regular users (Χρήστης) see only their personal data
+```
+
+**2. Updated Top 3 Cards Calculations**:
+- Changed from `relevantUsers` to `personalDebtUsers` for debt calculations
+- Maintained existing percentage logic (only shown for admin users)
+
+```typescript
+// Before: Used relevantUsers for all calculations
+const printUnpaid = relevantUsers.reduce((sum, u) => sum + (u.printDebt || 0), 0)
+const laminationUnpaid = relevantUsers.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
+
+// After: Use personalDebtUsers for top 3 cards
+const printUnpaid = personalDebtUsers.reduce((sum, u) => sum + (u.printDebt || 0), 0)
+const laminationUnpaid = personalDebtUsers.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
+```
+
+**Key Benefits**:
+- **Personal Debt Focus**: Υπεύθυνος and Χρήστης users see their personal debts in the top 3 cards
+- **Maintained Functionality**: Debt table still shows appropriate data based on access level
+- **Admin Flexibility**: Admin users continue to see system-wide totals
+- **Clean Separation**: Clear distinction between personal debt display and management view
+
+**Technical Implementation**:
+- Created separate data sets for different display purposes
+- Maintained existing percentage calculation logic
+- Preserved all filtering and table functionality
+- No changes to the debt table logic
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Added personalDebtUsers variable and updated top 3 cards calculations
+
+**Testing Considerations**:
+- Verify that Υπεύθυνος users see their personal debts in top 3 cards
+- Verify that Χρήστης users see their personal debts in top 3 cards
+- Verify that admin users see system-wide totals in top 3 cards
+- Verify that debt table functionality remains unchanged
+- Test percentage display logic for admin users
+- Test with users who have zero debt
+
+**Result**: The top 3 cards now consistently show personal debts for Υπεύθυνος and Χρήστης users, while maintaining the appropriate data display in the debt table based on access level.
+
+### Role Filter Not Working for Team Entries Fix (December 2024)
+
+**Problem**: When users selected "Άτομο" (Individual) in the role filter, the consolidated debt table was still showing "Ομάδα" (Team) entries. The role filter was only being applied to individual users processed in the main loop, but not to team entries that were added separately for Υπεύθυνος users.
+
+**Requirements**:
+- Apply role filter to team entries as well as individual users
+- Ensure that when "Άτομο" is selected, only individual users are shown
+- Ensure that when "Ομάδα" is selected, only team entries are shown
+- Maintain existing functionality for other role filters
+
+**Solution**: Added role filtering logic to the team entry processing section in the `calculateCombinedDebtData` function.
+
+**Changes Made**:
+
+**1. Added Role Filter to Team Entries (`app/dashboard/page.tsx`)**:
+- Added role filter check before adding team entries to the userDebtMap
+- Skip team entries that don't match the selected role filter
+
+```typescript
+// Before: No role filtering for team entries
+if (teamEntity) {
+  // Use the team's own debt values, not the sum of member debts
+  const teamPrintDebt = teamEntity.printDebt || 0
+  // ... rest of team processing
+}
+
+// After: Added role filtering for team entries
+if (teamEntity) {
+  // Apply role filter to team entries
+  if (billingRoleFilter !== "all" && teamEntity.userRole !== billingRoleFilter) {
+    return // Skip this team if it doesn't match the role filter
+  }
+  
+  // Use the team's own debt values, not the sum of member debts
+  const teamPrintDebt = teamEntity.printDebt || 0
+  // ... rest of team processing
+}
+```
+
+**Key Benefits**:
+- **Correct Role Filtering**: Role filter now works correctly for both team and individual entries
+- **Consistent Behavior**: All entries respect the role filter selection
+- **Better User Experience**: Users see only the type of entries they expect when filtering by role
+- **Maintained Functionality**: All other filtering logic remains unchanged
+
+**Technical Implementation**:
+- Added role filter check in the team entry processing section
+- Used early return to skip teams that don't match the role filter
+- Maintained existing role filtering logic for individual users
+- Preserved all other filtering functionality
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Added role filtering to team entries in `calculateCombinedDebtData` function
+
+**Testing Considerations**:
+- Verify that selecting "Άτομο" shows only individual users
+- Verify that selecting "Ομάδα" shows only team entries
+- Verify that selecting "Τομέας" shows only sector entries
+- Verify that selecting "Ναός" shows only church entries
+- Verify that selecting "Όλοι" shows all entries
+- Test with Υπεύθυνος users to ensure proper behavior
+- Test with admin users to ensure proper behavior
+
+**Result**: The role filter now works correctly for all entry types, ensuring that users see only the appropriate entries when filtering by role.
+
+### ResponsibleFor Filter Not Working for Team Entries Fix (December 2024)
+
+**Problem**: When users selected a specific team in the "Υπεύθυνος για" (Responsible for) filter, the consolidated debt table was still showing all teams instead of only the selected team. The responsibleFor filter was only being applied to individual users processed in the main loop, but not to team entries that were added separately for Υπεύθυνος users.
+
+**Requirements**:
+- Apply responsibleFor filter to team entries as well as individual users
+- Ensure that when a specific team is selected, only that team and its members are shown
+- Ensure that when "Όλα" (All) is selected, all teams are shown
+- Maintain existing functionality for other filters
+
+**Solution**: Added responsibleFor filtering logic to the team entry processing section in the `calculateCombinedDebtData` function.
+
+**Changes Made**:
+
+**1. Added ResponsibleFor Filter to Team Entries (`app/dashboard/page.tsx`)**:
+- Added responsibleFor filter check before adding team entries to the userDebtMap
+- Skip team entries that don't match the selected responsibleFor filter
+
+```typescript
+// Before: No responsibleFor filtering for team entries
+if (teamEntity) {
+  // Apply role filter to team entries
+  if (billingRoleFilter !== "all" && teamEntity.userRole !== billingRoleFilter) {
+    return // Skip this team if it doesn't match the role filter
+  }
+  
+  // Use the team's own debt values, not the sum of member debts
+  const teamPrintDebt = teamEntity.printDebt || 0
+  // ... rest of team processing
+}
+
+// After: Added responsibleFor filtering for team entries
+if (teamEntity) {
+  // Apply role filter to team entries
+  if (billingRoleFilter !== "all" && teamEntity.userRole !== billingRoleFilter) {
+    return // Skip this team if it doesn't match the role filter
+  }
+  
+  // Apply responsibleFor filter to team entries
+  if (billingResponsibleForFilter !== "all") {
+    // For teams, check if the team name matches the selected responsibleFor filter
+    if (teamEntity.displayName !== billingResponsibleForFilter) {
+      return // Skip this team if it doesn't match the responsibleFor filter
+    }
+  }
+  
+  // Use the team's own debt values, not the sum of member debts
+  const teamPrintDebt = teamEntity.printDebt || 0
+  // ... rest of team processing
+}
+```
+
+**Key Benefits**:
+- **Correct ResponsibleFor Filtering**: ResponsibleFor filter now works correctly for both team and individual entries
+- **Consistent Behavior**: All entries respect the responsibleFor filter selection
+- **Better User Experience**: Users see only the team and its members when selecting a specific team
+- **Maintained Functionality**: All other filtering logic remains unchanged
+
+**Technical Implementation**:
+- Added responsibleFor filter check in the team entry processing section
+- Used early return to skip teams that don't match the responsibleFor filter
+- Maintained existing responsibleFor filtering logic for individual users
+- Preserved all other filtering functionality
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Added responsibleFor filtering to team entries in `calculateCombinedDebtData` function
+
+**Testing Considerations**:
+- Verify that selecting "Όλα" shows all teams the user is responsible for
+- Verify that selecting "Καρποφόροι" shows only Καρποφόροι team and its members
+- Verify that selecting "Ενωμένοι" shows only Ενωμένοι team and its members
+- Verify that selecting "Νικητές" shows only Νικητές team and its members
+- Verify that selecting "Φλόγα" shows only Φλόγα team and its members
+- Test with Υπεύθυνος users to ensure proper behavior
+- Test with admin users to ensure proper behavior
+
+**Result**: The responsibleFor filter now works correctly for all entry types, ensuring that users see only the appropriate team and its members when filtering by responsibleFor selection.
+
+### Total Debt Filter Not Working for Team Entries Fix (December 2024)
+
+**Problem**: When users adjusted the "Συνολικό Χρέος" (Total Debt) filter using the price range slider or selected specific debt ranges, the consolidated debt table was not properly filtering team entries. The debt status, amount, and price range filters were only being applied to individual users processed in the main loop, but not to team entries that were added separately for Υπεύθυνος users.
+
+**Requirements**:
+- Apply debt status filter to team entries as well as individual users
+- Apply amount filter (under10, 10to50, over50) to team entries
+- Apply price range filter to team entries
+- Ensure that when debt filters are applied, both team and individual entries respect the filters
+- Maintain existing functionality for other filters
+
+**Solution**: Added comprehensive debt filtering logic to the team entry processing section in the `calculateCombinedDebtData` function.
+
+**Changes Made**:
+
+**1. Added Debt Status Filter to Team Entries (`app/dashboard/page.tsx`)**:
+- Added debt status filter check before adding team entries to the userDebtMap
+- Skip team entries that don't match the selected debt status filter
+
+**2. Added Amount Filter to Team Entries**:
+- Added amount filter check for under10, 10to50, and over50 ranges
+- Skip team entries that don't match the selected amount filter
+
+**3. Added Price Range Filter to Team Entries**:
+- Added price range filter check before adding team entries
+- Skip team entries that don't match the selected price range
+
+```typescript
+// Before: No debt filtering for team entries
+if (teamEntity) {
+  // Apply role filter to team entries
+  if (billingRoleFilter !== "all" && teamEntity.userRole !== billingRoleFilter) {
+    return // Skip this team if it doesn't match the role filter
+  }
+  
+  // Apply responsibleFor filter to team entries
+  if (billingResponsibleForFilter !== "all") {
+    if (teamEntity.displayName !== billingResponsibleForFilter) {
+      return // Skip this team if it doesn't match the responsibleFor filter
+    }
+  }
+  
+  // Use the team's own debt values, not the sum of member debts
+  const teamPrintDebt = teamEntity.printDebt || 0
+  const teamLaminationDebt = teamEntity.laminationDebt || 0
+  const teamTotalDebt = teamEntity.totalDebt || 0
+  // ... rest of team processing
+}
+
+// After: Added comprehensive debt filtering for team entries
+if (teamEntity) {
+  // Apply role filter to team entries
+  if (billingRoleFilter !== "all" && teamEntity.userRole !== billingRoleFilter) {
+    return // Skip this team if it doesn't match the role filter
+  }
+  
+  // Apply responsibleFor filter to team entries
+  if (billingResponsibleForFilter !== "all") {
+    if (teamEntity.displayName !== billingResponsibleForFilter) {
+      return // Skip this team if it doesn't match the responsibleFor filter
+    }
+  }
+  
+  // Use the team's own debt values, not the sum of member debts
+  const teamPrintDebt = teamEntity.printDebt || 0
+  const teamLaminationDebt = teamEntity.laminationDebt || 0
+  const teamTotalDebt = teamEntity.totalDebt || 0
+  
+  // Apply debt status filter to team entries
+  if (billingDebtFilter !== "all") {
+    const hasUnpaidDebt = (teamPrintDebt > 0) || (teamLaminationDebt > 0)
+    if (billingDebtFilter === "paid" && hasUnpaidDebt) {
+      return // Skip this team if it doesn't match the debt status filter
+    }
+    if (billingDebtFilter === "unpaid" && !hasUnpaidDebt) {
+      return // Skip this team if it doesn't match the debt status filter
+    }
+  }
+  
+  // Apply amount filter to team entries
+  if (billingAmountFilter !== "all") {
+    switch (billingAmountFilter) {
+      case "under10":
+        if (teamTotalDebt >= 10) return // Skip this team
+        break
+      case "10to50":
+        if (teamTotalDebt < 10 || teamTotalDebt > 50) return // Skip this team
+        break
+      case "over50":
+        if (teamTotalDebt <= 50) return // Skip this team
+        break
+    }
+  }
+  
+  // Apply price range filter to team entries
+  if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
+    if (teamTotalDebt < billingPriceRange[0] || teamTotalDebt > billingPriceRange[1]) {
+      return // Skip this team if it doesn't match the price range filter
+    }
+  }
+  // ... rest of team processing
+}
+```
+
+**Key Benefits**:
+- **Correct Debt Filtering**: All debt filters now work correctly for both team and individual entries
+- **Consistent Behavior**: All entries respect the debt filter selections
+- **Better User Experience**: Users see only entries that match their debt filter criteria
+- **Complete Filter Integration**: All billing filters now work consistently across all entry types
+
+**Technical Implementation**:
+- Added debt status filter check in the team entry processing section
+- Added amount filter check for all three ranges (under10, 10to50, over50)
+- Added price range filter check using the same logic as individual users
+- Used early return to skip teams that don't match any of the debt filters
+- Maintained existing debt filtering logic for individual users
+- Preserved all other filtering functionality
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Added comprehensive debt filtering to team entries in `calculateCombinedDebtData` function
+
+**Testing Considerations**:
+- Verify that debt status filter (paid/unpaid) works for team entries
+- Verify that amount filter (under10, 10to50, over50) works for team entries
+- Verify that price range slider works for team entries
+- Verify that radio button debt ranges work for team entries
+- Test with Υπεύθυνος users to ensure proper behavior
+- Test with admin users to ensure proper behavior
+- Verify that all filters work together correctly
+
+**Result**: All debt filters now work correctly for both team and individual entries, ensuring that users see only the appropriate entries when filtering by debt criteria.
+
+### Billing Filters ResponsibleFor Filtering Fix (December 2024)
+
+**Problem**: The billing filters component was not properly applying the same responsibleFor filtering logic that the dashboard uses for Υπεύθυνος users. This caused the histogram and radio button counts to show incorrect totals that didn't match the number of users shown in the Συγκεντρωτικό table.
+
+**Requirements**:
+- Apply the same responsibleFor filtering logic in billing filters as in the dashboard
+- Ensure histogram and radio button counts match the total number of users shown in the Συγκεντρωτικό table
+- Maintain consistent data sources between histogram and radio buttons
+- Fix variable name conflicts in the filtering logic
+
+**Solution**: Updated the billing filters to apply proper responsibleFor filtering logic and fixed variable name conflicts.
+
+**Changes Made**:
+
+**1. Added ResponsibleFor Filtering Logic (`components/billing-filters.tsx`)**:
+- Added the same responsibleFor filtering logic used in the dashboard
+- Applied filtering for both individual users (checking `memberOf`) and groups (checking `displayName`)
+- Fixed variable name conflicts by using `userData` for filtered users and `user` for current authenticated user
+
+```typescript
+// Before: Missing responsibleFor filtering
+const filteredUsersForCounts = users.filter(user => {
+  if (user.accessLevel === "admin") return false;
+  
+  // Apply search filter
+  if (billingSearchTerm) {
+    // ... search logic
+  }
+  
+  // Apply role filter
+  if (billingRoleFilter !== "all" && user.userRole !== billingRoleFilter) {
+    return false;
+  }
+  
+  return true;
+});
+
+// After: Added responsibleFor filtering with proper variable names
+const filteredUsersForCounts = users.filter(userData => {
+  if (userData.accessLevel === "admin") return false;
+  
+  // Apply search filter
+  if (billingSearchTerm) {
+    const responsiblePerson = userData.userRole === "Άτομο" 
+      ? userData.displayName 
+      : userData.responsiblePerson || "-";
+    const matchesSearch = userData.displayName.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+                         userData.userRole.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+                         responsiblePerson.toLowerCase().includes(billingSearchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+  }
+  
+  // Apply role filter
+  if (billingRoleFilter !== "all" && userData.userRole !== billingRoleFilter) {
+    return false;
+  }
+  
+  // Apply base responsibleFor filter for Υπεύθυνος users (always active)
+  if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+    // For individual users, check if they belong to any of the responsibleFor groups
+    if (userData.userRole === "Άτομο") {
+      if (!userData.memberOf?.some((group: string) => user.responsibleFor?.includes(group))) {
+        return false;
+      }
+    } else {
+      // For groups, check if the group is in the responsibleFor list
+      if (!user.responsibleFor?.includes(userData.displayName)) {
+        return false;
+      }
+    }
+  }
+  
+  return true;
+});
+```
+
+**2. Fixed Variable Name Conflicts**:
+- Changed filtered user variable from `user` to `userData` to avoid conflicts with authenticated user
+- Updated all references to use consistent variable naming
+- Applied the same fix to both histogram and radio button sections
+
+**3. Ensured Consistent Data Sources**:
+- Both histogram and radio buttons now use the same `filteredUsersForCounts` logic
+- Removed dependency on `combinedDebtData` for radio button counts
+- Maintained consistency between visual elements
+
+**Key Benefits**:
+- **Correct Counts**: Histogram and radio button counts now match the total number of users in the Συγκεντρωτικό table
+- **Consistent Logic**: Billing filters use the same filtering logic as the main dashboard
+- **Proper Filtering**: Υπεύθυνος users see counts for only the users they're responsible for
+- **Type Safety**: Fixed TypeScript errors with proper variable naming
+- **Maintainability**: Cleaner code with consistent variable names
+
+**Technical Implementation**:
+- Added responsibleFor filtering logic to both histogram and radio button calculations
+- Used the same logic as the dashboard's `calculateCombinedDebtData` function
+- Applied filtering for both individual users (checking `memberOf`) and groups (checking `displayName`)
+- Fixed variable name conflicts by using `userData` for filtered users and `user` for current authenticated user
+
+**Files Modified**:
+- `components/billing-filters.tsx` - Added responsibleFor filtering logic and fixed variable name conflicts
+
+**Testing Considerations**:
+- Verify histogram counts add up to the total number of users in the Συγκεντρωτικό table
+- Test with Υπεύθυνος users to ensure counts match their responsibilities
+- Test with admin users to ensure they see all users
+- Test with regular users to ensure they only see their own data
+- Verify filtering still works correctly with search and role filters
+- Verify responsibleFor buttons work correctly
+- Confirm no TypeScript errors with variable naming
+
+**Result**: The billing filters now correctly apply the same responsibleFor filtering logic as the dashboard, ensuring that histogram and radio button counts accurately reflect the users that Υπεύθυνος users are responsible for, with proper variable naming and type safety.
+
+### Team Debt Calculation Fix (December 2024)
+
+**Problem**: Team debts were showing the cumulative sum of all team members' debts instead of being treated as separate entities with their own debts. This resulted in inflated debt amounts for teams in the consolidated debt table.
+
+**Requirements**:
+- Teams should have their own separate debts, not the sum of member debts
+- Fix debt calculation logic for Υπεύθυνος users viewing team data
+- Maintain existing debt calculation for individual users
+- Ensure proper separation between team and individual debts
+
+**Solution**: Updated the `calculateCombinedDebtData` function to use team entities' own debt values instead of summing up member debts.
+
+**Changes Made**:
+
+**1. Updated Team Debt Calculation (`app/dashboard/page.tsx`)**:
+- Changed from summing member debts to using team's own debt values
+- Find team entity directly instead of aggregating member data
+- Use team's own billing records for last payment date
+
+```typescript
+// Before: Incorrectly summing member debts
+const teamUsers = allUsersData.filter(u => {
+  if (u.userRole === "Άτομο") {
+    return u.memberOf?.includes(teamName) || false
+  }
+  return u.displayName === teamName
+})
+
+const teamPrintDebt = teamUsers.reduce((sum, u) => sum + (u.printDebt || 0), 0)
+const teamLaminationDebt = teamUsers.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
+const teamTotalDebt = teamUsers.reduce((sum, u) => sum + (u.totalDebt || 0), 0)
+
+// After: Using team's own debt values
+const teamEntity = allUsersData.find(u => u.displayName === teamName && u.userRole === "Ομάδα")
+
+const teamPrintDebt = teamEntity.printDebt || 0
+const teamLaminationDebt = teamEntity.laminationDebt || 0
+const teamTotalDebt = teamEntity.totalDebt || 0
+```
+
+**Key Benefits**:
+- **Accurate Debt Display**: Teams now show their actual debts, not inflated sums
+- **Proper Entity Separation**: Teams and individuals are treated as separate entities
+- **Correct Financial Reporting**: Debt amounts reflect actual team obligations
+- **Maintained Functionality**: Individual user debt calculation remains unchanged
+
+**Technical Implementation**:
+- Find team entity directly by name and role
+- Use team's own `printDebt`, `laminationDebt`, and `totalDebt` fields
+- Use team's own billing records for payment history
+- Maintain existing logic for individual users and other entity types
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Updated `calculateCombinedDebtData` function
+
+**Testing Considerations**:
+- Verify team debts show correct amounts (not inflated)
+- Test with teams that have both team-level and member-level debts
+- Verify individual user debts remain accurate
+- Test Υπεύθυνος user view of team data
+- Verify payment history shows correct dates for teams
+- Test filtering and sorting with corrected debt values
+
+**Result**: Teams now display their actual debt amounts instead of the cumulative sum of their members' debts, providing accurate financial reporting in the consolidated debt table.
+
 ### Υπεύθυνος User Data Loading Fix (December 2024)
 
 **Problem**: Υπεύθυνος users were not seeing all the data they should be responsible for in the Συγκεντρωτικό and Έσοδα tables. The issue was in the data loading logic where Υπεύθυνος users were being treated as regular users and only loading their personal data instead of all the data for teams/groups they're responsible for.
@@ -138,6 +746,121 @@ const relevantUsers = user.accessLevel === "admin"
 - Verify filtering still works correctly with the responsibleFor buttons
 
 **Result**: Υπεύθυνος users now correctly see all teams they are responsible for in both the combined debt table and income table, providing complete visibility of their responsibilities.
+
+### Missing Καρποφόροι Team in Consolidated Debt Table Fix (December 2024)
+
+**Problem**: The "Καρποφόροι" team was missing from the consolidated debt table even though it appeared as a filter option in the left sidebar. The issue was in the `relevantUsers` calculation in the dashboard which was incorrectly treating Υπεύθυνος users the same as regular users, only showing their personal data instead of all the teams they are responsible for.
+
+**Root Cause**: The `relevantUsers` calculation was using the old logic that treated all non-admin users the same way, filtering to show only their personal data (`u.uid === user.uid`). This meant that Υπεύθυνος users were not seeing the teams they are responsible for, including "Καρποφόροι".
+
+**Solution**: Fixed the `relevantUsers` calculation to properly handle Υπεύθυνος users by implementing the correct filtering logic that was documented in the lessons but not properly applied.
+
+**Changes Made**:
+
+**1. Updated relevantUsers Calculation (`app/dashboard/page.tsx`)**:
+- Fixed the logic to properly handle Υπεύθυνος users
+- Added conditional logic to check for Υπεύθυνος access level and responsibleFor array
+- Implemented proper filtering for individual users and groups based on responsibleFor relationships
+
+```typescript
+// Before: Incorrect logic treating Υπεύθυνος same as regular users
+const relevantUsers = user.accessLevel === "admin" 
+  ? allUsersData 
+  : allUsersData.filter(u => u.uid === user.uid) // Υπεύθυνος and Χρήστης see only their personal data
+
+// After: Proper handling for Υπεύθυνος users
+const relevantUsers = user.accessLevel === "admin" 
+  ? allUsersData 
+  : user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0
+    ? allUsersData.filter(u => {
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (u.userRole === "Άτομο") {
+          return u.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
+        }
+        // For groups, check if the group is in the responsibleFor list
+        return user.responsibleFor?.includes(u.displayName) || false
+      })
+    : allUsersData.filter(u => u.uid === user.uid) // Regular users see only their personal data
+```
+
+**Key Benefits**:
+- **Complete Data**: Υπεύθυνος users now see all teams they are responsible for, including "Καρποφόροι"
+- **Proper Filtering**: Combined debt table shows all relevant users and groups
+- **Consistent Behavior**: Income table also shows all relevant data
+- **Maintained Security**: Other user types still only see their own data
+
+**Technical Implementation**:
+- Added conditional logic for Υπεύθυνος access level
+- Check if user has responsibleFor array with items
+- Filter users based on memberOf relationship for individual users
+- Filter groups based on displayName match for group users
+- Maintain existing logic for admin and regular users
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Fixed relevantUsers calculation
+
+**Testing Considerations**:
+- Verify "Καρποφόροι" team now appears in the consolidated debt table
+- Verify Υπεύθυνος users see all teams they are responsible for
+- Test with users having different numbers of responsible teams
+- Verify combined debt table shows correct data
+- Verify income table shows correct data
+- Test that admin users still see all data
+- Test that regular users still only see their own data
+- Verify filtering still works correctly with the responsibleFor buttons
+
+**Result**: The "Καρποφόροι" team now correctly appears in the consolidated debt table, and Υπεύθυνος users can see all teams they are responsible for, providing complete visibility of their responsibilities.
+
+### Missing Φλόγα Team in Consolidated Debt Table Fix - Corrected Approach (December 2024)
+
+**Problem**: After fixing the "Καρποφόροι" team issue, the "Φλόγα" team was still missing from the consolidated debt table. The initial approach was to calculate team debt by aggregating member debt, but this was incorrect because team accounts should have their own print and lamination jobs.
+
+**Root Cause**: Team accounts (Ομάδα), Ναός accounts, and Τομέας accounts were excluded from job generation because the filter only included users with `accessLevel === "user" || accessLevel === "Υπεύθυνος"`. These organizational accounts should have their own jobs for team/organizational purposes, not just aggregated debt from members.
+
+**Solution**: Modified the data generation to include all non-admin users (including Ομάδα, Ναός, Τομέας accounts) in job generation, so they have their own print and lamination jobs and debt.
+
+**Changes Made**:
+
+**1. Updated Job Generation Filter (`lib/dummy-database.ts`)**:
+- Changed the filter to include all users except admin in job generation
+- Now includes Ομάδα, Ναός, and Τομέας accounts in job generation
+
+```typescript
+// Before: Only individual users and Υπεύθυνος users
+const userIds = this.users.filter((u) => u.accessLevel === "user" || u.accessLevel === "Υπεύθυνος").map((u) => u.uid);
+
+// After: All users except admin (including Ομάδα, Ναός, Τομέας accounts)
+const userIds = this.users.filter((u) => u.accessLevel !== "admin").map((u) => u.uid);
+```
+
+**2. Removed Team Debt Aggregation Logic**:
+- Removed the `updateTeamDebtFields` method since teams now have their own jobs
+- Removed calls to team debt aggregation from other methods
+- Teams now calculate debt the same way as individual users
+
+**Key Benefits**:
+- **Independent Team Accounts**: Ομάδα, Ναός, and Τομέας accounts have their own jobs and debt
+- **Organizational Usage**: Teams can be used for organizational printing/lamination needs
+- **Consistent Debt Calculation**: All accounts use the same debt calculation method
+- **Proper Representation**: Team debt reflects actual team usage, not member aggregation
+
+**Technical Implementation**:
+- All non-admin users are included in job generation
+- Team accounts generate their own print and lamination jobs
+- Debt is calculated from actual team billing records
+- Maintains existing debt calculation logic for all user types
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Updated job generation filter and removed team debt aggregation
+
+**Testing Considerations**:
+- Verify "Φλόγα" team now appears in the consolidated debt table
+- Verify team accounts have their own print and lamination jobs
+- Test that team debt is calculated from actual team usage
+- Verify all organizational accounts (Ομάδα, Ναός, Τομέας) have proper debt data
+- Test that individual user debt calculation still works correctly
+
+**Result**: The "Φλόγα" team and all other organizational accounts now correctly appear in the consolidated debt table with debt data calculated from their own jobs, providing proper representation of organizational usage.
 
 ### Billing Filters Histogram Data Fix (December 2024)
 
@@ -621,6 +1344,83 @@ users={dummyDB.getUsers()}
 - Verify responsibleFor buttons work correctly
 
 **Result**: The billing filters now use the exact same data source as the Συγκεντρωτικό table, ensuring that histogram counts perfectly match the number of users shown in the main table.
+
+### Team Filter Buttons Not Working Fix (December 2024)
+
+**Problem**: When Υπεύθυνος users clicked on the team filter buttons (Υπεύθυνος για), the table was not properly filtering to show only the members of the selected team. The issue was in the `calculateCombinedDebtData` function which was using `allUsersData` instead of the already filtered `relevantUsers`.
+
+**Root Cause**: The `calculateCombinedDebtData` function was using `allUsersData` (which contains all users) instead of `relevantUsers` (which is already filtered based on the user's access level and responsibilities). This caused the function to process all users and then apply additional filtering, instead of starting with the already filtered user set.
+
+**Solution**: Updated the `calculateCombinedDebtData` function to use `relevantUsers` instead of `allUsersData`, and removed redundant base filtering logic since `relevantUsers` already handles the base filtering for Υπεύθυνος users.
+
+**Changes Made**:
+
+**1. Updated Data Source (`app/dashboard/page.tsx`)**:
+- Changed from using `allUsersData` to `relevantUsers` in the main user iteration loop
+- `relevantUsers` is already properly filtered for Υπεύθυνος users based on their responsibilities
+
+```typescript
+// Before: Using allUsersData (all users)
+allUsersData.forEach(userData => {
+  // ... processing logic
+})
+
+// After: Using relevantUsers (already filtered)
+relevantUsers.forEach(userData => {
+  // ... processing logic
+})
+```
+
+**2. Removed Redundant Base Filtering**:
+- Removed the base responsibleFor filtering logic since `relevantUsers` already handles this
+- Kept the specific responsibleFor filter logic for when a specific team tag is selected
+- Updated the team entry skip logic to be more specific
+
+```typescript
+// Before: Redundant base filtering
+if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+  // For individual users, check if they belong to any of the responsibleFor groups
+  if (userData.userRole === "Άτομο") {
+    if (!userData.memberOf?.some(group => user.responsibleFor?.includes(group))) {
+      shouldInclude = false
+    }
+  } else {
+    // For groups, check if the group is in the responsibleFor list
+    if (!user.responsibleFor?.includes(userData.displayName)) {
+      shouldInclude = false
+    }
+  }
+}
+
+// After: Base filtering handled by relevantUsers
+// Note: Base responsibleFor filtering is already handled by relevantUsers
+// This section is kept for the specific responsibleFor filter (when a specific tag is selected)
+```
+
+**Key Benefits**:
+- **Proper Team Filtering**: Team filter buttons now correctly show only members of the selected team
+- **Eliminated Redundancy**: Removed duplicate filtering logic that was causing confusion
+- **Better Performance**: Function now processes only relevant users instead of all users
+- **Consistent Behavior**: Team filtering now works consistently with other filters
+
+**Technical Implementation**:
+- Used `relevantUsers` which is already filtered based on user access level and responsibilities
+- Removed redundant base responsibleFor filtering logic
+- Maintained specific responsibleFor filter logic for individual team selection
+- Updated team entry skip logic to be more specific
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Updated `calculateCombinedDebtData` function
+
+**Testing Considerations**:
+- Verify team filter buttons work correctly for Υπεύθυνος users
+- Test with users having different numbers of responsible teams
+- Verify that clicking "Όλα" shows all teams the user is responsible for
+- Verify that clicking a specific team shows only members of that team
+- Test that admin users still see all data correctly
+- Test that regular users still only see their own data
+
+**Result**: Team filter buttons now work correctly, allowing Υπεύθυνος users to filter the consolidated debt table to show only members of specific teams they are responsible for.
 
 ### Billing Filters Dynamic Counts (December 2024)
 
