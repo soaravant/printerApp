@@ -139,21 +139,47 @@ const USER_PASSWORDS: Record<string, string> = {
   "507": "507", // Ομάδα Σύμψυχοι
 }
 
+// Cookie utility functions
+const setCookie = (name: string, value: string, days: number = 7) => {
+  if (typeof window === "undefined") return
+  
+  const expires = new Date()
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`
+}
+
+const getCookie = (name: string): string | null => {
+  if (typeof window === "undefined") return null
+  
+  const nameEQ = name + "="
+  const ca = document.cookie.split(';')
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i]
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length)
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length)
+  }
+  return null
+}
+
+const deleteCookie = (name: string) => {
+  if (typeof window === "undefined") return
+  
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check if user is logged in from localStorage
-    if (typeof window !== "undefined") {
-      const savedUserId = localStorage.getItem("currentUserId")
-      if (savedUserId) {
-        const savedUser = dummyDB.getUserById(savedUserId)
-        if (savedUser) {
-          setUser(savedUser)
-        } else {
-          localStorage.removeItem("currentUserId")
-        }
+    // Check if user is logged in from cookies
+    const savedUserId = getCookie("currentUserId")
+    if (savedUserId) {
+      const savedUser = dummyDB.getUserById(savedUserId)
+      if (savedUser) {
+        setUser(savedUser)
+      } else {
+        deleteCookie("currentUserId")
       }
     }
     setLoading(false)
@@ -166,9 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const user = dummyDB.getUserByUsername(username)
       if (user) {
         setUser(user)
-        if (typeof window !== "undefined") {
-          localStorage.setItem("currentUserId", user.uid)
-        }
+        setCookie("currentUserId", user.uid)
         return true
       }
     }
@@ -178,9 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setUser(null)
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("currentUserId")
-    }
+    deleteCookie("currentUserId")
   }
 
   return <AuthContext.Provider value={{ user, loading, signIn, logout }}>{children}</AuthContext.Provider>

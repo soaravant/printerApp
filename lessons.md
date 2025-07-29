@@ -2,6 +2,869 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+### Υπεύθυνος User Data Loading Fix (December 2024)
+
+**Problem**: Υπεύθυνος users were not seeing all the data they should be responsible for in the Συγκεντρωτικό and Έσοδα tables. The issue was in the data loading logic where Υπεύθυνος users were being treated as regular users and only loading their personal data instead of all the data for teams/groups they're responsible for.
+
+**Requirements**:
+- Fix data loading for Υπεύθυνος users to show all teams they are responsible for
+- Ensure combined debt table shows all relevant users/groups
+- Ensure income table shows all relevant users/groups
+- Maintain existing filtering logic for other user types
+
+**Solution**: Updated the data loading logic to properly handle Υπεύθυνος users by loading all data and then applying the responsibleFor filtering in the applyFilters function.
+
+**Changes Made**:
+
+**1. Updated Data Loading Logic (`app/dashboard/page.tsx`)**:
+- Added specific logic for Υπεύθυνος users in the useEffect
+- Load all data for Υπεύθυνος users (same as admin)
+- Apply responsibleFor filtering in the applyFilters function
+
+```typescript
+// Before: Υπεύθυνος users were treated as regular users
+} else {
+  // Regular user sees only their data
+  const pJobs = dummyDB.getPrintJobs(user.uid)
+  const lJobs = dummyDB.getLaminationJobs(user.uid)
+  const pBilling = dummyDB.getPrintBilling(user.uid)
+  const lBilling = dummyDB.getLaminationBilling(user.uid)
+  // ...
+}
+
+// After: Proper handling for Υπεύθυνος users
+} else if (user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+  // Υπεύθυνος users see data for all teams/groups they are responsible for
+  const allPrintJobs = dummyDB.getAllPrintJobs()
+  const allLaminationJobs = dummyDB.getAllLaminationJobs()
+  const allPrintBilling = dummyDB.getAllPrintBilling()
+  const allLaminationBilling = dummyDB.getAllLaminationBilling()
+  const users = dummyDB.getUsers()
+  // ...
+} else {
+  // Regular user sees only their data
+  // ...
+}
+```
+
+**Key Benefits**:
+- **Complete Data**: Υπεύθυνος users now see all teams they are responsible for
+- **Proper Filtering**: Combined debt table shows all relevant users and groups
+- **Consistent Behavior**: Income table also shows all relevant data
+- **Maintained Security**: Other user types still only see their own data
+
+**Technical Implementation**:
+- Added conditional logic for Υπεύθυνος access level in data loading
+- Check if user has responsibleFor array with items
+- Load all data for Υπεύθυνος users (same as admin)
+- Apply responsibleFor filtering in the applyFilters function
+- Maintain existing logic for admin and regular users
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Updated data loading logic for Υπεύθυνος users
+
+**Testing Considerations**:
+- Verify Υπεύθυνος users see all teams they are responsible for
+- Test with users having different numbers of responsible teams
+- Verify combined debt table shows correct data
+- Verify income table shows correct data
+- Test that admin users still see all data
+- Test that regular users still only see their own data
+- Verify filtering still works correctly with the responsibleFor buttons
+
+**Result**: Υπεύθυνος users now correctly see all teams they are responsible for in both the combined debt table and income table, providing complete visibility of their responsibilities.
+
+### Υπεύθυνος User Team Filtering Fix (December 2024)
+
+**Problem**: When a user with access level "Υπεύθυνος" (Responsible) was responsible for 4 teams, only 1 team was being shown in the combined debt table and income table. The issue was in the `relevantUsers` calculation which was incorrectly filtering the user data for Υπεύθυνος users.
+
+**Requirements**:
+- Fix filtering logic for Υπεύθυνος users to show all teams they are responsible for
+- Ensure combined debt table shows all relevant users/groups
+- Ensure income table shows all relevant users/groups
+- Maintain existing filtering logic for other user types
+
+**Solution**: Updated the `relevantUsers` calculation to properly handle Υπεύθυνος users by including all users and groups they are responsible for.
+
+**Changes Made**:
+
+**1. Updated relevantUsers Calculation (`app/dashboard/page.tsx`)**:
+- Added specific logic for Υπεύθυνος users
+- Include all users that belong to teams the Υπεύθυνος user is responsible for
+- Include all groups that the Υπεύθυνος user is responsible for
+
+```typescript
+// Before: Only showing current user for non-admin users
+const relevantUsers = user.accessLevel === "admin" ? allUsersData : allUsersData.filter(u => u.uid === user.uid)
+
+// After: Proper handling for Υπεύθυνος users
+const relevantUsers = user.accessLevel === "admin" 
+  ? allUsersData 
+  : user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0
+    ? allUsersData.filter(u => {
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (u.userRole === "Άτομο") {
+          return u.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
+        }
+        // For groups, check if the group is in the responsibleFor list
+        return user.responsibleFor?.includes(u.displayName) || false
+      })
+    : allUsersData.filter(u => u.uid === user.uid)
+```
+
+**Key Benefits**:
+- **Complete Data**: Υπεύθυνος users now see all teams they are responsible for
+- **Proper Filtering**: Combined debt table shows all relevant users and groups
+- **Consistent Behavior**: Income table also shows all relevant data
+- **Maintained Security**: Other user types still only see their own data
+
+**Technical Implementation**:
+- Added conditional logic for Υπεύθυνος access level
+- Check if user has responsibleFor array with items
+- Filter users based on memberOf relationship for individual users
+- Filter groups based on displayName match for group users
+- Maintain existing logic for admin and regular users
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Updated relevantUsers calculation
+
+**Testing Considerations**:
+- Verify Υπεύθυνος users see all teams they are responsible for
+- Test with users having different numbers of responsible teams
+- Verify combined debt table shows correct data
+- Verify income table shows correct data
+- Test that admin users still see all data
+- Test that regular users still only see their own data
+- Verify filtering still works correctly with the responsibleFor buttons
+
+**Result**: Υπεύθυνος users now correctly see all teams they are responsible for in both the combined debt table and income table, providing complete visibility of their responsibilities.
+
+### Billing Filters Histogram Data Fix (December 2024)
+
+**Problem**: The histogram bar chart in the billing filters was showing incorrect data. The issue was that the histogram was using the range from `billingPriceDistribution` (which is calculated from billing records with `remainingBalance`) but trying to display the distribution of user debt data (`user.totalDebt`). These are two different data sources with different ranges and meanings.
+
+**Requirements**:
+- Fix histogram to show correct distribution of user debt data
+- Use the actual range of user debt amounts for histogram buckets
+- Handle edge cases (no data, all values the same)
+- Maintain the same visual appearance and functionality
+
+**Solution**: Modified the histogram to calculate its range from the actual user debt data instead of using the billing distribution range.
+
+**Changes Made**:
+
+**1. Updated Histogram Range Calculation (`components/billing-filters.tsx`)**:
+- Removed dependency on `billingPriceDistribution` for histogram range
+- Calculate range from actual user debt data
+- Added safety checks for edge cases
+
+```typescript
+// Before: Using billing distribution range for user debt data
+const bucketSize = (billingPriceDistribution.max - billingPriceDistribution.min) / NUM_BUCKETS;
+const start = billingPriceDistribution.min + i * bucketSize;
+
+// After: Using actual user debt data range
+const userDebtAmounts = filteredUsersForCounts.map(user => user.totalDebt || 0);
+const minDebt = userDebtAmounts.length > 0 ? Math.min(...userDebtAmounts) : 0;
+const maxDebt = userDebtAmounts.length > 0 ? Math.max(...userDebtAmounts) : 100;
+const bucketSize = maxDebt > minDebt ? (maxDebt - minDebt) / NUM_BUCKETS : 1;
+const start = minDebt + i * bucketSize;
+```
+
+**2. Added Safety Checks**:
+- Handle case where no users match the filters
+- Handle case where all users have the same debt amount
+- Provide fallback values for edge cases
+
+**Key Benefits**:
+- **Accurate Data**: Histogram now shows the correct distribution of user debt
+- **Proper Range**: Buckets are sized based on actual data range
+- **Better Visualization**: Users can see the real distribution of debt amounts
+- **Robust Handling**: Works correctly with edge cases and empty data
+
+**Technical Implementation**:
+- Calculate histogram range from filtered user debt data
+- Use `user.totalDebt` values for bucket calculations
+- Added safety checks for empty arrays and single values
+- Maintained existing filtering logic for search and role filters
+
+**Files Modified**:
+- `components/billing-filters.tsx` - Updated histogram range calculation
+
+**Testing Considerations**:
+- Verify histogram shows correct distribution with different user data
+- Test with users having different debt amounts
+- Test with users having the same debt amount
+- Test with no users matching filters
+- Verify histogram updates when search/role filters are applied
+- Compare histogram with radio button counts for consistency
+
+**Result**: The histogram now accurately displays the distribution of user debt data, providing users with a correct visual representation of how debt amounts are distributed across the filtered dataset.
+
+### Billing Filters Radio Button Deselection (December 2024)
+
+**Problem**: Users wanted to be able to deselect a radio button by clicking on it again. Standard HTML radio buttons don't support deselection - once selected, they stay selected until another option is chosen. This was limiting the user experience in the billing filters.
+
+**Requirements**:
+- Allow users to deselect a radio button by clicking on it again
+- When deselected, reset the price range to the full range (0 to max)
+- Maintain the same visual appearance and accessibility
+- Keep keyboard navigation support
+
+**Solution**: Replaced the standard RadioGroup with a custom implementation that supports deselection.
+
+**Changes Made**:
+
+**1. Replaced RadioGroup with Custom Implementation (`components/billing-filters.tsx`)**:
+- Removed `RadioGroup` and `RadioGroupItem` components
+- Created custom radio button implementation with deselection logic
+- Added click handler that toggles between selection and deselection
+
+```typescript
+// Before: Standard RadioGroup (no deselection)
+<RadioGroup
+  value={`${billingPriceRange[0]}-${billingPriceRange[1]}`}
+  onValueChange={(value: string) => {
+    const [min, max] = value.split('-').map((v: string) => parseFloat(v));
+    setBillingPriceRange([min, max]);
+    setBillingPriceRangeInputs([
+      min.toFixed(2).replace('.', ','),
+      max.toFixed(2).replace('.', ',')
+    ]);
+  }}
+>
+  <RadioGroupItem value={`${start}-${end}`} id={`billing-range-${i}`} />
+  <Label htmlFor={`billing-range-${i}`} className="flex-1 text-sm cursor-pointer">
+    {intervalLabels[i]}
+  </Label>
+</RadioGroup>
+
+// After: Custom implementation with deselection
+const handleClick = () => {
+  if (isSelected) {
+    // If already selected, clear the selection (reset to full range)
+    setBillingPriceRange([0, billingPriceDistribution.max]);
+    setBillingPriceRangeInputs([
+      "0",
+      billingPriceDistribution.max.toString()
+    ]);
+  } else {
+    // If not selected, select this option
+    setBillingPriceRange([start, end]);
+    setBillingPriceRangeInputs([
+      start.toFixed(2).replace('.', ','),
+      end.toFixed(2).replace('.', ',')
+    ]);
+  }
+};
+
+<div
+  className={`w-4 h-4 rounded-full border-2 cursor-pointer transition-colors ${
+    isSelected 
+      ? 'bg-yellow-400 border-yellow-500' 
+      : 'bg-white border-gray-300 hover:border-yellow-400'
+  }`}
+  onClick={handleClick}
+  role="radio"
+  aria-checked={isSelected}
+  tabIndex={0}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleClick();
+    }
+  }}
+>
+  {isSelected && (
+    <div className="w-2 h-2 bg-white rounded-full m-0.5" />
+  )}
+</div>
+```
+
+**2. Enhanced User Experience**:
+- **Visual Feedback**: Custom radio buttons with proper hover and selected states
+- **Accessibility**: Maintained proper ARIA attributes and keyboard navigation
+- **Smooth Transitions**: Added transition effects for better visual feedback
+- **Clear Behavior**: When deselected, price range resets to full range
+
+**Key Benefits**:
+- **Deselection Support**: Users can now deselect radio buttons by clicking again
+- **Better UX**: More intuitive interaction pattern
+- **Accessibility**: Maintained keyboard navigation and screen reader support
+- **Visual Consistency**: Custom radio buttons match the existing design system
+
+**Technical Implementation**:
+- Created custom radio button component with click handler
+- Added deselection logic that resets to full price range
+- Maintained accessibility with proper ARIA attributes
+- Added keyboard support for Enter and Space keys
+- Used conditional rendering for selected state indicator
+
+**Files Modified**:
+- `components/billing-filters.tsx` - Replaced RadioGroup with custom implementation
+
+**Testing Considerations**:
+- Verify radio button can be selected by clicking
+- Verify radio button can be deselected by clicking again
+- Verify deselection resets price range to full range
+- Verify keyboard navigation works (Tab, Enter, Space)
+- Verify visual states are correct (selected, unselected, hover)
+- Test with screen readers for accessibility
+
+**Result**: Users can now deselect radio buttons by clicking on them again, providing a more intuitive and flexible interaction pattern while maintaining accessibility and visual consistency.
+
+### Billing Filters Count Stability Fix (December 2024)
+
+**Problem**: When users selected a radio button in the billing filters, the counts for other radio buttons would go to 0. This happened because the radio button selection was updating the price range filter, which then filtered the data further, causing the counts to change. Users expected the counts to remain stable regardless of which radio button was selected.
+
+**Requirements**:
+- Keep radio button counts stable when a radio button is selected
+- Keep histogram bar counts stable when a radio button is selected
+- Counts should only change when search or role filters are applied
+- Maintain the same visual appearance and functionality
+
+**Solution**: Modified the billing filters to calculate counts based on data that's only filtered by search and role filters, not by the price range filter.
+
+**Changes Made**:
+
+**1. Updated Histogram Bar Distribution (`components/billing-filters.tsx`)**:
+- Created `filteredUsersForCounts` that applies only search and role filters
+- Removed dependency on `combinedDebtData` which includes price range filtering
+- Now histogram bars remain stable when price range is changed
+
+```typescript
+// Before: Using combinedDebtData which includes price range filtering
+const count = combinedDebtData.filter((user: any) => {
+  const amount = user.totalDebt || 0;
+  return amount >= start && (i === NUM_BUCKETS - 1 ? amount <= end : amount < end);
+}).length;
+
+// After: Using filteredUsersForCounts with only search and role filters
+const filteredUsersForCounts = users.filter(user => {
+  if (user.accessLevel === "admin") return false;
+  
+  // Apply search filter
+  if (billingSearchTerm) {
+    const responsiblePerson = user.userRole === "Άτομο" 
+      ? user.displayName 
+      : user.responsiblePerson || "-";
+    const matchesSearch = user.displayName.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+                         user.userRole.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+                         responsiblePerson.toLowerCase().includes(billingSearchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+  }
+  
+  // Apply role filter
+  if (billingRoleFilter !== "all" && user.userRole !== billingRoleFilter) {
+    return false;
+  }
+  
+  return true;
+});
+
+const count = filteredUsersForCounts.filter((user: any) => {
+  const amount = user.totalDebt || 0;
+  return amount >= start && (i === NUM_BUCKETS - 1 ? amount <= end : amount < end);
+}).length;
+```
+
+**2. Updated Radio Button Counts**:
+- Applied the same `filteredUsersForCounts` logic to radio button counts
+- Now radio button counts remain stable when price range is changed
+- Maintains consistency with histogram data source
+
+**Key Benefits**:
+- **Stable Counts**: Radio button counts no longer change when a radio button is selected
+- **Stable Histogram**: Histogram bars remain stable when price range is changed
+- **Intuitive Behavior**: Counts only change when search or role filters are applied
+- **Better UX**: Users can see the distribution of data without interference from price range selection
+
+**Technical Implementation**:
+- Created `filteredUsersForCounts` that applies only search and role filters
+- Removed dependency on `combinedDebtData` for count calculations
+- Maintained the same filtering logic for search and role filters
+- Ensured both histogram and radio buttons use the same stable data source
+
+**Files Modified**:
+- `components/billing-filters.tsx` - Updated histogram and radio button count calculations
+
+**Testing Considerations**:
+- Verify radio button counts remain stable when a radio button is selected
+- Verify histogram bars remain stable when price range is changed
+- Verify counts still update when search filter is applied
+- Verify counts still update when role filter is applied
+- Test with different filter combinations to ensure proper behavior
+
+**Result**: The billing filters now provide stable counts that only change when search or role filters are applied, making the interface more intuitive and user-friendly.
+
+### Billing Filters Count Fix (December 2024)
+
+**Problem**: The histogram counts in the billing filters were showing incorrect totals. The counts should add up to the total number of users in the Συγκεντρωτικό table (38 users), but they were showing different numbers because the billing filters were using all users instead of the filtered users that Υπεύθυνος users should see.
+
+**Requirements**:
+- Fix histogram counts to match the total number of users shown in the Συγκεντρωτικό table
+- Ensure counts add up correctly for Υπεύθυνος users
+- Maintain existing filtering functionality
+
+**Solution**: Updated the BillingFilters component to use the correct users array that matches what the Υπεύθυνος user should see.
+
+**Changes Made**:
+
+**1. Updated BillingFilters Users Prop (`app/dashboard/page.tsx`)**:
+- Changed from passing `dummyDB.getUsers()` to passing `allUsers`
+- `allUsers` is already filtered based on the user's access level and responsibilities
+
+```typescript
+// Before: Using all users regardless of access level
+users={dummyDB.getUsers()}
+
+// After: Using filtered users based on access level
+users={allUsers}
+```
+
+**Key Benefits**:
+- **Correct Counts**: Histogram counts now match the total number of users shown in the Συγκεντρωτικό table
+- **Consistent Data**: Billing filters show the same data as the main tables
+- **Proper Filtering**: Υπεύθυνος users see counts for only the teams they're responsible for
+
+**Technical Implementation**:
+- The `allUsers` state variable is already properly filtered based on user access level
+- For Υπεύθυνος users, `allUsers` contains only the users they're responsible for
+- For admin users, `allUsers` contains all users
+- For regular users, `allUsers` contains only their own data
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Updated BillingFilters users prop
+
+**Testing Considerations**:
+- Verify histogram counts add up to the total number of users in the Συγκεντρωτικό table
+- Test with Υπεύθυνος users to ensure counts match their responsibilities
+- Test with admin users to ensure they see all users
+- Test with regular users to ensure they only see their own data
+- Verify filtering still works correctly
+
+**Result**: The histogram counts in the billing filters now correctly reflect the total number of users shown in the Συγκεντρωτικό table, providing accurate data visualization for all user types.
+
+### Billing Filters ResponsibleFor Filtering Fix (December 2024)
+
+**Problem**: The histogram counts in the billing filters were still showing incorrect totals even after the previous fix. The issue was that the billing filters were not applying the same responsibleFor filtering logic that the dashboard uses for Υπεύθυνος users. This caused the counts to be based on all users instead of only the users that Υπεύθυνος users are responsible for.
+
+**Requirements**:
+- Apply the same responsibleFor filtering logic in billing filters as in the dashboard
+- Ensure counts match the total number of users shown in the Συγκεντρωτικό table
+- Maintain existing filtering functionality for search and role filters
+
+**Solution**: Updated the billing filters to apply the same responsibleFor filtering logic that's used in the dashboard's `calculateCombinedDebtData` function.
+
+**Changes Made**:
+
+**1. Updated Billing Filters User Filtering (`components/billing-filters.tsx`)**:
+- Added responsibleFor filtering logic to the `filteredUsersForCounts` calculation
+- Applied the same logic used in the dashboard for Υπεύθυνος users
+- Fixed TypeScript error by adding proper typing for the group parameter
+
+```typescript
+// Before: Only applying search and role filters
+const filteredUsersForCounts = users.filter(user => {
+  if (user.accessLevel === "admin") return false;
+  
+  // Apply search filter
+  if (billingSearchTerm) {
+    // ... search logic
+  }
+  
+  // Apply role filter
+  if (billingRoleFilter !== "all" && user.userRole !== billingRoleFilter) {
+    return false;
+  }
+  
+  return true;
+});
+
+// After: Also applying responsibleFor filtering for Υπεύθυνος users
+const filteredUsersForCounts = users.filter(user => {
+  if (user.accessLevel === "admin") return false;
+  
+  // Apply search filter
+  if (billingSearchTerm) {
+    // ... search logic
+  }
+  
+  // Apply role filter
+  if (billingRoleFilter !== "all" && user.userRole !== billingRoleFilter) {
+    return false;
+  }
+  
+  // Apply base responsibleFor filter for Υπεύθυνος users (always active)
+  if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+    // For individual users, check if they belong to any of the responsibleFor groups
+    if (user.userRole === "Άτομο") {
+      if (!user.memberOf?.some((group: string) => user.responsibleFor?.includes(group))) {
+        return false;
+      }
+    } else {
+      // For groups, check if the group is in the responsibleFor list
+      if (!user.responsibleFor?.includes(user.displayName)) {
+        return false;
+      }
+    }
+  }
+  
+  return true;
+});
+```
+
+**Key Benefits**:
+- **Correct Counts**: Histogram counts now match the total number of users shown in the Συγκεντρωτικό table
+- **Consistent Logic**: Billing filters use the same filtering logic as the main dashboard
+- **Proper Filtering**: Υπεύθυνος users see counts for only the users they're responsible for
+- **Type Safety**: Fixed TypeScript error with proper typing
+
+**Technical Implementation**:
+- Added responsibleFor filtering logic to the `filteredUsersForCounts` calculation
+- Used the same logic as the dashboard's `calculateCombinedDebtData` function
+- Applied filtering for both individual users (checking `memberOf`) and groups (checking `displayName`)
+- Fixed TypeScript error by adding explicit typing for the group parameter
+
+**Files Modified**:
+- `components/billing-filters.tsx` - Added responsibleFor filtering logic
+
+**Testing Considerations**:
+- Verify histogram counts add up to the total number of users in the Συγκεντρωτικό table
+- Test with Υπεύθυνος users to ensure counts match their responsibilities
+- Test with admin users to ensure they see all users
+- Test with regular users to ensure they only see their own data
+- Verify filtering still works correctly with search and role filters
+- Verify responsibleFor buttons work correctly
+
+**Result**: The billing filters now correctly apply the same responsibleFor filtering logic as the dashboard, ensuring that histogram counts accurately reflect the users that Υπεύθυνος users are responsible for.
+
+### Billing Filters Data Source Fix (December 2024)
+
+**Problem**: The histogram counts in the billing filters were still showing incorrect totals even after applying responsibleFor filtering logic. The issue was that the billing filters were trying to replicate the complex filtering logic from the dashboard, but this was causing inconsistencies and the counts still didn't match the Συγκεντρωτικό table.
+
+**Requirements**:
+- Ensure histogram counts exactly match the total number of users shown in the Συγκεντρωτικό table
+- Use the same data source for both the filters and the main table
+- Simplify the filtering logic to avoid inconsistencies
+
+**Solution**: Changed the billing filters to use the `combinedDebtData` prop directly instead of trying to replicate the filtering logic, since `combinedDebtData` already contains the properly filtered data.
+
+**Changes Made**:
+
+**1. Updated Billing Filters Data Source (`components/billing-filters.tsx`)**:
+- Replaced complex user filtering logic with direct use of `combinedDebtData`
+- Removed duplicate filtering logic that was causing inconsistencies
+- Simplified the count calculation to use the same data as the main table
+
+```typescript
+// Before: Complex filtering logic trying to replicate dashboard logic
+const filteredUsersForCounts = users.filter(user => {
+  if (user.accessLevel === "admin") return false;
+  
+  // Apply search filter
+  if (billingSearchTerm) {
+    // ... complex search logic
+  }
+  
+  // Apply role filter
+  if (billingRoleFilter !== "all" && user.userRole !== billingRoleFilter) {
+    return false;
+  }
+  
+  // Apply responsibleFor filter
+  if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+    // ... complex responsibleFor logic
+  }
+  
+  return true;
+});
+
+// After: Use the same data source as the main table
+const filteredUsersForCounts = combinedDebtData;
+```
+
+**2. Updated Dashboard Data Passing (`app/dashboard/page.tsx`)**:
+- Changed back to passing `dummyDB.getUsers()` to billing filters
+- The billing filters now use `combinedDebtData` for counts instead of filtering users
+
+```typescript
+// Before: Passing filtered users
+users={allUsers}
+
+// After: Passing all users (billing filters use combinedDebtData instead)
+users={dummyDB.getUsers()}
+```
+
+**Key Benefits**:
+- **Exact Match**: Histogram counts now exactly match the total number of users in the Συγκεντρωτικό table
+- **Single Source of Truth**: Both the filters and main table use the same data source
+- **Simplified Logic**: Removed complex duplicate filtering logic
+- **Consistent Behavior**: No more discrepancies between filters and main table
+
+**Technical Implementation**:
+- Billing filters now use `combinedDebtData` directly for count calculations
+- Removed duplicate filtering logic from billing filters
+- Maintained existing functionality for search and role filters
+- Used the same data source that the main table uses
+
+**Files Modified**:
+- `components/billing-filters.tsx` - Simplified data source to use combinedDebtData
+- `app/dashboard/page.tsx` - Updated users prop to pass all users
+
+**Testing Considerations**:
+- Verify histogram counts exactly match the total number of users in the Συγκεντρωτικό table
+- Test with Υπεύθυνος users to ensure counts match their responsibilities
+- Test with admin users to ensure they see all users
+- Test with regular users to ensure they only see their own data
+- Verify filtering still works correctly with search and role filters
+- Verify responsibleFor buttons work correctly
+
+**Result**: The billing filters now use the exact same data source as the Συγκεντρωτικό table, ensuring that histogram counts perfectly match the number of users shown in the main table.
+
+### Billing Filters Dynamic Counts (December 2024)
+
+**Problem**: The billing filters component was showing static counts that didn't change based on the applied search and role filters. Users expected the counts to update dynamically when they applied filters, similar to how other filter components work.
+
+**Requirements**:
+- Make the histogram bar counts update based on applied filters (search and role)
+- Make the radio button range counts update based on applied filters
+- Ensure consistency between histogram and radio button data sources
+- Maintain the same visual appearance and functionality
+
+**Solution**: Updated the billing filters to use `combinedDebtData` (which is already filtered) instead of the original unfiltered data.
+
+**Changes Made**:
+
+**1. Updated Histogram Bar Distribution (`components/billing-filters.tsx`)**:
+- Changed from using `printBilling` data to `combinedDebtData`
+- Changed from `b.remainingBalance` to `user.totalDebt || 0` for consistency
+- Now histogram bars reflect the filtered data
+
+```typescript
+// Before: Using unfiltered printBilling data
+const count = printBilling.filter((b: any) => {
+  const amount = b.remainingBalance;
+  return amount >= start && (i === NUM_BUCKETS - 1 ? amount <= end : amount < end);
+}).length;
+
+// After: Using filtered combinedDebtData
+const count = combinedDebtData.filter((user: any) => {
+  const amount = user.totalDebt || 0;
+  return amount >= start && (i === NUM_BUCKETS - 1 ? amount <= end : amount < end);
+}).length;
+```
+
+**2. Updated Radio Button Counts**:
+- Changed from using `allUsersData` to `combinedDebtData`
+- Now radio button counts reflect the filtered data
+- Maintains consistency with histogram data source
+
+```typescript
+// Before: Using unfiltered allUsersData
+const allUsersData = users.filter(user => user.accessLevel !== "admin")
+const intervalCounts = intervals.map(([start, end], i) =>
+  allUsersData.filter((user: any) => {
+    const amount = user.totalDebt || 0;
+    // ... filtering logic
+  }).length
+);
+
+// After: Using filtered combinedDebtData
+const intervalCounts = intervals.map(([start, end], i) =>
+  combinedDebtData.filter((user: any) => {
+    const amount = user.totalDebt || 0;
+    // ... filtering logic
+  }).length
+);
+```
+
+**Key Benefits**:
+- **Dynamic Counts**: Counts now update in real-time when search or role filters are applied
+- **Consistent Data Source**: Both histogram and radio buttons use the same filtered data
+- **Better User Experience**: Users can see how their filters affect the data distribution
+- **Accurate Representation**: Visual elements now accurately represent the filtered dataset
+
+**Technical Implementation**:
+- Used `combinedDebtData` which is already filtered by search and role filters
+- Changed data source from billing records to user debt data for consistency
+- Maintained existing filtering logic and visual styling
+- Ensured both histogram and radio buttons use the same data source
+
+**Files Modified**:
+- `components/billing-filters.tsx` - Updated histogram and radio button count calculations
+
+**Testing Considerations**:
+- Verify histogram bars update when search filter is applied
+- Verify histogram bars update when role filter is applied
+- Verify radio button counts update when search filter is applied
+- Verify radio button counts update when role filter is applied
+- Confirm histogram and radio button counts are consistent
+- Test with different filter combinations
+
+**Result**: The billing filters now provide dynamic, real-time feedback showing how applied filters affect the data distribution, improving the user experience and providing more accurate information.
+
+### Dashboard Debt Cards Access Level Filtering (December 2024)
+
+**Problem**: Users with simple access levels (`"user"` and `"Υπεύθυνος"`) were seeing gray subtext showing percentage information in the debt cards, which was confusing and unnecessary for their access level. Only admin users should see this detailed percentage information.
+
+**Requirements**:
+- Hide gray subtext (percentage information) for users with access levels `"user"` and `"Υπεύθυνος"`
+- Show gray subtext only for admin users (`"admin"` access level)
+- Maintain the same layout and functionality for admin users
+- Keep the debt amount display for all users
+
+**Solution**: Added access level condition to the gray subtext display logic in the dashboard debt cards.
+
+**Changes Made**:
+
+**1. Updated Total Debt Card (`app/dashboard/page.tsx`)**:
+- Added `user.accessLevel === "admin"` condition to the flex layout logic
+- Added `user.accessLevel === "admin"` condition to the gray subtext display
+
+```typescript
+// Before: Showing percentage for all users when filters are applied
+<div className={`p-6 flex-1 flex ${hasFilters && totalUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+  <div className={`text-3xl font-bold ${totalUnpaid > 0 ? 'text-red-600' : totalUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+    {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
+  </div>
+  {hasFilters && totalUnpaidPercentage < 100 && (
+    <div className="text-sm text-gray-500 pb-0.5">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
+  )}
+</div>
+
+// After: Showing percentage only for admin users
+<div className={`p-6 flex-1 flex ${hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "admin" ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+  <div className={`text-3xl font-bold ${totalUnpaid > 0 ? 'text-red-600' : totalUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+    {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
+  </div>
+  {hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "admin" && (
+    <div className="text-sm text-gray-500 pb-0.5">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
+  )}
+</div>
+```
+
+**2. Updated Print Debt Card**:
+- Applied the same access level condition to the print debt card
+- Maintains consistency across all debt cards
+
+**3. Updated Lamination Debt Card**:
+- Applied the same access level condition to the lamination debt card
+- Ensures uniform behavior across all debt cards
+
+**Key Benefits**:
+- **Cleaner UI for Simple Users**: Users with `"user"` and `"Υπεύθυνος"` access levels see a cleaner interface without confusing percentage information
+- **Detailed Information for Admins**: Admin users still see the detailed percentage information when filters are applied
+- **Consistent Behavior**: All three debt cards (Total, Print, Lamination) behave consistently
+- **Maintained Functionality**: All existing functionality is preserved, only the display logic is modified
+
+**Technical Implementation**:
+- Added `user.accessLevel === "admin"` condition to flex layout logic
+- Added `user.accessLevel === "admin"` condition to gray subtext display
+- Applied changes to all three debt cards for consistency
+- Maintained existing filter logic and percentage calculations
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Updated debt card display logic for all three cards
+
+**Testing Considerations**:
+- Verify gray subtext is hidden for users with `"user"` access level
+- Verify gray subtext is hidden for users with `"Υπεύθυνος"` access level  
+- Verify gray subtext is shown for users with `"admin"` access level when filters are applied
+- Confirm debt amounts are still displayed correctly for all access levels
+- Test with different filter combinations to ensure proper behavior
+
+**Result**: Users with simple access levels now see a cleaner dashboard interface without the confusing percentage subtext, while admin users retain access to detailed percentage information when filters are applied.
+
+### Protected Route Authentication Fix (December 2024)
+
+### Protected Route Authentication Fix (December 2024)
+
+**Problem**: When users were logged out and tried to access protected routes like `/dashboard`, they were not being redirected to the login page. The redirection was not working properly, allowing users to see protected content without authentication.
+
+**Root Cause**: The `ProtectedRoute` component was using `router.push()` instead of `router.replace()` for redirection, and the authentication context was using localStorage which can cause issues with Next.js App Router. Additionally, the redirection logic wasn't properly handling the case where users were already on the login page.
+
+**Solution**: Implemented a comprehensive fix that addresses multiple issues with the authentication and redirection system.
+
+**Changes Made**:
+
+**1. Updated ProtectedRoute Component (`components/protected-route.tsx`)**:
+- **Changed from `router.push()` to `router.replace()`**: More reliable redirection that replaces the current history entry
+- **Added pathname checking**: Prevents infinite redirects when already on login page
+- **Simplified redirection logic**: Removed complex state management that could cause issues
+- **Better error handling**: More robust redirection with proper dependency management
+
+```typescript
+// Before: Using router.push() which can cause navigation issues
+router.push("/login")
+
+// After: Using router.replace() for more reliable redirection
+if (pathname !== "/login") {
+  router.replace("/login")
+}
+```
+
+**2. Updated Authentication Context (`lib/auth-context.tsx`)**:
+- **Replaced localStorage with cookies**: Better compatibility with Next.js and server-side rendering
+- **Added cookie utility functions**: `setCookie()`, `getCookie()`, `deleteCookie()` for proper cookie management
+- **Improved persistence**: Cookies persist better across browser sessions and work with SSR
+- **Better error handling**: More robust cookie management with proper expiration
+
+```typescript
+// Cookie utility functions for better authentication persistence
+const setCookie = (name: string, value: string, days: number = 7) => {
+  if (typeof window === "undefined") return
+  const expires = new Date()
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`
+}
+
+const getCookie = (name: string): string | null => {
+  if (typeof window === "undefined") return null
+  const nameEQ = name + "="
+  const ca = document.cookie.split(';')
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i]
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length)
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length)
+  }
+  return null
+}
+```
+
+**3. Enhanced Redirection Logic**:
+- **Pathname awareness**: Component now checks current pathname to prevent unnecessary redirects
+- **Loading state handling**: Properly waits for authentication state to load before making redirection decisions
+- **Admin access validation**: Improved logic for checking admin privileges
+- **Dependency management**: Proper useEffect dependencies to prevent unnecessary re-renders
+
+**Key Benefits**:
+- **Reliable Redirection**: Users are now properly redirected to login when accessing protected routes
+- **Better Persistence**: Authentication state persists properly across browser sessions
+- **Improved Performance**: Reduced unnecessary redirects and re-renders
+- **Better UX**: Users see appropriate loading states and smooth transitions
+- **SSR Compatibility**: Works better with Next.js server-side rendering
+
+**Technical Implementation**:
+- Used `router.replace()` instead of `router.push()` for more reliable navigation
+- Implemented cookie-based authentication storage for better persistence
+- Added proper pathname checking to prevent redirect loops
+- Enhanced error handling and loading state management
+- Maintained backward compatibility with existing authentication flow
+
+**Files Modified**:
+- `components/protected-route.tsx` - Updated redirection logic and error handling
+- `lib/auth-context.tsx` - Replaced localStorage with cookies and improved persistence
+
+**Testing Considerations**:
+- Verify redirection works when accessing protected routes while logged out
+- Test authentication persistence across browser sessions
+- Confirm admin access restrictions work properly
+- Verify no infinite redirect loops occur
+- Test on different browsers and devices
+
+**Result**: Users are now properly redirected to the login page when trying to access protected routes while logged out, and authentication state persists reliably across browser sessions.
+
 ### Κυδωνιών Printer Configuration Update (December 2024)
 
 **Problem**: The Κυδωνιών printer was configured to print both A4 B/W and A4 Color, but it should only print A4 B/W like the Canon B/W and Brother printers. Also, the printer filter dropdown needed to be reordered for better user experience.

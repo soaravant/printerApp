@@ -106,12 +106,14 @@ export default function DashboardPage() {
   const [billingPriceRange, setBillingPriceRange] = useState<[number, number]>([0, 100])
   const [billingPriceRangeInputs, setBillingPriceRangeInputs] = useState<[string, string]>(["0", "100"])
   const [billingRoleFilter, setBillingRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Ναός, Τομέας
+  const [billingResponsibleForFilter, setBillingResponsibleForFilter] = useState("all") // all, or specific responsibleFor item
 
   // Filtered data states
   const [filteredPrintBilling, setFilteredPrintBilling] = useState<PrintBilling[]>([])
   const [filteredPrintJobs, setFilteredPrintJobs] = useState<PrintJob[]>([])
   const [filteredLaminationBilling, setFilteredLaminationBilling] = useState<LaminationBilling[]>([])
   const [filteredLaminationJobs, setFilteredLaminationJobs] = useState<LaminationJob[]>([])
+  const [filteredIncome, setFilteredIncome] = useState<Income[]>([])
 
   // Pagination state
   const [printJobsPage, setPrintJobsPage] = useState(1)
@@ -130,6 +132,20 @@ export default function DashboardPage() {
 
     if (user.accessLevel === "admin") {
       // Admin sees all data
+      const allPrintJobs = dummyDB.getAllPrintJobs()
+      const allLaminationJobs = dummyDB.getAllLaminationJobs()
+      const allPrintBilling = dummyDB.getAllPrintBilling()
+      const allLaminationBilling = dummyDB.getAllLaminationBilling()
+      const users = dummyDB.getUsers()
+
+      setPrintJobs(allPrintJobs)
+      setLaminationJobs(allLaminationJobs)
+      setPrintBilling(allPrintBilling)
+      setLaminationBilling(allLaminationBilling)
+      setAllUsers(users)
+      setIncome(dummyDB.getFreshIncome())
+    } else if (user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+      // Υπεύθυνος users see data for all teams/groups they are responsible for
       const allPrintJobs = dummyDB.getAllPrintJobs()
       const allLaminationJobs = dummyDB.getAllLaminationJobs()
       const allPrintBilling = dummyDB.getAllPrintBilling()
@@ -172,6 +188,7 @@ export default function DashboardPage() {
     laminationJobs,
     printBilling,
     laminationBilling,
+    income,
     // New tab-specific filters
     activeTab,
     printTypeFilter,
@@ -183,6 +200,7 @@ export default function DashboardPage() {
     billingPriceRange,
     billingAmountFilter,
     billingRoleFilter,
+    billingResponsibleForFilter,
   ])
 
   // Reset page on filter change
@@ -295,6 +313,39 @@ export default function DashboardPage() {
       filteredPB = filteredPB.filter((item) => {
         const userData = dummyDB.getUserById(item.uid)
         return userData?.userRole === billingRoleFilter
+      })
+    }
+
+    // Apply base responsibleFor filter for Υπεύθυνος users (always active)
+    if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+      filteredPB = filteredPB.filter((item) => {
+        const userData = dummyDB.getUserById(item.uid)
+        if (!userData) return false
+        
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (userData.userRole === "Άτομο") {
+          return userData.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
+        }
+        
+        // For groups, check if the group is in the responsibleFor list
+        return user.responsibleFor?.includes(userData.displayName) || false
+      })
+    }
+
+    // Apply specific responsibleFor filter (when a specific tag is selected)
+    if (billingResponsibleForFilter !== "all" && user?.accessLevel === "Υπεύθυνος") {
+      filteredPB = filteredPB.filter((item) => {
+        const userData = dummyDB.getUserById(item.uid)
+        if (!userData) return false
+        
+        // Check if the user is responsible for this item
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (userData.userRole === "Άτομο") {
+          return userData.memberOf?.includes(billingResponsibleForFilter) || false
+        }
+        
+        // For groups, check if the group name matches
+        return userData.displayName === billingResponsibleForFilter
       })
     }
 
@@ -429,6 +480,39 @@ export default function DashboardPage() {
       })
     }
 
+    // Apply base responsibleFor filter for Υπεύθυνος users (always active)
+    if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+      filteredLB = filteredLB.filter((item) => {
+        const userData = dummyDB.getUserById(item.uid)
+        if (!userData) return false
+        
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (userData.userRole === "Άτομο") {
+          return userData.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
+        }
+        
+        // For groups, check if the group is in the responsibleFor list
+        return user.responsibleFor?.includes(userData.displayName) || false
+      })
+    }
+
+    // Apply specific responsibleFor filter (when a specific tag is selected)
+    if (billingResponsibleForFilter !== "all" && user?.accessLevel === "Υπεύθυνος") {
+      filteredLB = filteredLB.filter((item) => {
+        const userData = dummyDB.getUserById(item.uid)
+        if (!userData) return false
+        
+        // Check if the user is responsible for this item
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (userData.userRole === "Άτομο") {
+          return userData.memberOf?.includes(billingResponsibleForFilter) || false
+        }
+        
+        // For groups, check if the group name matches
+        return userData.displayName === billingResponsibleForFilter
+      })
+    }
+
     // Apply legacy filters for backward compatibility
     if (searchTerm) {
       filteredLB = filteredLB.filter(
@@ -500,6 +584,83 @@ export default function DashboardPage() {
       filteredLJ = filteredLJ.filter((item) => item.type === laminationTypeFilter)
     }
     setFilteredLaminationJobs(filteredLJ)
+
+    // Filter Income with billing-specific filters
+    let filteredInc = [...income]
+    
+    // Apply billing search filter
+    if (billingSearchTerm) {
+      filteredInc = filteredInc.filter(
+        (item) =>
+          item.userDisplayName.toLowerCase().includes(billingSearchTerm.toLowerCase())
+      )
+    }
+
+    // Apply billing role filter
+    if (billingRoleFilter !== "all") {
+      filteredInc = filteredInc.filter((item) => {
+        const userData = dummyDB.getUserById(item.uid)
+        return userData?.userRole === billingRoleFilter
+      })
+    }
+
+    // Apply base responsibleFor filter for Υπεύθυνος users (always active)
+    if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+      filteredInc = filteredInc.filter((item) => {
+        const userData = dummyDB.getUserById(item.uid)
+        if (!userData) return false
+        
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (userData.userRole === "Άτομο") {
+          return userData.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
+        }
+        
+        // For groups, check if the group is in the responsibleFor list
+        return user.responsibleFor?.includes(userData.displayName) || false
+      })
+    }
+
+    // Apply specific responsibleFor filter (when a specific tag is selected)
+    if (billingResponsibleForFilter !== "all" && user?.accessLevel === "Υπεύθυνος") {
+      filteredInc = filteredInc.filter((item) => {
+        const userData = dummyDB.getUserById(item.uid)
+        if (!userData) return false
+        
+        // Check if the user is responsible for this item
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (userData.userRole === "Άτομο") {
+          return userData.memberOf?.includes(billingResponsibleForFilter) || false
+        }
+        
+        // For groups, check if the group name matches
+        return userData.displayName === billingResponsibleForFilter
+      })
+    }
+
+    // Apply billing amount filter
+    if (billingAmountFilter !== "all") {
+      filteredInc = filteredInc.filter((item) => {
+        switch (billingAmountFilter) {
+          case "under10":
+            return item.amount < 10
+          case "10to50":
+            return item.amount >= 10 && item.amount <= 50
+          case "over50":
+            return item.amount > 50
+          default:
+            return true
+        }
+      })
+    }
+
+    // Apply billing price range filter
+    if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
+      filteredInc = filteredInc.filter((item) => {
+        return item.amount >= billingPriceRange[0] && item.amount <= billingPriceRange[1]
+      })
+    }
+
+    setFilteredIncome(filteredInc)
   }
 
   const clearFilters = () => {
@@ -521,6 +682,7 @@ export default function DashboardPage() {
     setBillingPriceRange([0, billingPriceDistribution.max])
     setBillingPriceRangeInputs(["0", billingPriceDistribution.max.toString()])
     setBillingRoleFilter("all")
+    setBillingResponsibleForFilter("all")
   }
 
   type RGB = string // e.g. "4472C4"
@@ -612,7 +774,9 @@ export default function DashboardPage() {
 
   // Calculate totals based on user debt fields
   const allUsersData = dummyDB.getUsers()
-  const relevantUsers = user.accessLevel === "admin" ? allUsersData : allUsersData.filter(u => u.uid === user.uid)
+  const relevantUsers = user.accessLevel === "admin" 
+    ? allUsersData 
+    : allUsersData.filter(u => u.uid === user.uid) // Υπεύθυνος and Χρήστης see only their personal data
   
   const printUnpaid = relevantUsers.reduce((sum, u) => sum + (u.printDebt || 0), 0)
   const laminationUnpaid = relevantUsers.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
@@ -787,24 +951,24 @@ export default function DashboardPage() {
     }>()
 
     // Get all users and their debt information
-    allUsersData.forEach(user => {
+    allUsersData.forEach(userData => {
       // Skip admin users from the debt table
-      if (user.accessLevel === "admin") return
+      if (userData.accessLevel === "admin") return
       
-      const responsiblePerson = user.userRole === "Άτομο" 
-        ? user.displayName 
-        : user.responsiblePerson || "-"
+      const responsiblePerson = userData.userRole === "Άτομο" 
+        ? userData.displayName 
+        : userData.responsiblePerson || "-"
       
       // Get user's current debt from their debt fields
-      const printDebt = user.printDebt || 0
-      const laminationDebt = user.laminationDebt || 0
-      const totalDebt = user.totalDebt || 0
+      const printDebt = userData.printDebt || 0
+      const laminationDebt = userData.laminationDebt || 0
+      const totalDebt = userData.totalDebt || 0
       
       // Find the most recent payment date from billing records
       let lastPayment: Date | null = null
       
-      const userPrintBilling = filteredPrintBilling.filter(b => b.uid === user.uid)
-      const userLaminationBilling = filteredLaminationBilling.filter(b => b.uid === user.uid)
+      const userPrintBilling = filteredPrintBilling.filter(b => b.uid === userData.uid)
+      const userLaminationBilling = filteredLaminationBilling.filter(b => b.uid === userData.uid)
       
       // Check print billing for last payment
       userPrintBilling.forEach(billing => {
@@ -820,16 +984,98 @@ export default function DashboardPage() {
         }
       })
       
-      userDebtMap.set(user.uid, {
-        uid: user.uid,
-        userDisplayName: user.displayName,
-        userRole: user.userRole,
-        responsiblePerson: responsiblePerson,
-        printDebt: printDebt,
-        laminationDebt: laminationDebt,
-        totalDebt: totalDebt,
-        lastPayment: lastPayment
-      })
+      // Apply billing filters to determine if this user should be included
+      let shouldInclude = true
+      
+      // Apply search filter
+      if (billingSearchTerm) {
+        const matchesSearch = userData.displayName.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+                             userData.userRole.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+                             responsiblePerson.toLowerCase().includes(billingSearchTerm.toLowerCase())
+        if (!matchesSearch) shouldInclude = false
+      }
+      
+      // Apply role filter
+      if (billingRoleFilter !== "all" && userData.userRole !== billingRoleFilter) {
+        shouldInclude = false
+      }
+      
+      // Apply base responsibleFor filter for Υπεύθυνος users (always active)
+      if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (userData.userRole === "Άτομο") {
+          if (!userData.memberOf?.some(group => user.responsibleFor?.includes(group))) {
+            shouldInclude = false
+          }
+        } else {
+          // For groups, check if the group is in the responsibleFor list
+          if (!user.responsibleFor?.includes(userData.displayName)) {
+            shouldInclude = false
+          }
+        }
+      }
+      
+      // Apply debt status filter (check if user has any unpaid debt)
+      if (billingDebtFilter !== "all") {
+        const hasUnpaidDebt = (printDebt > 0) || (laminationDebt > 0)
+        if (billingDebtFilter === "paid" && hasUnpaidDebt) {
+          shouldInclude = false
+        }
+        if (billingDebtFilter === "unpaid" && !hasUnpaidDebt) {
+          shouldInclude = false
+        }
+      }
+      
+      // Apply amount filter
+      if (billingAmountFilter !== "all") {
+        switch (billingAmountFilter) {
+          case "under10":
+            if (totalDebt >= 10) shouldInclude = false
+            break
+          case "10to50":
+            if (totalDebt < 10 || totalDebt > 50) shouldInclude = false
+            break
+          case "over50":
+            if (totalDebt <= 50) shouldInclude = false
+            break
+        }
+      }
+      
+      // Apply price range filter
+      if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
+        if (totalDebt < billingPriceRange[0] || totalDebt > billingPriceRange[1]) {
+          shouldInclude = false
+        }
+      }
+      
+      // Apply responsibleFor filter (only for Υπεύθυνος users)
+      if (billingResponsibleForFilter !== "all" && user?.accessLevel === "Υπεύθυνος") {
+        // Check if the user is responsible for this item
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (userData.userRole === "Άτομο") {
+          if (!userData.memberOf?.includes(billingResponsibleForFilter)) {
+            shouldInclude = false
+          }
+        } else {
+          // For groups, check if the group name matches
+          if (userData.displayName !== billingResponsibleForFilter) {
+            shouldInclude = false
+          }
+        }
+      }
+      
+      if (shouldInclude) {
+        userDebtMap.set(userData.uid, {
+          uid: userData.uid,
+          userDisplayName: userData.displayName,
+          userRole: userData.userRole,
+          responsiblePerson: responsiblePerson,
+          printDebt: printDebt,
+          laminationDebt: laminationDebt,
+          totalDebt: totalDebt,
+          lastPayment: lastPayment
+        })
+      }
     })
 
     return Array.from(userDebtMap.values())
@@ -864,11 +1110,11 @@ export default function DashboardPage() {
                     <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Χρέους/Πίστωσης</h3>
                   </div>
                 </div>
-                <div className={`p-6 flex-1 flex ${hasFilters && totalUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+                <div className={`p-6 flex-1 flex ${hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "admin" ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
                   <div className={`text-3xl font-bold ${totalUnpaid > 0 ? 'text-red-600' : totalUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                     {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
                   </div>
-                  {hasFilters && totalUnpaidPercentage < 100 && (
+                  {hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "admin" && (
                     <div className="text-sm text-gray-500 pb-0.5">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
                   )}
                 </div>
@@ -882,11 +1128,11 @@ export default function DashboardPage() {
                     <h3 className="text-lg font-semibold text-blue-900">Χρέος/Πίστωση ΤΟ. ΦΩ.</h3>
                   </div>
                 </div>
-                <div className={`p-6 flex-1 flex ${hasFilters && printUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+                <div className={`p-6 flex-1 flex ${hasFilters && printUnpaidPercentage < 100 && user.accessLevel === "admin" ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
                   <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-blue-600' : printUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                     {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
                   </div>
-                  {hasFilters && printUnpaidPercentage < 100 && (
+                  {hasFilters && printUnpaidPercentage < 100 && user.accessLevel === "admin" && (
                     <div className="text-sm text-gray-500 pb-0.5">({printUnpaidPercentage.toFixed(1)}% του {formatPrice(totalPrintUnpaid)})</div>
                   )}
                 </div>
@@ -900,112 +1146,122 @@ export default function DashboardPage() {
                     <h3 className="text-lg font-semibold text-green-900">Χρέος/Πίστωση ΠΛΑ. ΤΟ.</h3>
                   </div>
                 </div>
-                <div className={`p-6 flex-1 flex ${hasFilters && laminationUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+                <div className={`p-6 flex-1 flex ${hasFilters && laminationUnpaidPercentage < 100 && user.accessLevel === "admin" ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
                   <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-green-600' : laminationUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                     {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
                   </div>
-                  {hasFilters && laminationUnpaidPercentage < 100 && (
+                  {hasFilters && laminationUnpaidPercentage < 100 && user.accessLevel === "admin" && (
                     <div className="text-sm text-gray-500 pb-0.5">({laminationUnpaidPercentage.toFixed(1)}% του {formatPrice(totalLaminationUnpaid)})</div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Consolidated Table Card */}
-            <BillingFilters
-              billingSearchTerm={billingSearchTerm}
-              setBillingSearchTerm={setBillingSearchTerm}
-              billingDebtFilter={billingDebtFilter}
-              setBillingDebtFilter={setBillingDebtFilter}
-              billingAmountFilter={billingAmountFilter}
-              setBillingAmountFilter={setBillingAmountFilter}
-              billingPriceRange={billingPriceRange}
-              setBillingPriceRange={setBillingPriceRange}
-              billingPriceRangeInputs={billingPriceRangeInputs}
-              setBillingPriceRangeInputs={setBillingPriceRangeInputs}
-              billingRoleFilter={billingRoleFilter}
-              setBillingRoleFilter={setBillingRoleFilter}
-              billingPriceDistribution={billingPriceDistribution}
-              printBilling={printBilling}
-              users={dummyDB.getUsers()}
-              clearFilters={clearFilters}
-            />
-            
-
-            
-            {/* Consolidated Table Card */}
-            <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden mb-8">
-              <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <BarChart3 className="h-6 w-6 text-yellow-700" />
-                    <div>
-                      <h3 className="text-lg font-semibold text-yellow-900">Συγκεντρωτικός Πίνακας Χρέους/Πίστωσης</h3>
-                      <p className="text-sm text-yellow-700">Συγκεντρωμένα δεδομένα χρεώσεων, πληρωμών και πιστώσεων</p>
-                    </div>
-                  </div>
-                  {user.accessLevel === "admin" && (
-                    <Button
-                      onClick={() =>
-                        exportTableXLSX(
-                          combinedDebtData.map((item) => ({
-                            userRole: item.userRole,
-                            userDisplayName: item.userDisplayName,
-                            responsiblePerson: item.responsiblePerson,
-                            currentDebt: `${item.printDebt > 0 ? formatPrice(item.printDebt) : item.printDebt < 0 ? `-${formatPrice(Math.abs(item.printDebt))}` : formatPrice(item.printDebt)} | ${item.laminationDebt > 0 ? formatPrice(item.laminationDebt) : item.laminationDebt < 0 ? `-${formatPrice(Math.abs(item.laminationDebt))}` : formatPrice(item.laminationDebt)} | ${item.totalDebt > 0 ? formatPrice(item.totalDebt) : item.totalDebt < 0 ? `-${formatPrice(Math.abs(item.totalDebt))}` : formatPrice(item.totalDebt)}`,
-                            lastPayment: item.lastPayment ? item.lastPayment.toLocaleDateString("el-GR") : "-",
-                          })),
-                          "combined_debt",
-                          [
-                            { key: "userRole", label: "Ρόλος" },
-                            { key: "userDisplayName", label: "Όνομα" },
-                            { key: "responsiblePerson", label: "Υπεύθυνος" },
-                            { key: "currentDebt", label: "Τρέχον Χρέος/Πίστωση (ΤΟ. ΦΩ. | ΠΛΑ. ΤΟ. | Σύνολο)" },
-                            { key: "lastPayment", label: "Τελευταία Εξόφληση" }
-                          ],
-                          "EAB308",
-                          "Συγκεντρωτικός Πίνακας Χρέους/Πίστωσης"
-                        )
-                      }
-                      variant="outline"
-                      size="sm"
-                      className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Εξαγωγή XLSX
-                    </Button>
-                  )}
+            {/* Two Column Layout: Filters on Left, Tables on Right */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+              {/* Left Column: Filters */}
+              <div className="lg:col-span-1">
+                <div className="sticky top-6 space-y-6">
+                  {/* Billing Filters */}
+                  <BillingFilters
+                    billingSearchTerm={billingSearchTerm}
+                    setBillingSearchTerm={setBillingSearchTerm}
+                    billingDebtFilter={billingDebtFilter}
+                    setBillingDebtFilter={setBillingDebtFilter}
+                    billingAmountFilter={billingAmountFilter}
+                    setBillingAmountFilter={setBillingAmountFilter}
+                    billingPriceRange={billingPriceRange}
+                    setBillingPriceRange={setBillingPriceRange}
+                    billingPriceRangeInputs={billingPriceRangeInputs}
+                    setBillingPriceRangeInputs={setBillingPriceRangeInputs}
+                    billingRoleFilter={billingRoleFilter}
+                    setBillingRoleFilter={setBillingRoleFilter}
+                    billingResponsibleForFilter={billingResponsibleForFilter}
+                    setBillingResponsibleForFilter={setBillingResponsibleForFilter}
+                    billingPriceDistribution={billingPriceDistribution}
+                    printBilling={printBilling}
+                    users={dummyDB.getUsers()}
+                    clearFilters={clearFilters}
+                    combinedDebtData={combinedDebtData}
+                  />
                 </div>
               </div>
-              
-              <div className="p-6">
-                <CombinedDebtTable
-                  data={combinedDebtData}
-                  page={printBillingPage}
-                  pageSize={PAGE_SIZE}
-                  onPageChange={setPrintBillingPage}
-                  userRole={user.accessLevel}
-                  onRowHover={setHoveredPrintJob}
-                />
-              </div>
-            </div>
 
-            {/* Income Table */}
-            <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden mb-8">
-              <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <Receipt className="h-6 w-6 text-yellow-700" />
-                    <div>
-                      <h3 className="text-lg font-semibold text-yellow-900">Έσοδα</h3>
-                      <p className="text-sm text-yellow-700">Ιστορικό εσόδων από πληρωμές</p>
+              {/* Right Column: Tables */}
+              <div className="lg:col-span-3 space-y-6">
+                {/* Consolidated Table Card */}
+                <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden">
+                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <BarChart3 className="h-6 w-6 text-yellow-700" />
+                        <div>
+                          <h3 className="text-lg font-semibold text-yellow-900">Συγκεντρωτικός Πίνακας Χρέους/Πίστωσης</h3>
+                          <p className="text-sm text-yellow-700">Συγκεντρωμένα δεδομένα χρεώσεων, πληρωμών και πιστώσεων</p>
+                        </div>
+                      </div>
+                      {user.accessLevel === "admin" && (
+                        <Button
+                          onClick={() =>
+                            exportTableXLSX(
+                              combinedDebtData.map((item) => ({
+                                userRole: item.userRole,
+                                userDisplayName: item.userDisplayName,
+                                responsiblePerson: item.responsiblePerson,
+                                currentDebt: `${item.printDebt > 0 ? formatPrice(item.printDebt) : item.printDebt < 0 ? `-${formatPrice(Math.abs(item.printDebt))}` : formatPrice(item.printDebt)} | ${item.laminationDebt > 0 ? formatPrice(item.laminationDebt) : item.laminationDebt < 0 ? `-${formatPrice(Math.abs(item.laminationDebt))}` : formatPrice(item.laminationDebt)} | ${item.totalDebt > 0 ? formatPrice(item.totalDebt) : item.totalDebt < 0 ? `-${formatPrice(Math.abs(item.totalDebt))}` : formatPrice(item.totalDebt)}`,
+                                lastPayment: item.lastPayment ? item.lastPayment.toLocaleDateString("el-GR") : "-",
+                              })),
+                              "combined_debt",
+                              [
+                                { key: "userRole", label: "Ρόλος" },
+                                { key: "userDisplayName", label: "Όνομα" },
+                                { key: "responsiblePerson", label: "Υπεύθυνος" },
+                                { key: "currentDebt", label: "Τρέχον Χρέος/Πίστωση (ΤΟ. ΦΩ. | ΠΛΑ. ΤΟ. | Σύνολο)" },
+                                { key: "lastPayment", label: "Τελευταία Εξόφληση" }
+                              ],
+                              "EAB308",
+                              "Συγκεντρωτικός Πίνακας Χρέους/Πίστωσης"
+                            )
+                          }
+                          variant="outline"
+                          size="sm"
+                          className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Εξαγωγή XLSX
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  {user.accessLevel === "admin" && (
+                  
+                  <div className="p-6">
+                    <CombinedDebtTable
+                      data={combinedDebtData}
+                      page={printBillingPage}
+                      pageSize={PAGE_SIZE}
+                      onPageChange={setPrintBillingPage}
+                      userRole={user.accessLevel}
+                      onRowHover={setHoveredPrintJob}
+                    />
+                  </div>
+                </div>
+
+                {/* Income Table */}
+                <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden">
+                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <Receipt className="h-6 w-6 text-yellow-700" />
+                        <div>
+                          <h3 className="text-lg font-semibold text-yellow-900">Έσοδα</h3>
+                          <p className="text-sm text-yellow-700">Ιστορικό εσόδων από πληρωμές</p>
+                        </div>
+                      </div>
+                                        {user.accessLevel === "admin" && (
                     <Button
                       onClick={() =>
                         exportTableXLSX(
-                          income.map((incomeRecord) => ({
+                          filteredIncome.map((incomeRecord) => ({
                             timestamp: incomeRecord.timestamp.toLocaleDateString("el-GR"),
                             userDisplayName: incomeRecord.userDisplayName,
                             amount: formatPrice(incomeRecord.amount),
@@ -1028,19 +1284,21 @@ export default function DashboardPage() {
                       Εξαγωγή XLSX
                     </Button>
                   )}
+                    </div>
+                  </div>
+                  
+                  <div className="p-6">
+                    <ErrorBoundary fallback={<div>Φόρτωση εσόδων...</div>}>
+                      <IncomeTable
+                        data={filteredIncome}
+                        page={incomePage}
+                        pageSize={PAGE_SIZE}
+                        onPageChange={setIncomePage}
+                        userRole={user.accessLevel}
+                      />
+                    </ErrorBoundary>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="p-6">
-                <ErrorBoundary fallback={<div>Φόρτωση εσόδων...</div>}>
-                  <IncomeTable
-                    data={income}
-                    page={incomePage}
-                    pageSize={PAGE_SIZE}
-                    onPageChange={setIncomePage}
-                    userRole={user.accessLevel}
-                  />
-                </ErrorBoundary>
               </div>
             </div>
 
@@ -1063,211 +1321,205 @@ export default function DashboardPage() {
                 </TabsTrigger>
               </TabsList>
 
-              {/* Tab-specific Filters */}
-              <div className="mt-4">
-                {activeTab === "printing" ? (
-                  <PrintFilters
-                    searchTerm={searchTerm}
-                    setSearchTerm={setSearchTerm}
-                    dateFrom={dateFrom}
-                    setDateFrom={setDateFrom}
-                    dateTo={dateTo}
-                    setDateTo={setDateTo}
-                    deviceFilter={deviceFilter}
-                    setDeviceFilter={setDeviceFilter}
-                    printTypeFilter={printTypeFilter}
-                    setPrintTypeFilter={setPrintTypeFilter}
-                    uniqueDevices={uniqueDevices}
-                    clearFilters={clearFilters}
-                  />
-                ) : (
-                  <LaminationFilters
-                    searchTerm={searchTerm}
-                    setSearchTerm={setSearchTerm}
-                    dateFrom={dateFrom}
-                    setDateFrom={setDateFrom}
-                    dateTo={dateTo}
-                    setDateTo={setDateTo}
-                    machineFilter={machineFilter}
-                    setMachineFilter={setMachineFilter}
-                    laminationTypeFilter={laminationTypeFilter}
-                    setLaminationTypeFilter={setLaminationTypeFilter}
-                    clearFilters={clearFilters}
-                  />
-                )}
-              </div>
+
 
               <TabsContent value="printing" className="mt-4">
-                <div className="bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
-                  {/* Print Jobs Table */}
-                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <Printer className="h-6 w-6 text-blue-700" />
-                          <div>
-                            <h3 className="text-lg font-semibold text-blue-900">Ιστορικό Εκτυπώσεων</h3>
-                            <p className="text-sm text-blue-700">Λεπτομερές ιστορικό όλων των εκτυπώσεων</p>
+                {/* Two Column Layout: Filters on Left, Table on Right */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  {/* Left Column: Print Filters */}
+                  <div className="lg:col-span-1 h-full">
+                    <div className="h-full">
+                      <PrintFilters
+                        searchTerm={searchTerm}
+                        setSearchTerm={setSearchTerm}
+                        dateFrom={dateFrom}
+                        setDateFrom={setDateFrom}
+                        dateTo={dateTo}
+                        setDateTo={setDateTo}
+                        deviceFilter={deviceFilter}
+                        setDeviceFilter={setDeviceFilter}
+                        printTypeFilter={printTypeFilter}
+                        setPrintTypeFilter={setPrintTypeFilter}
+                        uniqueDevices={uniqueDevices}
+                        clearFilters={clearFilters}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Column: Print Table */}
+                  <div className="lg:col-span-3">
+                    <div className="bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                      {/* Print Jobs Table */}
+                      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                        <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                              <Printer className="h-6 w-6 text-blue-700" />
+                              <div>
+                                <h3 className="text-lg font-semibold text-blue-900">Ιστορικό Εκτυπώσεων</h3>
+                                <p className="text-sm text-blue-700">Λεπτομερές ιστορικό όλων των εκτυπώσεων</p>
+                              </div>
+                            </div>
+                            {user.accessLevel === "admin" && (
+                              <Button
+                                onClick={() => {
+                                  // Helper function to expand a print job into individual rows
+                                  const expandPrintJob = (job: any) => {
+                                    const rows = []
+                                    
+                                    if (job.pagesA4BW > 0) {
+                                      rows.push({
+                                        timestamp: job.timestamp.toLocaleString("el-GR"),
+                                        uid: job.uid,
+                                        userDisplayName: job.userDisplayName,
+                                        deviceName: job.deviceName,
+                                        printType: "A4 Ασπρόμαυρο",
+                                        quantity: job.pagesA4BW,
+                                        cost: formatPrice(job.pagesA4BW * 0.05)
+                                      })
+                                    }
+                                    
+                                    if (job.pagesA4Color > 0) {
+                                      rows.push({
+                                        timestamp: job.timestamp.toLocaleString("el-GR"),
+                                        uid: job.uid,
+                                        userDisplayName: job.userDisplayName,
+                                        deviceName: job.deviceName,
+                                        printType: "A4 Έγχρωμο",
+                                        quantity: job.pagesA4Color,
+                                        cost: formatPrice(job.pagesA4Color * 0.20)
+                                      })
+                                    }
+                                    
+                                    if (job.pagesA3BW > 0) {
+                                      rows.push({
+                                        timestamp: job.timestamp.toLocaleString("el-GR"),
+                                        uid: job.uid,
+                                        userDisplayName: job.userDisplayName,
+                                        deviceName: job.deviceName,
+                                        printType: "A3 Ασπρόμαυρο",
+                                        quantity: job.pagesA3BW,
+                                        cost: formatPrice(job.pagesA3BW * 0.10)
+                                      })
+                                    }
+                                    
+                                    if (job.pagesA3Color > 0) {
+                                      rows.push({
+                                        timestamp: job.timestamp.toLocaleString("el-GR"),
+                                        uid: job.uid,
+                                        userDisplayName: job.userDisplayName,
+                                        deviceName: job.deviceName,
+                                        printType: "A3 Έγχρωμο",
+                                        quantity: job.pagesA3Color,
+                                        cost: formatPrice(job.pagesA3Color * 0.40)
+                                      })
+                                    }
+                                    
+                                    if (job.pagesRizochartoA3 > 0) {
+                                      rows.push({
+                                        timestamp: job.timestamp.toLocaleString("el-GR"),
+                                        uid: job.uid,
+                                        userDisplayName: job.userDisplayName,
+                                        deviceName: job.deviceName,
+                                        printType: "Ριζόχαρτο A3",
+                                        quantity: job.pagesRizochartoA3,
+                                        cost: formatPrice(job.pagesRizochartoA3 * 0.10)
+                                      })
+                                    }
+                                    
+                                    if (job.pagesRizochartoA4 > 0) {
+                                      rows.push({
+                                        timestamp: job.timestamp.toLocaleString("el-GR"),
+                                        uid: job.uid,
+                                        userDisplayName: job.userDisplayName,
+                                        deviceName: job.deviceName,
+                                        printType: "Ριζόχαρτο A4",
+                                        quantity: job.pagesRizochartoA4,
+                                        cost: formatPrice(job.pagesRizochartoA4 * 0.10)
+                                      })
+                                    }
+                                    
+                                    if (job.pagesChartoniA3 > 0) {
+                                      rows.push({
+                                        timestamp: job.timestamp.toLocaleString("el-GR"),
+                                        uid: job.uid,
+                                        userDisplayName: job.userDisplayName,
+                                        deviceName: job.deviceName,
+                                        printType: "Χαρτόνι A3",
+                                        quantity: job.pagesChartoniA3,
+                                        cost: formatPrice(job.pagesChartoniA3 * 0.10)
+                                      })
+                                    }
+                                    
+                                    if (job.pagesChartoniA4 > 0) {
+                                      rows.push({
+                                        timestamp: job.timestamp.toLocaleString("el-GR"),
+                                        uid: job.uid,
+                                        userDisplayName: job.userDisplayName,
+                                        deviceName: job.deviceName,
+                                        printType: "Χαρτόνι A4",
+                                        quantity: job.pagesChartoniA4,
+                                        cost: formatPrice(job.pagesChartoniA4 * 0.10)
+                                      })
+                                    }
+                                    
+                                    if (job.pagesAutokollito > 0) {
+                                      rows.push({
+                                        timestamp: job.timestamp.toLocaleString("el-GR"),
+                                        uid: job.uid,
+                                        userDisplayName: job.userDisplayName,
+                                        deviceName: job.deviceName,
+                                        printType: "Αυτοκόλλητο",
+                                        quantity: job.pagesAutokollito,
+                                        cost: formatPrice(job.pagesAutokollito * 0.10)
+                                      })
+                                    }
+                                    
+                                    return rows
+                                  }
+
+                                  const expandedData = filteredPrintJobs.flatMap(expandPrintJob)
+                                  
+                                  exportTableXLSX(
+                                    expandedData,
+                                    "print_jobs",
+                                    [
+                                      { key: "timestamp", label: "Ημερομηνία/Ώρα" },
+                                      { key: "username", label: "Χρήστης" },
+                                      { key: "userDisplayName", label: "Όνομα" },
+                                      { key: "deviceName", label: "Εκτυπωτής" },
+                                      { key: "printType", label: "Είδος Εκτύπωσης" },
+                                      { key: "quantity", label: "Ποσότητα" },
+                                      { key: "cost", label: "Κόστος" }
+                                    ],
+                                    "4472C4",
+                                    "Ιστορικό Εκτυπώσεων"
+                                  )
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Εξαγωγή XLSX
+                              </Button>
+                            )}
                           </div>
                         </div>
-                        {user.accessLevel === "admin" && (
-                          <Button
-                            onClick={() => {
-                              // Helper function to expand a print job into individual rows
-                              const expandPrintJob = (job: any) => {
-                                const rows = []
-                                
-                                if (job.pagesA4BW > 0) {
-                                  rows.push({
-                                    timestamp: job.timestamp.toLocaleString("el-GR"),
-                                    uid: job.uid,
-                                    userDisplayName: job.userDisplayName,
-                                    deviceName: job.deviceName,
-                                    printType: "A4 Ασπρόμαυρο",
-                                    quantity: job.pagesA4BW,
-                                    cost: formatPrice(job.pagesA4BW * 0.05)
-                                  })
-                                }
-                                
-                                if (job.pagesA4Color > 0) {
-                                  rows.push({
-                                    timestamp: job.timestamp.toLocaleString("el-GR"),
-                                    uid: job.uid,
-                                    userDisplayName: job.userDisplayName,
-                                    deviceName: job.deviceName,
-                                    printType: "A4 Έγχρωμο",
-                                    quantity: job.pagesA4Color,
-                                    cost: formatPrice(job.pagesA4Color * 0.20)
-                                  })
-                                }
-                                
-                                if (job.pagesA3BW > 0) {
-                                  rows.push({
-                                    timestamp: job.timestamp.toLocaleString("el-GR"),
-                                    uid: job.uid,
-                                    userDisplayName: job.userDisplayName,
-                                    deviceName: job.deviceName,
-                                    printType: "A3 Ασπρόμαυρο",
-                                    quantity: job.pagesA3BW,
-                                    cost: formatPrice(job.pagesA3BW * 0.10)
-                                  })
-                                }
-                                
-                                if (job.pagesA3Color > 0) {
-                                  rows.push({
-                                    timestamp: job.timestamp.toLocaleString("el-GR"),
-                                    uid: job.uid,
-                                    userDisplayName: job.userDisplayName,
-                                    deviceName: job.deviceName,
-                                    printType: "A3 Έγχρωμο",
-                                    quantity: job.pagesA3Color,
-                                    cost: formatPrice(job.pagesA3Color * 0.40)
-                                  })
-                                }
-                                
-                                if (job.pagesRizochartoA3 > 0) {
-                                  rows.push({
-                                    timestamp: job.timestamp.toLocaleString("el-GR"),
-                                    uid: job.uid,
-                                    userDisplayName: job.userDisplayName,
-                                    deviceName: job.deviceName,
-                                    printType: "Ριζόχαρτο A3",
-                                    quantity: job.pagesRizochartoA3,
-                                    cost: formatPrice(job.pagesRizochartoA3 * 0.10)
-                                  })
-                                }
-                                
-                                if (job.pagesRizochartoA4 > 0) {
-                                  rows.push({
-                                    timestamp: job.timestamp.toLocaleString("el-GR"),
-                                    uid: job.uid,
-                                    userDisplayName: job.userDisplayName,
-                                    deviceName: job.deviceName,
-                                    printType: "Ριζόχαρτο A4",
-                                    quantity: job.pagesRizochartoA4,
-                                    cost: formatPrice(job.pagesRizochartoA4 * 0.10)
-                                  })
-                                }
-                                
-                                if (job.pagesChartoniA3 > 0) {
-                                  rows.push({
-                                    timestamp: job.timestamp.toLocaleString("el-GR"),
-                                    uid: job.uid,
-                                    userDisplayName: job.userDisplayName,
-                                    deviceName: job.deviceName,
-                                    printType: "Χαρτόνι A3",
-                                    quantity: job.pagesChartoniA3,
-                                    cost: formatPrice(job.pagesChartoniA3 * 0.10)
-                                  })
-                                }
-                                
-                                if (job.pagesChartoniA4 > 0) {
-                                  rows.push({
-                                    timestamp: job.timestamp.toLocaleString("el-GR"),
-                                    uid: job.uid,
-                                    userDisplayName: job.userDisplayName,
-                                    deviceName: job.deviceName,
-                                    printType: "Χαρτόνι A4",
-                                    quantity: job.pagesChartoniA4,
-                                    cost: formatPrice(job.pagesChartoniA4 * 0.10)
-                                  })
-                                }
-                                
-                                if (job.pagesAutokollito > 0) {
-                                  rows.push({
-                                    timestamp: job.timestamp.toLocaleString("el-GR"),
-                                    uid: job.uid,
-                                    userDisplayName: job.userDisplayName,
-                                    deviceName: job.deviceName,
-                                    printType: "Αυτοκόλλητο",
-                                    quantity: job.pagesAutokollito,
-                                    cost: formatPrice(job.pagesAutokollito * 0.10)
-                                  })
-                                }
-                                
-                                return rows
-                              }
-
-                              const expandedData = filteredPrintJobs.flatMap(expandPrintJob)
-                              
-                              exportTableXLSX(
-                                expandedData,
-                                "print_jobs",
-                                [
-                                  { key: "timestamp", label: "Ημερομηνία/Ώρα" },
-                                  { key: "username", label: "Χρήστης" },
-                                  { key: "userDisplayName", label: "Όνομα" },
-                                  { key: "deviceName", label: "Εκτυπωτής" },
-                                  { key: "printType", label: "Είδος Εκτύπωσης" },
-                                  { key: "quantity", label: "Ποσότητα" },
-                                  { key: "cost", label: "Κόστος" }
-                                ],
-                                "4472C4",
-                                "Ιστορικό Εκτυπώσεων"
-                              )
-                            }}
-                            variant="outline"
-                            size="sm"
-                            className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50"
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Εξαγωγή XLSX
-                          </Button>
-                        )}
+                        <div className="p-6">
+                          <ErrorBoundary fallback={<div>Φόρτωση εκτυπώσεων...</div>}>
+                            <PrintJobsTable
+                              data={filteredPrintJobs}
+                              page={printJobsPage}
+                              pageSize={PAGE_SIZE}
+                              onPageChange={setPrintJobsPage}
+                              userRole={user.accessLevel}
+                              onRowHover={setHoveredPrintJob}
+                              printTypeFilter={printTypeFilter}
+                            />
+                          </ErrorBoundary>
+                        </div>
                       </div>
-                    </div>
-                    <div className="p-6">
-                      <ErrorBoundary fallback={<div>Φόρτωση εκτυπώσεων...</div>}>
-                        <PrintJobsTable
-                          data={filteredPrintJobs}
-                          page={printJobsPage}
-                          pageSize={PAGE_SIZE}
-                          onPageChange={setPrintJobsPage}
-                          userRole={user.accessLevel}
-                          onRowHover={setHoveredPrintJob}
-                          printTypeFilter={printTypeFilter}
-                        />
-                      </ErrorBoundary>
                     </div>
                   </div>
                 </div>
@@ -1429,64 +1681,89 @@ export default function DashboardPage() {
               </TabsContent>
 
               <TabsContent value="lamination" className="mt-4">
-                <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm">
-                  {/* Lamination Jobs Table */}
-                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="bg-green-100 px-6 py-4 border-b border-green-200">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <CreditCard className="h-6 w-6 text-green-700" />
-                          <div>
-                            <h3 className="text-lg font-semibold text-green-900">Ιστορικό Πλαστικοποιήσεων</h3>
-                            <p className="text-sm text-green-700">Ιστορικό καταχωρημένων πλαστικοποιήσεων</p>
+                {/* Two Column Layout: Filters on Left, Table on Right */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  {/* Left Column: Lamination Filters */}
+                  <div className="lg:col-span-1 h-full">
+                    <div className="h-full">
+                      <LaminationFilters
+                        searchTerm={searchTerm}
+                        setSearchTerm={setSearchTerm}
+                        dateFrom={dateFrom}
+                        setDateFrom={setDateFrom}
+                        dateTo={dateTo}
+                        setDateTo={setDateTo}
+                        machineFilter={machineFilter}
+                        setMachineFilter={setMachineFilter}
+                        laminationTypeFilter={laminationTypeFilter}
+                        setLaminationTypeFilter={setLaminationTypeFilter}
+                        clearFilters={clearFilters}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Column: Lamination Table */}
+                  <div className="lg:col-span-3">
+                    <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm">
+                      {/* Lamination Jobs Table */}
+                      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                        <div className="bg-green-100 px-6 py-4 border-b border-green-200">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                              <CreditCard className="h-6 w-6 text-green-700" />
+                              <div>
+                                <h3 className="text-lg font-semibold text-green-900">Ιστορικό Πλαστικοποιήσεων</h3>
+                                <p className="text-sm text-green-700">Ιστορικό καταχωρημένων πλαστικοποιήσεων</p>
+                              </div>
+                            </div>
+                            {user.accessLevel === "admin" && (
+                              <Button
+                                onClick={() =>
+                                  exportTableXLSX(
+                                    filteredLaminationJobs.map((j) => ({
+                                      timestamp: j.timestamp.toLocaleDateString("el-GR"),
+                                      uid: j.uid,
+                                      userDisplayName: j.userDisplayName,
+                                      type: getLaminationTypeLabel(j.type),
+                                      quantity: j.quantity,
+                                      totalCost: formatPrice(j.totalCost),
+                                    })),
+                                    "lamination_jobs",
+                                    [
+                                      { key: "timestamp", label: "Ημερομηνία" },
+                                      { key: "username", label: "Χρήστης" },
+                                      { key: "userDisplayName", label: "Όνομα" },
+                                      { key: "type", label: "Είδος" },
+                                      { key: "quantity", label: "Ποσότητα" },
+                                      { key: "totalCost", label: "Κόστος" }
+                                    ],
+                                    "22C55E",
+                                    "Ιστορικό Πλαστικοποιήσεων"
+                                  )
+                                }
+                                variant="outline"
+                                size="sm"
+                                className="bg-white border-green-300 text-green-700 hover:bg-green-50"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Εξαγωγή XLSX
+                              </Button>
+                            )}
                           </div>
                         </div>
-                        {user.accessLevel === "admin" && (
-                          <Button
-                            onClick={() =>
-                              exportTableXLSX(
-                                filteredLaminationJobs.map((j) => ({
-                                  timestamp: j.timestamp.toLocaleDateString("el-GR"),
-                                  uid: j.uid,
-                                  userDisplayName: j.userDisplayName,
-                                  type: getLaminationTypeLabel(j.type),
-                                  quantity: j.quantity,
-                                  totalCost: formatPrice(j.totalCost),
-                                })),
-                                "lamination_jobs",
-                                [
-                                  { key: "timestamp", label: "Ημερομηνία" },
-                                  { key: "username", label: "Χρήστης" },
-                                  { key: "userDisplayName", label: "Όνομα" },
-                                  { key: "type", label: "Είδος" },
-                                  { key: "quantity", label: "Ποσότητα" },
-                                  { key: "totalCost", label: "Κόστος" }
-                                ],
-                                "22C55E",
-                                "Ιστορικό Πλαστικοποιήσεων"
-                              )
-                            }
-                            variant="outline"
-                            size="sm"
-                            className="bg-white border-green-300 text-green-700 hover:bg-green-50"
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Εξαγωγή XLSX
-                          </Button>
-                        )}
+                        <div className="p-6">
+                          <ErrorBoundary fallback={<div>Φόρτωση πλαστικοποιήσεων...</div>}>
+                            <LaminationJobsTable
+                              data={filteredLaminationJobs}
+                              page={laminationJobsPage}
+                              pageSize={PAGE_SIZE}
+                              onPageChange={setLaminationJobsPage}
+                              userRole={user.accessLevel}
+                              onRowHover={setHoveredLaminationJob}
+                            />
+                          </ErrorBoundary>
+                        </div>
                       </div>
-                    </div>
-                    <div className="p-6">
-                      <ErrorBoundary fallback={<div>Φόρτωση πλαστικοποιήσεων...</div>}>
-                        <LaminationJobsTable
-                          data={filteredLaminationJobs}
-                          page={laminationJobsPage}
-                          pageSize={PAGE_SIZE}
-                          onPageChange={setLaminationJobsPage}
-                          userRole={user.accessLevel}
-                          onRowHover={setHoveredLaminationJob}
-                        />
-                      </ErrorBoundary>
                     </div>
                   </div>
                 </div>

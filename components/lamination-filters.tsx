@@ -34,14 +34,17 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
   clearFilters,
 }) => {
   return (
-    <div className="bg-white rounded-lg border border-green-200 shadow-sm overflow-hidden mb-4">
-      <div className="bg-green-100 px-6 py-4 border-b border-green-200">
+    <div className="bg-white rounded-lg border border-green-200 shadow-sm overflow-hidden h-full flex flex-col">
+      <div className="bg-green-100 px-6 py-4 border-b border-green-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-green-50 p-2 rounded-lg">
               <Filter className="h-5 w-5 text-green-700" />
             </div>
-            <h3 className="text-lg font-semibold text-green-900">Φίλτρα Πλαστικοποιήσεων</h3>
+            <h3 className="text-lg font-semibold text-green-900">
+              Φίλτρα<br />
+              ΠΛΑ. ΤΟ.
+            </h3>
           </div>
           <button
             type="button"
@@ -53,10 +56,10 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
           </button>
         </div>
       </div>
-      <div className="p-6">
-        {/* Basic Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="md:col-span-2">
+      <div className="p-6 flex-1 flex flex-col">
+        <div className="space-y-4 flex-1">
+          {/* Row 1: Search */}
+          <div>
             <Label htmlFor="search" className="text-gray-700">Αναζήτηση</Label>
             <div className="relative">
               <Input
@@ -79,6 +82,28 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
               )}
             </div>
           </div>
+          
+          {/* Row 2: Date From */}
+          <div>
+            <GreekDatePicker
+              id="dateFrom"
+              label="Από Ημερομηνία"
+              value={dateFrom}
+              onChange={setDateFrom}
+            />
+          </div>
+          
+          {/* Row 3: Date To */}
+          <div>
+            <GreekDatePicker
+              id="dateTo"
+              label="Έως Ημερομηνία"
+              value={dateTo}
+              onChange={setDateTo}
+            />
+          </div>
+          
+          {/* Row 4: Machine */}
           <div>
             <Label htmlFor="machine" className="text-gray-700">Μηχάνημα</Label>
             <Select value={machineFilter} onValueChange={setMachineFilter}>
@@ -97,25 +122,8 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
               </SelectContent>
             </Select>
           </div>
-        </div>
-        {/* Date and Type Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <GreekDatePicker
-              id="dateFrom"
-              label="Από Ημερομηνία"
-              value={dateFrom}
-              onChange={setDateFrom}
-            />
-          </div>
-          <div>
-            <GreekDatePicker
-              id="dateTo"
-              label="Έως Ημερομηνία"
-              value={dateTo}
-              onChange={setDateTo}
-            />
-          </div>
+          
+          {/* Row 5: Type */}
           <div>
             <Label htmlFor="laminationType" className="text-gray-700">
               Είδος {machineFilter === "binding" ? "Βιβλιοδεσίας" : machineFilter === "lamination" ? "Πλαστικοποίησης" : "Εργασίας"}

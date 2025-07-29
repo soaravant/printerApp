@@ -140,7 +140,7 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
               onSort={handleSort}
             >
               <div className="text-center">
-                <div>Τρέχον Χρέος/Πίστωση</div>
+                <div>Τρέχον Χρέος</div>
                 <div className="text-xs font-normal text-gray-600">ΤΟ. ΦΩ. | ΠΛΑ. ΤΟ. | Σύνολο</div>
               </div>
             </SortableTableHeader>

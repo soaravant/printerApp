@@ -94,7 +94,6 @@ export function Navigation() {
               <div className="flex items-center space-x-2">
                 <div className="text-right">
                   <div className="text-sm font-medium text-gray-700">{displayUsername}</div>
-                  {displayName && <div className="text-xs text-gray-500">{displayName}</div>}
                 </div>
                 <RoleBadge accessLevel={user.accessLevel} className="text-xs" />
               </div>

@@ -36,14 +36,17 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
   clearFilters,
 }) => {
   return (
-    <div className="bg-white rounded-lg border border-blue-200 shadow-sm overflow-hidden mb-4">
-      <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
+    <div className="bg-white rounded-lg border border-blue-200 shadow-sm overflow-hidden h-full flex flex-col">
+      <div className="bg-blue-100 px-6 py-4 border-b border-blue-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-blue-50 p-2 rounded-lg">
               <Filter className="h-5 w-5 text-blue-700" />
             </div>
-            <h3 className="text-lg font-semibold text-blue-900">Φίλτρα Εκτυπώσεων</h3>
+            <h3 className="text-lg font-semibold text-blue-900">
+              Φίλτρα<br />
+              ΤΟ. ΦΩ.
+            </h3>
           </div>
           <button
             type="button"
@@ -55,10 +58,10 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
           </button>
         </div>
       </div>
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Row 1: Search and Printer */}
-          <div className="md:col-span-2">
+      <div className="p-6 flex-1 flex flex-col">
+        <div className="space-y-4 flex-1">
+          {/* Row 1: Search */}
+          <div>
             <Label htmlFor="search" className="text-gray-700">Αναζήτηση</Label>
             <div className="relative">
               <Input
@@ -81,7 +84,29 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
               )}
             </div>
           </div>
-          <div className="md:col-span-1">
+          
+          {/* Row 2: Date From */}
+          <div>
+            <GreekDatePicker
+              id="dateFrom"
+              label="Από Ημερομηνία"
+              value={dateFrom}
+              onChange={setDateFrom}
+            />
+          </div>
+          
+          {/* Row 3: Date To */}
+          <div>
+            <GreekDatePicker
+              id="dateTo"
+              label="Έως Ημερομηνία"
+              value={dateTo}
+              onChange={setDateTo}
+            />
+          </div>
+          
+          {/* Row 4: Printer */}
+          <div>
             <Label htmlFor="device" className="text-gray-700">Εκτυπωτής</Label>
             <Select value={deviceFilter} onValueChange={setDeviceFilter}>
               <SelectTrigger className="border-gray-200 focus:border-blue-500">
@@ -98,24 +123,8 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
             </Select>
           </div>
           
-          {/* Row 2: Date 1, Date 2, and Type */}
-          <div className="md:col-span-1">
-            <GreekDatePicker
-              id="dateFrom"
-              label="Από Ημερομηνία"
-              value={dateFrom}
-              onChange={setDateFrom}
-            />
-          </div>
-          <div className="md:col-span-1">
-            <GreekDatePicker
-              id="dateTo"
-              label="Έως Ημερομηνία"
-              value={dateTo}
-              onChange={setDateTo}
-            />
-          </div>
-          <div className="md:col-span-1">
+          {/* Row 5: Print Type */}
+          <div>
             <Label htmlFor="printType" className="text-gray-700">Είδος Εκτύπωσης</Label>
             <Select 
               value={printTypeFilter} 
