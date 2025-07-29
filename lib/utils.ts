@@ -109,8 +109,10 @@ export function calculatePrintJobTotal(costs: {
   costA4Color: number
   costA3BW: number
   costA3Color: number
-  costRizocharto: number
-  costChartoni: number
+  costRizochartoA3: number
+  costRizochartoA4: number
+  costChartoniA3: number
+  costChartoniA4: number
   costAutokollito: number
 }): number {
   return addMoney(
@@ -118,8 +120,10 @@ export function calculatePrintJobTotal(costs: {
     costs.costA4Color,
     costs.costA3BW,
     costs.costA3Color,
-    costs.costRizocharto,
-    costs.costChartoni,
+    costs.costRizochartoA3,
+    costs.costRizochartoA4,
+    costs.costChartoniA3,
+    costs.costChartoniA4,
     costs.costAutokollito
   )
 }
@@ -133,4 +137,48 @@ export function calculatePrintJobTotal(costs: {
  */
 export function calculatePrintCost(pages: number, pricePerPage: number): number {
   return multiplyMoney(pricePerPage, pages)
+}
+
+// Utility functions for dynamic filter options
+export const getDynamicFilterOptions = (users: any[]) => {
+  const teams = new Set<string>()
+  const naoi = new Set<string>()
+  const tomeis = new Set<string>()
+
+  users.forEach(user => {
+    // Extract teams from user data
+    if (user.team) {
+      teams.add(user.team)
+    }
+    
+    // Extract ναοί from user data (users with userRole "Ναός")
+    if (user.userRole === "Ναός") {
+      naoi.add(user.displayName)
+    }
+    
+    // Extract τομείς from user data (users with userRole "Τομέας")
+    if (user.userRole === "Τομέας") {
+      tomeis.add(user.displayName)
+    }
+    
+    // Also extract from memberOf arrays for individual users
+    if (user.memberOf && Array.isArray(user.memberOf)) {
+      user.memberOf.forEach((member: string) => {
+        if (member.includes("Ναός")) {
+          naoi.add(member)
+        } else if (member.includes("Τομέας")) {
+          tomeis.add(member)
+        } else {
+          // Assume it's a team if it doesn't contain "Ναός" or "Τομέας"
+          teams.add(member)
+        }
+      })
+    }
+  })
+
+  return {
+    teams: Array.from(teams).sort(),
+    naoi: Array.from(naoi).sort(),
+    tomeis: Array.from(tomeis).sort()
+  }
 }

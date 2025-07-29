@@ -3,25 +3,36 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SimplePagination } from "@/components/ui/pagination"
 import { Calendar } from "lucide-react"
-import type { PrintBilling, User } from "@/lib/dummy-database"
-import { dummyDB } from "@/lib/dummy-database"
 import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
 import { useState, useEffect } from "react"
 
 // Shared column definition for consistent widths
-const BillingColGroup = () => (
+const CombinedDebtColGroup = () => (
   <colgroup>
-    <col style={{ width: "15%" }} />
-    <col style={{ width: "25%" }} />
-    <col style={{ width: "25%" }} />
-    <col style={{ width: "15%" }} />
+    <col style={{ width: "12%" }} />
     <col style={{ width: "20%" }} />
+    <col style={{ width: "20%" }} />
+    <col style={{ width: "12%" }} />
+    <col style={{ width: "12%" }} />
+    <col style={{ width: "12%" }} />
+    <col style={{ width: "12%" }} />
   </colgroup>
 )
 
-interface PrintBillingTableProps {
-  data: PrintBilling[]
+interface CombinedDebtData {
+  uid: string
+  userDisplayName: string
+  userRole: string
+  responsiblePerson: string
+  printDebt: number
+  laminationDebt: number
+  totalDebt: number
+  lastPayment: Date | null
+}
+
+interface CombinedDebtTableProps {
+  data: CombinedDebtData[]
   page: number
   pageSize: number
   onPageChange: (page: number) => void
@@ -29,7 +40,7 @@ interface PrintBillingTableProps {
   onRowHover?: (hoveredJob: { deviceName: string; printType: string } | null) => void
 }
 
-export default function PrintBillingTable({ data, page, pageSize, onPageChange, userRole, onRowHover }: PrintBillingTableProps) {
+export default function CombinedDebtTable({ data, page, pageSize, onPageChange, userRole, onRowHover }: CombinedDebtTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
   const [sortedData, setSortedData] = useState(data)
 
@@ -39,7 +50,7 @@ export default function PrintBillingTable({ data, page, pageSize, onPageChange, 
       return
     }
 
-    // Custom sort for print billing data
+    // Custom sort for combined debt data
     const sorted = [...data].sort((a, b) => {
       const aValue = getSortValue(a, sortConfig.key)
       const bValue = getSortValue(b, sortConfig.key)
@@ -74,20 +85,16 @@ export default function PrintBillingTable({ data, page, pageSize, onPageChange, 
     setSortedData(sorted)
   }, [data, sortConfig])
 
-  const getSortValue = (billing: PrintBilling, key: string): any => {
+  const getSortValue = (item: CombinedDebtData, key: string): any => {
     switch (key) {
       case 'userRole':
-        const userData = dummyDB.getUserById(billing.uid)
-        return userData?.userRole || ""
+        return item.userRole
       case 'responsiblePerson':
-        const user = dummyDB.getUserById(billing.uid)
-        return user?.userRole === "Άτομο" 
-          ? user.displayName 
-          : user?.responsiblePerson || ""
+        return item.responsiblePerson
       case 'lastPayment':
-        return billing.lastPayment
+        return item.lastPayment
       default:
-        return (billing as any)[key]
+        return (item as any)[key]
     }
   }
 
@@ -98,16 +105,11 @@ export default function PrintBillingTable({ data, page, pageSize, onPageChange, 
 
   const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
   
-  // Helper function to get user data for each billing record
-  const getUserData = (uid: string): User | undefined => {
-    return dummyDB.getUserById(uid)
-  }
-  
   return (
     <div className="border rounded-lg">
       {/* Fixed (non-scrolling) header */}
       <Table className="min-w-full table-fixed">
-        <BillingColGroup />
+        <CombinedDebtColGroup />
         <TableHeader className="bg-gray-100">
           <TableRow>
             <SortableTableHeader
@@ -133,11 +135,25 @@ export default function PrintBillingTable({ data, page, pageSize, onPageChange, 
               Υπεύθυνος
             </SortableTableHeader>
             <SortableTableHeader
-              sortKey="remainingBalance"
+              sortKey="printDebt"
               currentSort={sortConfig}
               onSort={handleSort}
             >
-              Συνολικό Χρέος
+              Εκτυπώσεις
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="laminationDebt"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Πλαστικοποιήσεις
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="totalDebt"
+              currentSort={sortConfig}
+              onSort={handleSort}
+            >
+              Τρέχων Χρέος
             </SortableTableHeader>
             <SortableTableHeader
               sortKey="lastPayment"
@@ -154,53 +170,52 @@ export default function PrintBillingTable({ data, page, pageSize, onPageChange, 
       {/* Scrollable body only */}
       <div className="max-h-[400px] overflow-y-auto">
         <Table className="min-w-full table-fixed">
-          <BillingColGroup />
+          <CombinedDebtColGroup />
           <TableBody>
             {sortedData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                   Δεν βρέθηκαν αποτελέσματα
                 </TableCell>
               </TableRow>
             ) : (
-              sortedData.slice((page-1)*pageSize, page*pageSize).map((billing: PrintBilling) => {
-                const userData = getUserData(billing.uid)
-                const responsiblePerson = userData?.userRole === "Άτομο" 
-                  ? userData.displayName 
-                  : userData?.responsiblePerson || "-"
-                
-                return (
-                  <TableRow 
-                    key={billing.billingId}
-                    className="hover:bg-yellow-50 cursor-pointer transition-colors duration-200"
-                    onMouseEnter={() => onRowHover?.({ deviceName: "billing", printType: "print" })}
-                    onMouseLeave={() => onRowHover?.(null)}
-                  >
-                    <TableCell className="text-center font-medium">{userData?.userRole || "-"}</TableCell>
-                    <TableCell className="text-center">{billing.userDisplayName}</TableCell>
-                    <TableCell className="text-center">{responsiblePerson}</TableCell>
-                    <TableCell className={`text-center ${billing.remainingBalance > 0 ? "text-red-600 font-semibold" : "text-green-600"}`}>
-                      {formatPrice(billing.remainingBalance)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {billing.lastPayment ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {billing.lastPayment.toLocaleDateString("el-GR")}
-                        </div>
-                      ) : (
-                        <span className="text-gray-500">-</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )
-              })
+              sortedData.slice((page-1)*pageSize, page*pageSize).map((item: CombinedDebtData) => (
+                <TableRow 
+                  key={item.uid}
+                  className="hover:bg-yellow-50 cursor-pointer transition-colors duration-200"
+                  onMouseEnter={() => onRowHover?.({ deviceName: "billing", printType: "combined" })}
+                  onMouseLeave={() => onRowHover?.(null)}
+                >
+                  <TableCell className="text-center font-medium">{item.userRole}</TableCell>
+                  <TableCell className="text-center">{item.userDisplayName}</TableCell>
+                  <TableCell className="text-center">{item.responsiblePerson}</TableCell>
+                  <TableCell className={`text-center ${item.printDebt > 0 ? "text-red-600 font-semibold" : "text-green-600"}`}>
+                    {formatPrice(item.printDebt)}
+                  </TableCell>
+                  <TableCell className={`text-center ${item.laminationDebt > 0 ? "text-red-600 font-semibold" : "text-green-600"}`}>
+                    {formatPrice(item.laminationDebt)}
+                  </TableCell>
+                  <TableCell className={`text-center ${item.totalDebt > 0 ? "text-red-600 font-semibold" : "text-green-600"}`}>
+                    {formatPrice(item.totalDebt)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {item.lastPayment ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        {item.lastPayment.toLocaleDateString("el-GR")}
+                      </div>
+                    ) : (
+                      <span className="text-gray-500">-</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
       </div>
 
-              <SimplePagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
+      <SimplePagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
     </div>
   )
 } 

@@ -2,6 +2,2307 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+### Ξεχρέωση (Debt Reduction) Feature Implementation (December 2024)
+
+**Problem**: Admins needed a way to record payments from users to reduce their debt. There was no system to track payments and maintain a transaction history.
+
+**Requirements**:
+- Add a new "Ξεχρέωση" tab in the admin page for debt reduction
+- Allow admins to input payment amounts for users
+- Automatically update billing records when payments are made
+- Display transaction history in the dashboard
+- Use yellow color theme to match the debt management section
+
+**Solution**: Implemented a comprehensive debt reduction system with transaction tracking.
+
+**Changes Made**:
+
+**1. Enhanced Dummy Database (`lib/dummy-database.ts`)**:
+- **Added Transaction interface**: New data structure for payment records
+- **Added transactions array**: Store all payment transactions
+- **Added transaction methods**: `getTransactions()`, `addTransaction()`
+- **Automatic billing updates**: When a transaction is added, it automatically updates the corresponding billing records
+- **Payment allocation**: Payments are applied to print billing first, then lamination billing
+
+**2. Updated Admin Page (`app/admin/page.tsx`)**:
+- **Added Ξεχρέωση tab**: New yellow-themed tab for debt reduction
+- **Payment form**: User selection, amount input, date picker, and optional description
+- **Current debt display**: Shows user's current debt breakdown when selected
+- **Form validation**: Ensures required fields are filled and amount is positive
+- **Success feedback**: Toast notifications for successful payments
+- **Form reset**: Clears form after successful payment
+
+**3. Created Transaction History Table (`components/transaction-history-table.tsx`)**:
+- **New component**: Displays transaction history with yellow theme
+- **Column structure**: Ημερομηνία, Χρήστης, Ποσό, Τύπος, Περιγραφή, Διαχειριστής
+- **Visual indicators**: Green for payments, red for refunds
+- **Pagination support**: Consistent with other table components
+- **Export functionality**: XLSX export for transaction history
+
+**4. Updated Dashboard Page (`app/dashboard/page.tsx`)**:
+- **Added transaction history section**: New yellow-themed section under the combined debt table
+- **Transaction data loading**: Loads and displays all transactions
+- **Admin-only export**: Export button only visible to admins
+- **Consistent styling**: Matches the yellow theme of debt management
+
+**Key Features**:
+- **Payment recording**: Admins can record payments with amount, date, and description
+- **Automatic debt reduction**: Payments automatically reduce user debt across all billing records
+- **Transaction history**: Complete audit trail of all payments and refunds
+- **Visual feedback**: Color-coded transaction types and amounts
+- **Export capability**: XLSX export for transaction history
+- **Form validation**: Ensures data integrity and user-friendly error messages
+
+**Technical Implementation**:
+- **Data integrity**: Transactions are atomic and automatically update billing records
+- **Payment allocation**: Smart allocation to oldest unpaid billing records first
+- **Type safety**: Full TypeScript support with proper interfaces
+- **Performance**: Efficient data processing and pagination
+- **Maintainability**: Clean separation of concerns with dedicated components
+
+**Result**: Admins can now efficiently record payments, automatically reduce user debt, and maintain a complete transaction history. The system provides transparency and auditability for all financial transactions.
+
+### Negative Debt (Credit) Support Implementation (December 2024)
+
+**Problem**: Users wanted the ability to create negative debt (credits) for users, but the system was only showing €0.00 instead of negative amounts when credits were applied.
+
+**Requirements**:
+- Allow negative amounts in the debt reduction form
+- Display negative debt amounts correctly in all components
+- Show green color for zero or negative debt (credits)
+- Support credits that can be used for future charges
+- Maintain proper transaction history for credits
+
+**Solution**: Implemented comprehensive negative debt support with proper display and color coding.
+
+**Changes Made**:
+
+**1. Enhanced Database Logic (`lib/dummy-database.ts`)**:
+- **Simplified credit creation**: Negative amounts always create credits (negative balances)
+- **Proper negative balance handling**: Database now supports negative `remainingBalance` values
+- **Credit allocation**: Credits are applied to lamination billing first, then print billing
+- **Transaction type automation**: Automatically sets type to "payment" or "refund" based on amount sign
+
+**2. Updated Admin Interface (`app/admin/page.tsx`)**:
+- **Enhanced form labels**: Changed to "Ποσό Πληρωμής/Επιστροφής" to reflect both payments and refunds
+- **Improved placeholder text**: Added "(αρνητικό για επιστροφή)" to clarify negative amounts are allowed
+- **Updated button text**: Changed to "Προσθήκη Πληρωμής/Επιστροφής"
+- **Better debt preview**: Enhanced logic to properly calculate remaining debt after credits
+- **Transaction type automation**: Automatically sets transaction type based on amount sign
+
+**3. Enhanced Display Components**:
+- **Color-coded debt display**: Green for zero or negative debt (credits), red for positive debt
+- **Proper negative formatting**: All components now correctly display negative amounts with minus sign
+- **Consistent styling**: Applied across all debt display components (dashboard, admin, user cards)
+
+**4. Comprehensive Testing**:
+- **Verified negative debt creation**: Confirmed that negative amounts create proper credits
+- **Tested display logic**: Ensured negative amounts show correctly in all components
+- **Dashboard table verification**: Confirmed that `CombinedDebtTable` displays negative values with green color
+- **UI component testing**: Verified that all UI components handle negative values correctly
+- **Formatting validation**: Confirmed `formatPrice` function properly formats negative numbers (e.g., €-27,49)
+- **Color logic testing**: Verified color logic correctly applies green for negative/zero values, red for positive
+
+**Testing Results**:
+- ✅ Database correctly creates negative balances in billing records
+- ✅ `formatPrice` function properly formats negative numbers (e.g., €-27,49)
+- ✅ Color logic correctly applies green for negative/zero values, red for positive
+- ✅ Dashboard table (`CombinedDebtTable`) displays negative values with green color
+- ✅ Admin debt reduction form supports negative amounts for credits
+- ✅ All UI components handle negative debt values correctly
+
+**Example**: User with €2,95 print debt and €-27,49 lamination credit shows total debt of €-24,54 in green color.
+- **Validated color coding**: Confirmed green color for credits, red for debt
+- **Checked formatting**: Verified negative amounts display with proper formatting
+
+**Key Features**:
+- **Credit creation**: Negative amounts create credits that can be used for future charges
+- **Visual feedback**: Green color for credits, red for outstanding debt
+- **Proper formatting**: Negative amounts display with minus sign (e.g., €-10,50)
+- **Transaction history**: Credits are properly recorded in transaction history
+- **Flexible allocation**: Credits are applied to appropriate billing records
+
+**Technical Implementation**:
+- **Database support**: Negative `remainingBalance` values are properly stored and calculated
+- **Type safety**: Full TypeScript support with proper interfaces
+- **Performance**: Efficient calculation and display of negative balances
+- **Maintainability**: Clean separation of concerns with consistent logic
+
+**Result**: Users can now create credits for users, and the system properly displays negative debt amounts in green color across all components. Credits can be used for future charges and are properly tracked in the transaction history.
+
+**Recent Updates (December 2024)**:
+- **Removed description field**: Simplified the payment form by removing the optional description field
+- **Enhanced user filter**: Now shows all users except admin (includes Υπεύθυνος users)
+- **Live debt calculation**: Shows remaining debt after payment in real-time as the amount is entered
+- **Payment allocation logic**: Payments are applied to lamination debt first, then printing debt
+- **Negative payments support**: Allows negative amounts for refunds/credits
+- **Visual feedback**: Shows green color for zero or negative debt, red for outstanding debt
+- **Improved validation**: Removed positive-only restriction on payment amounts
+- **Form layout optimization**: All three fields (User, Amount, Date) now display in a single row
+- **Default date**: Payment date automatically set to today's date
+- **Negative debt support**: Fixed database methods to properly handle and display negative debt amounts
+- **Comprehensive debt tracking**: Updated `getTotalUnpaidForUser` to include all billing records regardless of paid status
+- **Enhanced negative debt handling**: Improved refund logic to properly distribute negative amounts across print and lamination billing records
+- **Better credit management**: Negative amounts now create proper credits that can be used for future charges
+- **Updated UI labels**: Changed labels to reflect that both payments and refunds are supported
+- **Improved transaction types**: Automatically sets transaction type to "payment" or "refund" based on amount sign
+- **Simplified credit creation**: Negative amounts always create credits (negative balances) regardless of existing paid amounts
+- **Proper negative balance support**: Database now properly handles and displays negative remaining balances
+- **Color-coded debt display**: Green for zero or negative debt (credits), red for positive debt
+- **Comprehensive testing**: Verified that negative debt displays correctly in all components
+
+### Combined Debt Table Implementation - Show Current Debt (December 2024)
+
+### Combined Debt Table Implementation - Show Current Debt (December 2024)
+
+**Problem**: The "Συγκεντρωτικός Χρεωστικός Πίνακας" (Total Debt Table) was only showing printing billing data, but users wanted to see the combined current debt from both printing and lamination services for each user.
+
+**Requirements**:
+- Show combined debt (printing + lamination) for each user
+- Change column header from "Συνολικό Χρέος" to "Τρέχων Χρέος"
+- Display separate columns for printing and lamination debts
+- Show total current debt as the sum
+
+**Solution**: Created a new CombinedDebtTable component and modified the dashboard to calculate and display combined debt data.
+
+**Changes Made**:
+
+**1. Created CombinedDebtTable Component (`components/combined-debt-table.tsx`)**:
+- **New component**: Displays combined debt data with separate columns for printing and lamination
+- **Column structure**: Ρόλος, Όνομα, Υπεύθυνος, Εκτυπώσεις, Πλαστικοποιήσεις, Τρέχων Χρέος, Τελευταία Εξόφληση
+- **Sorting support**: All columns are sortable with proper data type handling
+- **Visual indicators**: Red text for debts > 0, green for zero debt
+- **Responsive design**: Consistent with existing table components
+
+**2. Updated Dashboard Page (`app/dashboard/page.tsx`)**:
+- **Added calculateCombinedDebtData function**: Combines printing and lamination billing data by user
+- **Data aggregation**: Sums up remaining balances from both services per user
+- **Payment tracking**: Keeps the most recent payment date from either service
+- **Export functionality**: Updated XLSX export to include separate columns for printing and lamination debts
+- **Component integration**: Replaced PrintBillingTable with CombinedDebtTable in the consolidated debt section
+
+**Key Features**:
+- **Combined calculation**: Automatically sums printing and lamination debts per user
+- **Separate columns**: Shows printing and lamination debts separately for transparency
+- **Total debt**: "Τρέχων Χρέος" column shows the combined total
+- **Visual feedback**: Color-coded debt amounts (red for outstanding, green for paid)
+- **Export support**: XLSX export includes all debt breakdown columns
+- **Sorting**: All columns support sorting with proper data type handling
+
+**Technical Implementation**:
+- **Data mapping**: Uses Map to efficiently aggregate debt data by user ID
+- **Type safety**: Full TypeScript support with proper interfaces
+- **Performance**: Efficient data processing with O(n) complexity
+- **Maintainability**: Clean separation of concerns with dedicated component
+
+**Result**: Users can now see the complete current debt picture for each user, including separate breakdowns for printing and lamination services, with the total current debt prominently displayed in the "Τρέχων Χρέος" column.
+
+### Print Type Filter Fix - Filter Expanded Rows (December 2024)
+
+**Problem**: The print type filter was not working as expected. When users selected a specific print type (e.g., "Α4 Ασπρόμαυρο"), the table would show all print types from jobs that contained the selected type, rather than showing only the specific print type rows.
+
+**Root Cause**: The filtering was applied to the raw print jobs before they were expanded into individual rows. This meant that if a job contained multiple print types and one matched the filter, the entire job would be included, and all its print types would be displayed.
+
+**Example of the Issue**:
+- A job has: `pagesA4BW: 5`, `pagesRizochartoA3: 2`, `pagesChartoniA4: 1`
+- User selects filter: "Α4 Ασπρόμαυρο" (a4BW)
+- Expected: Show only A4 Ασπρόμαυρο rows
+- Actual: Showed A4 Ασπρόμαυρο, Ριζόχαρτο A3, and Χαρτόνι A4 rows
+
+**Solution**: Modified the PrintJobsTable component to accept a `printTypeFilter` prop and apply filtering to the expanded rows instead of the raw jobs.
+
+**Changes Made**:
+
+**1. Updated PrintJobsTable Component (`components/print-jobs-table.tsx`)**:
+- **Added printTypeFilter prop**: New optional prop to receive the current print type filter
+- **Added filterExpandedRowsByType function**: Helper function to filter expanded rows by print type
+- **Updated useEffect**: Now applies print type filtering to expanded rows after job expansion
+- **Maintained existing functionality**: All other filtering and sorting remains unchanged
+
+```typescript
+// New prop interface
+interface PrintJobsTableProps {
+  // ... existing props
+  printTypeFilter?: string // New prop for filtering expanded rows
+}
+
+// New filter function
+const filterExpandedRowsByType = (rows: any[], printTypeFilter: string) => {
+  if (!printTypeFilter || printTypeFilter === "all") {
+    return rows
+  }
+  
+  const filterMap: { [key: string]: string } = {
+    "a4BW": "A4 Ασπρόμαυρο",
+    "a4Color": "A4 Έγχρωμο",
+    "a3BW": "A3 Ασπρόμαυρο",
+    "a3Color": "A3 Έγχρωμο",
+    "rizochartoA3": "Ριζόχαρτο A3",
+    "rizochartoA4": "Ριζόχαρτο A4",
+    "chartoniA3": "Χαρτόνι A3",
+    "chartoniA4": "Χαρτόνι A4",
+    "autokollito": "Αυτοκόλλητο"
+  }
+  
+  const targetPrintType = filterMap[printTypeFilter]
+  if (!targetPrintType) {
+    return rows
+  }
+  
+  return rows.filter(row => row.printType === targetPrintType)
+}
+
+// Updated useEffect
+useEffect(() => {
+  // Expand each print job into individual rows
+  const expandedData = data.flatMap(expandPrintJob)
+  
+  // Apply print type filter to expanded rows
+  const filteredExpandedData = filterExpandedRowsByType(expandedData, printTypeFilter || "all")
+  
+  setSortedData(sortData(filteredExpandedData, sortConfig))
+}, [data, sortConfig, printTypeFilter])
+```
+
+**2. Updated Dashboard Page (`app/dashboard/page.tsx`)**:
+- **Passed printTypeFilter prop**: Added printTypeFilter to PrintJobsTable component
+- **Maintained existing filter logic**: The existing filter logic for raw jobs remains for other filters
+
+```typescript
+<PrintJobsTable
+  data={filteredPrintJobs}
+  page={printJobsPage}
+  pageSize={PAGE_SIZE}
+  onPageChange={setPrintJobsPage}
+  userRole={user.accessLevel}
+  onRowHover={setHoveredPrintJob}
+  printTypeFilter={printTypeFilter} // New prop
+/>
+```
+
+**Key Benefits**:
+- **Precise Filtering**: Users now see only the specific print type they selected
+- **Better User Experience**: Filter behavior matches user expectations
+- **Maintained Performance**: Filtering is applied efficiently to expanded rows
+- **Backward Compatibility**: All existing functionality remains unchanged
+
+**Technical Implementation**:
+- **Two-stage filtering**: Raw jobs are filtered first (for other filters), then expanded rows are filtered by print type
+- **Efficient mapping**: Uses a filter map to convert filter values to display names
+- **Conditional filtering**: Only applies print type filter when a specific type is selected
+- **Proper dependency management**: useEffect includes printTypeFilter in dependencies
+
+**Result**: The print type filter now works correctly, showing only the specific print type rows that users expect to see when they select a filter option.
+
+### Print Type Filter Enhancement - Specific A3/A4 Variants (December 2024)
+
+### Print Type Filter Enhancement - Specific A3/A4 Variants (December 2024)
+
+**Feature Modified**: Enhanced the print type filter to show specific A3/A4 variants for Ριζόχαρτο and Χαρτόνι instead of generic options, providing more precise filtering capabilities.
+
+**Changes Made**:
+
+**1. Updated Print Filters (`components/print-filters.tsx`)**:
+- **Filter Options**: Replaced generic options with specific A3/A4 variants
+  - Removed: `rizocharto`, `chartoni` (generic)
+  - Added: `rizochartoA3`, `rizochartoA4`, `chartoniA3`, `chartoniA4` (specific)
+- **User Interface**: Dropdown now shows:
+  - A4 Ασπρόμαυρο
+  - A4 Έγχρωμο  
+  - A3 Ασπρόμαυρο
+  - A3 Έγχρωμο
+  - Ριζόχαρτο A3
+  - Ριζόχαρτο A4
+  - Χαρτόνι A3
+  - Χαρτόνι A4
+  - Αυτοκόλλητο
+
+**2. Updated Filter Logic (`app/dashboard/page.tsx`)**:
+- **Filter Cases**: Updated switch statement to handle specific variants
+  - `rizochartoA3`: Filters for `pagesRizochartoA3 > 0`
+  - `rizochartoA4`: Filters for `pagesRizochartoA4 > 0`
+  - `chartoniA3`: Filters for `pagesChartoniA3 > 0`
+  - `chartoniA4`: Filters for `pagesChartoniA4 > 0`
+- **Export Functionality**: Updated `expandPrintJob` function to handle specific variants
+  - Each variant now exports as a separate row with correct labels
+  - Proper cost calculation for each specific variant
+
+**3. Printer Capability Integration**:
+- **Canon Colour**: Can filter by all print types (full capability)
+- **Canon B/W & Brother**: Automatically restricted to A4 Ασπρόμαυρο only
+- **Filter Disabling**: Type filter is disabled and auto-set when B/W printers are selected
+
+**Key Benefits**:
+- **Precise Filtering**: Users can filter by specific paper sizes and types
+- **Better Data Analysis**: More granular filtering for reporting and analysis
+- **Consistent with Database**: Filter options match the actual database schema
+- **Improved UX**: Clear distinction between different paper variants
+
+**Technical Implementation**:
+- Updated filter dropdown options to match database fields
+- Modified filter logic to handle specific variants
+- Updated export functionality to properly handle specific variants
+- Maintained backward compatibility with existing filter behavior
+
+**Files Modified**:
+- `components/print-filters.tsx` - Filter dropdown options
+- `app/dashboard/page.tsx` - Filter logic and export functionality
+
+**Testing Considerations**:
+- Verify all specific filter options work correctly
+- Verify export functionality includes all variants properly
+- Verify printer-specific filter restrictions work as expected
+- Verify filter combinations work correctly
+
+**Result**: Print type filter now provides precise filtering by specific A3/A4 variants, improving data analysis capabilities and user experience.
+
+### Printing Items Refined - Removed Generic Χαρτόνι & Ριζοχαρτο (December 2024)
+
+**Feature Modified**: Removed generic "Χαρτόνι" and "Ριζόχαρτο" items, keeping only the specific A3 and A4 variants for better precision and clarity.
+
+**Current Items**:
+- **Ριζοχαρτο A3**: €0,20 (Ριζόχαρτο A3)
+- **Ριζοχαρτο A4**: €0,15 (Ριζόχαρτο A4)  
+- **Χαρτόνι A3**: €0,20 (Χαρτόνι A3)
+- **Χαρτόνι A4**: €0,15 (Χαρτόνι A4)
+
+**Removed Items**:
+- ~~Ριζόχαρτο (generic)~~
+- ~~Χαρτόνι (generic)~~
+
+**Changes Made**:
+
+**1. Updated Database Schema (`lib/dummy-database.ts`)**:
+- **PrintJob Interface**: Removed generic fields, kept only A3/A4 variants
+  - Removed: `pagesRizocharto`, `pagesChartoni`, `costRizocharto`, `costChartoni`
+  - Kept: `pagesRizochartoA3`, `pagesRizochartoA4`, `pagesChartoniA3`, `pagesChartoniA4`
+  - Kept: `costRizochartoA3`, `costRizochartoA4`, `costChartoniA3`, `costChartoniA4`
+- **PrintBilling Interface**: Removed generic total fields
+  - Removed: `totalRizocharto`, `totalChartoni`
+  - Kept: `totalRizochartoA3`, `totalRizochartoA4`, `totalChartoniA3`, `totalChartoniA4`
+- **Price Tables**: Removed generic pricing entries
+  - Removed: `rizocharto: 0.10`, `chartoni: 0.10`
+  - Kept: `rizochartoA3: 0.20`, `rizochartoA4: 0.15`, `chartoniA3: 0.20`, `chartoniA4: 0.15`
+
+**2. Updated Cost Calculation (`lib/utils.ts`)**:
+- **calculatePrintJobTotal Function**: Removed generic cost fields from total calculation
+- **Enhanced Money Handling**: Updated to handle only specific A3/A4 variants
+
+**3. Updated Admin Interface (`app/admin/page.tsx`)**:
+- **Printing Type State**: Removed generic types from type definition
+- **Select Options**: Removed generic items from printing type dropdown
+- **Price Display**: Only specific A3/A4 variants show with their respective prices
+
+**4. Updated Prices Page (`app/prices/page.tsx`)**:
+- **Price Display**: Removed generic items from price list display
+- **Service Options**: Updated calculator service options to exclude generic variants
+- **Conditional Calculator**: Price calculator now only shows for non-admin users
+
+**5. Updated Python Data Collection (`python/collect.py`)**:
+- **Default Pricing**: Removed generic pricing entries from default pricing structure
+- **Cost Calculation**: Updated cost calculation to exclude generic fields
+- **Error Handling**: Updated error handling to exclude generic cost fields
+
+**Key Benefits**:
+- **Precise Pricing**: Users must select specific A3/A4 variants, eliminating ambiguity
+- **Accurate Billing**: Clear distinction between different paper sizes and types
+- **Better User Experience**: No confusion between generic and specific paper types
+- **Admin Control**: Admin users can manage charges for specific paper sizes only
+
+**Technical Implementation**:
+- Removed generic fields while maintaining specific A3/A4 variants
+- Used proper money handling functions for all calculations
+- Updated error handling to exclude generic fields
+- Updated all relevant interfaces and displays to show only specific variants
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Database schema and price tables
+- `lib/utils.ts` - Cost calculation functions
+- `app/admin/page.tsx` - Admin interface updates
+- `app/prices/page.tsx` - Price display and calculator updates
+- `python/collect.py` - Data collection service updates
+
+**Testing Considerations**:
+- Verify generic items no longer appear in admin printing charge interface
+- Verify only specific A3/A4 variants appear in price list display
+- Verify cost calculations work correctly for specific variants only
+- Verify price calculator includes only specific variants (for non-admin users)
+- Verify data collection service handles specific fields properly
+
+**Result**: System now supports only specific A3/A4 variants for Χαρτόνι and Ριζόχαρτο, eliminating ambiguity and providing more precise billing control.
+
+### Price Calculator Access Control (December 2024)
+
+**Feature Modified**: Modified the price calculator section to only be visible to non-admin users, while keeping it accessible to all other user access levels.
+
+**Changes Made**:
+
+**1. Conditional Display (`app/prices/page.tsx`)**:
+- **Access Control**: Added condition `{user && user.accessLevel !== "admin" && (...)}` around calculator section
+- **User Experience**: Admin users see only price lists, other users see price lists + calculator
+- **Maintained Functionality**: Calculator remains fully functional for authorized users
+
+**Key Benefits**:
+- **Admin Focus**: Admin users can focus on price management without calculator distraction
+- **User Empowerment**: Regular users can still calculate costs before printing
+- **Role-Based Access**: Clear separation of functionality based on user role
+- **Cleaner Interface**: Admin interface is more streamlined
+
+**Technical Implementation**:
+- Used existing user authentication context
+- Maintained all calculator functionality for authorized users
+- No changes to calculator logic or features
+
+**Files Modified**:
+- `app/prices/page.tsx` - Added conditional rendering for calculator section
+
+**Testing Considerations**:
+- Verify calculator is hidden for admin users
+- Verify calculator is visible for regular users and Υπεύθυνος users
+- Verify calculator functionality works correctly for authorized users
+- Verify price lists remain visible for all users
+
+**Result**: Price calculator is now appropriately restricted based on user access level, providing a better user experience for different user roles.
+
+### Lamination Debts Card Dynamic Filtering Fix (December 2024)
+
+**Problem**: The "Οφειλές ΠΛΑ. ΤΟ." (lamination debts) card on the dashboard was not updating dynamically when users applied billing filters. The card continued to show the total lamination debts from all data instead of reflecting the filtered results.
+
+**Root Cause**: The lamination billing filtering in the `applyFilters` function was only applying legacy filters (`searchTerm`, `statusFilter`, `userFilter`) but was missing the billing-specific filters that were applied to print billing (`billingSearchTerm`, `billingDebtFilter`, `billingPriceRange`, `billingAmountFilter`, `billingRoleFilter`).
+
+**Solution**: Updated the lamination billing filtering logic to include all the same billing-specific filters that are applied to print billing, ensuring consistent behavior across both debt cards.
+
+**Changes Made**:
+
+**1. Enhanced Lamination Billing Filtering (`app/dashboard/page.tsx`)**:
+- **Added billing search filter**: Now applies `billingSearchTerm` to lamination billing data
+- **Added billing debt filter**: Now applies `billingDebtFilter` (paid/unpaid) to lamination billing
+- **Added billing price range filter**: Now applies `billingPriceRange` to filter by remaining balance
+- **Added billing amount filter**: Now applies `billingAmountFilter` (under10, 10to50, over50) to lamination billing
+- **Added billing role filter**: Now applies `billingRoleFilter` to filter by user role
+- **Maintained legacy filters**: Preserved existing legacy filter functionality for backward compatibility
+
+```typescript
+// Before: Only legacy filters
+let filteredLB = [...laminationBilling]
+if (searchTerm) {
+  filteredLB = filteredLB.filter(/* search logic */)
+}
+if (statusFilter !== "all") {
+  filteredLB = filteredLB.filter(/* status logic */)
+}
+if (userFilter !== "all") {
+  filteredLB = filteredLB.filter(/* user logic */)
+}
+
+// After: Complete billing-specific filters + legacy filters
+let filteredLB = [...laminationBilling]
+
+// Apply billing search filter
+if (billingSearchTerm) {
+  filteredLB = filteredLB.filter(/* billing search logic */)
+}
+
+// Apply billing debt filter
+if (billingDebtFilter !== "all") {
+  filteredLB = filteredLB.filter(/* billing debt logic */)
+}
+
+// Apply billing price range filter
+if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
+  filteredLB = filteredLB.filter(/* price range logic */)
+}
+
+// Apply billing amount filter
+if (billingAmountFilter !== "all") {
+  filteredLB = filteredLB.filter(/* amount filter logic */)
+}
+
+// Apply billing role filter
+if (billingRoleFilter !== "all") {
+  filteredLB = filteredLB.filter(/* role filter logic */)
+}
+
+// Apply legacy filters for backward compatibility
+if (searchTerm) { /* legacy search logic */ }
+if (statusFilter !== "all") { /* legacy status logic */ }
+if (userFilter !== "all") { /* legacy user logic */ }
+```
+
+**Key Benefits**:
+- **Consistent Behavior**: Both print and lamination debt cards now respond to the same filters
+- **Accurate Statistics**: Lamination debts card now shows accurate totals based on current filter state
+- **Better User Experience**: Users can filter data and see corresponding changes in both debt cards
+- **Real-time Updates**: Lamination debts update immediately when billing filters are applied or changed
+- **Complete Filtering**: All billing-specific filters now work for both print and lamination data
+
+**Technical Implementation**:
+- Used the same filtering logic as print billing for consistency
+- Maintained backward compatibility with existing legacy filters
+- Applied all billing-specific filters: search, debt status, price range, amount ranges, and role filtering
+- Preserved existing functionality while adding new capabilities
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Enhanced lamination billing filtering in `applyFilters` function
+
+**Testing Considerations**:
+- Verify that lamination debts card updates when billing search is applied
+- Verify that lamination debts card updates when debt status filter is changed
+- Verify that lamination debts card updates when price range filter is adjusted
+- Verify that lamination debts card updates when amount filter is changed
+- Verify that lamination debts card updates when role filter is applied
+- Verify that both debt cards show consistent totals when same filters are applied
+
+**Result**: The "Οφειλές ΠΛΑ. ΤΟ." card now updates dynamically with all billing filters, providing users with accurate and consistent debt information that reflects their current filter selections.
+
+### Conditional Percentage Display for Debt Cards (December 2024)
+
+**Feature Enhanced**: Modified the percentage indicators on debt cards to only appear when filters are applied, and to show 100% for each debt type when no filters are active.
+
+**Changes Made**:
+
+**1. Added Filter Detection Logic (`app/dashboard/page.tsx`)**:
+- **Comprehensive filter checking**: Detects when any billing or legacy filters are applied
+- **Dynamic percentage calculation**: Shows 100% when no filters, actual percentages when filtered
+- **Real-time updates**: Filter detection updates automatically when any filter changes
+
+```typescript
+// Check if any filters are applied
+const hasFilters = billingSearchTerm || 
+                  billingDebtFilter !== "all" || 
+                  billingPriceRange[0] !== billingPriceDistribution.min || 
+                  billingPriceRange[1] !== billingPriceDistribution.max ||
+                  billingAmountFilter !== "all" || 
+                  billingRoleFilter !== "all" ||
+                  searchTerm || 
+                  statusFilter !== "all" || 
+                  userFilter !== "all"
+
+// Calculate percentages for debt cards
+// When no filters are applied, each type represents 100% of its own total
+// When filters are applied, calculate percentage of filtered total
+const printUnpaidPercentage = hasFilters 
+  ? (totalUnpaid > 0 ? (printUnpaid / totalUnpaid) * 100 : 0)
+  : 100
+const laminationUnpaidPercentage = hasFilters 
+  ? (totalUnpaid > 0 ? (laminationUnpaid / totalUnpaid) * 100 : 0)
+  : 100
+```
+
+**2. Updated Card Layouts**:
+- **Conditional percentage display**: Percentage text only appears when `hasFilters` is true
+- **Dynamic layout**: Uses `justify-between` when filters are applied, `justify-center` when not
+- **Clean interface**: No percentage text cluttering the interface when no filters are active
+
+```typescript
+// Before: Always show percentage
+<div className="p-6 flex-1 flex items-center justify-between">
+  <div className="text-3xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
+  <div className="text-sm text-gray-500">({printUnpaidPercentage.toFixed(1)}% συνολικού)</div>
+</div>
+
+// After: Conditional percentage display
+<div className={`p-6 flex-1 flex items-center ${hasFilters ? 'justify-between' : 'justify-center'}`}>
+  <div className="text-3xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
+  {hasFilters && (
+    <div className="text-sm text-gray-500">({printUnpaidPercentage.toFixed(1)}% συνολικού)</div>
+  )}
+</div>
+```
+
+**Key Features**:
+- **Clean Default State**: No percentage text when no filters are applied
+- **100% Representation**: Each debt type shows as 100% of its own total when unfiltered
+- **Dynamic Percentages**: When filters are applied, percentages show actual proportions
+- **Responsive Layout**: Cards automatically adjust layout based on filter state
+- **Real-time Updates**: Percentage display updates immediately when filters change
+
+**User Experience**:
+1. **No Filters Applied**: 
+   - Print Debts: €2,753.06 (centered, no percentage text)
+   - Lamination Debts: €208.12 (centered, no percentage text)
+
+2. **Filters Applied**:
+   - Print Debts: €2,753.06 (93.0% συνολικού) ← percentage on right
+   - Lamination Debts: €208.12 (7.0% συνολικού) ← percentage on right
+
+**Technical Implementation**:
+- Used comprehensive filter detection covering all billing and legacy filters
+- Implemented conditional rendering for percentage text
+- Applied dynamic CSS classes for responsive layout
+- Maintained existing functionality while adding new behavior
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Added filter detection and conditional percentage display
+
+**Benefits**:
+- **Cleaner Interface**: No unnecessary percentage text when viewing total data
+- **Better Context**: Percentages only appear when they provide meaningful information
+- **Intuitive Behavior**: Users understand that 100% means "all data" for each type
+- **Consistent Experience**: Layout adapts smoothly between filtered and unfiltered states
+
+### Debt Card Percentage Indicators (December 2024)
+
+**Feature Added**: Added percentage indicators next to the large monetary values in the debt cards, showing what percentage each debt type represents of the total debt amount.
+
+**Changes Made**:
+
+**1. Added Percentage Calculations (`app/dashboard/page.tsx`)**:
+- **Print debt percentage**: Calculates what percentage print debts represent of total debts
+- **Lamination debt percentage**: Calculates what percentage lamination debts represent of total debts
+- **Zero division protection**: Handles cases where total debt is zero to prevent calculation errors
+
+```typescript
+// Calculate percentages for debt cards
+const printUnpaidPercentage = totalUnpaid > 0 ? (printUnpaid / totalUnpaid) * 100 : 0
+const laminationUnpaidPercentage = totalUnpaid > 0 ? (laminationUnpaid / totalUnpaid) * 100 : 0
+```
+
+**2. Updated Card Layouts**:
+- **Centered content**: Changed card content to be centered for better visual balance
+- **Percentage display**: Added small gray text below the main monetary value showing percentage
+- **Consistent styling**: Used consistent text styling and spacing across all cards
+
+```typescript
+// Before: Simple monetary value
+<div className="text-3xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
+
+// After: Monetary value with percentage
+<div className="text-center">
+  <div className="text-3xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
+  <div className="text-sm text-gray-500 mt-1">({printUnpaidPercentage.toFixed(1)}% συνολικού)</div>
+</div>
+```
+
+**Key Features**:
+- **Real-time Updates**: Percentages update automatically when filters are applied
+- **Dynamic Calculation**: Percentages are calculated based on current filtered data
+- **Visual Clarity**: Small, unobtrusive text that doesn't interfere with the main monetary display
+- **Greek Formatting**: Uses Greek text "συνολικού" (of total) as requested
+- **Decimal Precision**: Shows percentages with one decimal place for accuracy
+
+**Technical Implementation**:
+- Used conditional calculation to prevent division by zero
+- Applied consistent styling with `text-sm text-gray-500` for percentage text
+- Used `toFixed(1)` for consistent decimal precision
+- Maintained existing card structure while adding new information
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Added percentage calculations and updated card layouts
+
+**User Experience Improvements**:
+1. **Better Context**: Users can quickly see the proportion of each debt type
+2. **Filter Awareness**: Percentages change when filters are applied, showing relative importance
+3. **Visual Hierarchy**: Main monetary values remain prominent while percentages provide additional context
+4. **Consistent Design**: All debt cards follow the same pattern for consistency
+
+**Example Display**:
+- **Print Debts**: €2,973.77 (93.3% συνολικού)
+- **Lamination Debts**: €213.29 (6.7% συνολικού)
+
+**Future Considerations**:
+- Consider adding percentage indicators to other statistics cards if needed
+- Monitor user feedback on the percentage display
+- Consider adding tooltips or hover effects for additional context
+- Implement percentage-based color coding for visual emphasis
+
+### Simplified Role Filter Options (December 2024)
+
+**Problem**: The billing filter dropdown was showing hardcoded numbered options like "Ναός 1", "Ναός 2", "Τομέας 1", "Τομέας 2", etc., which made the interface cluttered and confusing.
+
+**Solution**: Simplified the role filter to show only the basic role categories: "Όλοι", "Άτομο", "Ομάδα", "Τομέας", and "Ναός" without numbered suffixes.
+
+**Changes Made**:
+
+**1. Updated Billing Filters (`components/billing-filters.tsx`)**:
+- **Simplified options**: Replaced dynamic numbered options with basic role categories
+- **Cleaner interface**: Removed cluttered numbered options for better user experience
+- **Consistent filtering**: Maintains same filtering functionality with simplified options
+
+```typescript
+// Before: Dynamic numbered options
+{(() => {
+  const { naoi, tomeis } = getDynamicFilterOptions(users);
+  return (
+    <>
+      {naoi.map((naos) => (
+        <SelectItem key={naos} value={naos}>
+          {naos}
+        </SelectItem>
+      ))}
+      {tomeis.map((tomeas) => (
+        <SelectItem key={tomeas} value={tomeas}>
+          {tomeas}
+        </SelectItem>
+      ))}
+    </>
+  );
+})()}
+
+// After: Simplified basic role options
+<SelectItem value="Τομέας">Τομέας</SelectItem>
+<SelectItem value="Ναός">Ναός</SelectItem>
+```
+
+**Benefits**:
+- **Cleaner UI**: Simplified dropdown with only essential role categories
+- **Better UX**: Users can easily understand and select role filters
+- **Consistent**: Matches the role filter in admin users tab
+- **Maintainable**: No need to update code when new numbered entities are added
+
+### Dynamic Filter Options for Ομάδες, Τομείς, Ναοί (December 2024)
+
+**Problem**: The filter dropdowns for Ομάδες (Teams), Τομείς (Sectors), and Ναοί (Churches) were hardcoded with specific values, making the system inflexible when new organizational units were added to the database.
+
+**Solution**: Implemented a dynamic filter system that automatically extracts Ομάδες, Τομείς, and Ναοί from the user database, making the filters adaptable to any organizational structure.
+
+**Changes Made**:
+
+**1. Created Dynamic Filter Utility (`lib/utils.ts`)**:
+- **Dynamic extraction**: Added `getDynamicFilterOptions()` function that scans user database
+- **Automatic categorization**: Automatically identifies teams, ναοί, and τομείς based on user roles and memberships
+- **Sorted results**: Returns alphabetically sorted arrays for consistent dropdown ordering
+
+```typescript
+export const getDynamicFilterOptions = (users: any[]) => {
+  const teams = new Set<string>()
+  const naoi = new Set<string>()
+  const tomeis = new Set<string>()
+
+  users.forEach(user => {
+    // Extract teams from user data
+    if (user.team) {
+      teams.add(user.team)
+    }
+    
+    // Extract ναοί from user data (users with userRole "Ναός")
+    if (user.userRole === "Ναός") {
+      naoi.add(user.displayName)
+    }
+    
+    // Extract τομείς from user data (users with userRole "Τομέας")
+    if (user.userRole === "Τομέας") {
+      tomeis.add(user.displayName)
+    }
+    
+    // Also extract from memberOf arrays for individual users
+    if (user.memberOf && Array.isArray(user.memberOf)) {
+      user.memberOf.forEach((member: string) => {
+        if (member.includes("Ναός")) {
+          naoi.add(member)
+        } else if (member.includes("Τομέας")) {
+          tomeis.add(member)
+        } else {
+          // Assume it's a team if it doesn't contain "Ναός" or "Τομέας"
+          teams.add(member)
+        }
+      })
+    }
+  })
+
+  return {
+    teams: Array.from(teams).sort(),
+    naoi: Array.from(naoi).sort(),
+    tomeis: Array.from(tomeis).sort()
+  }
+}
+```
+
+**2. Updated Admin Users Tab (`components/admin-users-tab.tsx`)**:
+- **Dynamic team filter**: Replaced hardcoded team options with dynamic extraction
+- **Real-time updates**: Team filter automatically updates when new teams are added to database
+- **Consistent interface**: Maintains same user experience with dynamic data
+
+```typescript
+// Before: Hardcoded team options
+<SelectItem value="Ενωμένοι">Ενωμένοι</SelectItem>
+<SelectItem value="Σποριάδες">Σποριάδες</SelectItem>
+// ... more hardcoded options
+
+// After: Dynamic team options
+{(() => {
+  const { teams } = getDynamicFilterOptions(users);
+  return teams.map((team) => (
+    <SelectItem key={team} value={team}>
+      {team}
+    </SelectItem>
+  ));
+})()}
+```
+
+**3. Updated Billing Filters (`components/billing-filters.tsx`)**:
+- **Dynamic role filter**: Replaced hardcoded Ναός/Τομέας options with dynamic extraction
+- **Enhanced filtering**: Users can now filter by specific ναοί and τομείς names
+- **Flexible structure**: Supports any number of ναοί and τομείς without code changes
+
+```typescript
+// Before: Hardcoded role options
+<SelectItem value="Ναός">Ναός</SelectItem>
+<SelectItem value="Τομέας">Τομέας</SelectItem>
+
+// After: Dynamic role options
+{(() => {
+  const { naoi, tomeis } = getDynamicFilterOptions(users);
+  return (
+    <>
+      {naoi.map((naos) => (
+        <SelectItem key={naos} value={naos}>
+          {naos}
+        </SelectItem>
+      ))}
+      {tomeis.map((tomeas) => (
+        <SelectItem key={tomeas} value={tomeas}>
+          {tomeas}
+        </SelectItem>
+      ))}
+    </>
+  );
+})()}
+```
+
+**4. Updated Admin Page (`app/admin/page.tsx`)**:
+- **Dynamic team validation**: Replaced hardcoded team names in validation logic
+- **Flexible team assignment**: Team field assignment now uses dynamic team options
+- **Consistent data handling**: All team-related operations use dynamic data
+
+```typescript
+// Before: Hardcoded team validation
+const teamNames = ["Ενωμένοι", "Σποριάδες", "Καρποφόροι", ...]
+
+// After: Dynamic team validation
+const { teams } = getDynamicFilterOptions(users)
+const teamsInMembers = newUser.memberOf.filter(member => teams.includes(member))
+```
+
+**5. Updated Data Models**:
+- **Dynamic team types**: Changed team field from union type to string for flexibility
+- **Consistent interfaces**: Updated User interface in both data-store.ts and dummy-database.ts
+- **Backward compatibility**: Existing data continues to work with new dynamic system
+
+```typescript
+// Before: Fixed team types
+team?: "Ενωμένοι" | "Σποριάδες" | "Καρποφόροι" | ...
+
+// After: Dynamic team types
+team?: string // Now supports any team name
+```
+
+**Technical Benefits**:
+- **Scalability**: System automatically adapts to new organizational units
+- **Maintainability**: No code changes needed when adding new teams/ναοί/τομείς
+- **Data consistency**: All filters use the same source of truth (user database)
+- **Performance**: Efficient extraction with Set-based deduplication
+- **Type safety**: Maintains TypeScript type safety while allowing dynamic values
+
+**User Experience Improvements**:
+- **Automatic updates**: Filters reflect current organizational structure
+- **Consistent naming**: Uses actual display names from database
+- **Flexible filtering**: Users can filter by specific organizational units
+- **Future-proof**: System adapts to organizational changes without development intervention
+
+**Result**: The filtering system is now completely dynamic and will automatically adapt to any changes in the organizational structure, making the application more flexible and maintainable.
+
+### Members-Based Team Assignment System (December 2024)
+
+**Problem**: Users requested to remove the separate "Ομάδα" (Team) field and instead use the existing "Μέλος" (Member) field for team assignment and responsible person determination.
+
+**Solution**: Removed the separate team field and updated the system to use the members field for team assignment, ensuring users with "user" access level have at least one team in their members list.
+
+**Changes Made**:
+
+**1. Removed Separate Team Field (`app/admin/page.tsx`)**:
+- **Removed team field**: Eliminated the separate team selection field from user creation form
+- **Updated validation**: Changed validation to check members array instead of team field
+- **Simplified form**: User creation form now uses only the existing members field for team assignment
+- **Updated state management**: Removed team field from newUser state object
+
+```typescript
+// Before: Separate team field
+team: "" as "" | "Ενωμένοι" | "Σποριάδες" | ...
+
+// After: Use members field for team assignment
+// Validation checks members array length instead of team field
+if (newUser.accessLevel === "user" && newUser.members.length === 0) {
+  // Show error: "Παρακαλώ επιλέξτε τουλάχιστον μία ομάδα/ναό/τομέα"
+}
+```
+
+**2. Updated Responsible User Logic (`app/profile/[uid]/page.tsx` & `components/admin-users-tab.tsx`)**:
+- **Members-based lookup**: Changed from team field to members field for finding responsible person
+- **First team priority**: Uses the first team in the members list to determine responsible person
+- **Fallback logic**: Maintains existing Υπεύθυνος-based logic for other access levels
+
+```typescript
+// Updated logic to use members field
+if (profileUser.accessLevel === "user" && profileUser.members && profileUser.members.length > 0) {
+  // Find the first team in the members list and get its responsible person
+  const firstTeam = profileUser.members.find((member: string) => {
+    const teamAccount = allUsers.find(user => 
+      user.userRole === "Ομάδα" && user.displayName === member
+    )
+    return teamAccount && teamAccount.responsiblePerson
+  })
+  
+  if (firstTeam) {
+    const teamAccount = allUsers.find(user => 
+      user.userRole === "Ομάδα" && user.displayName === firstTeam
+    )
+    
+    if (teamAccount && teamAccount.responsiblePerson) {
+      responsibleUsers.push(teamAccount.responsiblePerson)
+      return responsibleUsers
+    }
+  }
+}
+```
+
+**3. Updated Dummy Database (`lib/dummy-database.ts`)**:
+- **Removed team field**: Eliminated team field from sample user data
+- **Updated members assignment**: Users with "user" access level now have their team in the members array
+- **Consistent data structure**: All users use members field for team assignment
+
+```typescript
+// Before: Separate team field
+team: team,
+members: isIndividual ? [`Ενωμένοι`, `Ναός 1`] : undefined,
+
+// After: Use members field for team
+members: isIndividual ? [team] : undefined, // Use members field instead of team
+```
+
+**4. Form Validation Updates**:
+- **Members requirement**: Users with "user" access level must have at least one team in members list
+- **Clear error message**: Updated validation message to guide users to select team/naos/tomeas
+- **Simplified UI**: Removed separate team selection, using existing members field
+
+**Technical Details**:
+- **Data consistency**: All team assignments now go through members field
+- **Responsible person lookup**: Uses first team in members list to find responsible person
+- **Backward compatibility**: Maintains existing logic for admin and Υπεύθυνος users
+- **Type safety**: Removed team field types and updated validation logic
+
+**Result**: The system now uses a unified approach where the "Μέλος" field handles team assignment, eliminating the need for a separate team field while maintaining the same functionality for responsible person determination.
+
+### Team-Based Responsible User System (December 2024)
+
+**Problem**: Users requested that every user with "Χρήστης" (User) access level must belong to a team, and the responsible person of that team should appear as the single responsible person in the "Υπεύθυνοι" field.
+
+**Solution**: Implemented a team-based responsible user system where users with "user" access level are automatically assigned to teams, and their responsible person is determined by their team's responsible person.
+
+**Changes Made**:
+
+**1. Updated Responsible User Logic (`app/profile/[uid]/page.tsx` & `components/admin-users-tab.tsx`)**:
+- **Team-based calculation**: For users with "user" access level, find their team's responsible person
+- **Fallback logic**: For other access levels (admin, Υπεύθυνος), use the existing Υπεύθυνος-based calculation
+- **Single responsible person**: Users with "user" access level now show only their team's responsible person
+
+```typescript
+const getResponsibleUsers = () => {
+  const allUsers = dummyDB.getUsers()
+  const responsibleUsers: string[] = []
+  
+  // For users with "user" access level, find their team's responsible person
+  if (profileUser.accessLevel === "user" && profileUser.team) {
+    const teamAccount = allUsers.find(user => 
+      user.userRole === "Ομάδα" && user.displayName === profileUser.team
+    )
+    
+    if (teamAccount && teamAccount.responsiblePerson) {
+      responsibleUsers.push(teamAccount.responsiblePerson)
+      return responsibleUsers
+    }
+  }
+  
+  // For other cases, use the old Υπεύθυνος-based logic
+  // ... existing logic
+}
+```
+
+**2. Enhanced User Creation Form (`app/admin/page.tsx`)**:
+- **Added team field**: Added team selection for users with "user" access level
+- **Required validation**: Users with "user" access level must select a team
+- **Team assignment**: All new users with "user" access level are automatically assigned to a team
+- **Form validation**: Added validation to ensure team selection for "user" access level
+
+```typescript
+// Added team field to newUser state
+team: "" as "" | "Ενωμένοι" | "Σποριάδες" | "Καρποφόροι" | "Ολόφωτοι" | "Νικητές" | "Νικηφόροι" | "Φλόγα" | "Σύμψυχοι"
+
+// Added validation
+if (newUser.accessLevel === "user" && !newUser.team) {
+  toast({
+    title: "Σφάλμα Επικύρωσης",
+    description: "Παρακαλώ επιλέξτε ομάδα για χρήστες με επίπεδο πρόσβασης 'Χρήστης'",
+    variant: "destructive",
+  })
+  return
+}
+```
+
+**3. Updated Dummy Database (`lib/dummy-database.ts`)**:
+- **Ensured team assignment**: All users with "user" access level now have a team assigned
+- **Consistent data structure**: Updated sample data to ensure all users have proper team assignments
+- **Team distribution**: Users are distributed across different teams for realistic testing
+
+**4. Team Selection UI**:
+- **Conditional display**: Team selection only appears for users with "user" access level
+- **All team options**: Includes all available teams: Ενωμένοι, Σποριάδες, Καρποφόροι, Ολόφωτοι, Νικητές, Νικηφόροι, Φλόγα, Σύμψυχοι
+- **Required field**: Team selection is mandatory for "user" access level
+
+**Technical Details**:
+- **Data consistency**: All users with "user" access level must have a team
+- **Responsible person lookup**: Uses team account's responsiblePerson field
+- **Fallback mechanism**: Maintains existing logic for admin and Υπεύθυνος users
+- **Type safety**: Proper TypeScript types for team field
+
+**Result**: The system now ensures that every user with "Χρήστης" access level belongs to a team, and their responsible person is automatically determined by their team's responsible person, providing a clear and consistent hierarchy of responsibility.
+
+### Profile Page and Admin Page Cleanup - Single Responsible Field (December 2024)
+
+**Problem**: Users requested to keep only the "Υπεύθυνοι" (Responsible/Managers - plural) field and remove the old single "Υπεύθυνος" (Responsible - singular) field that was leftover from the previous system. This needed to be applied to both the profile page and the admin page user cards.
+
+**Solution**: Removed the single responsiblePerson field and ensured only the automatically calculated "Υπεύθυνοι" field is displayed across all pages.
+
+**Changes Made**:
+
+**1. Profile Page Cleanup (`app/profile/[uid]/page.tsx`)**:
+- **Removed single responsiblePerson field**: Eliminated the old "Υπεύθυνος" (singular) field from the Role Information card
+- **Kept only automatic Υπεύθυνοι**: Maintained only the automatically calculated "Υπεύθυνοι" (plural) field
+- **Cleaner interface**: Simplified the role information display
+
+**2. Admin Users Tab Cleanup (`components/admin-users-tab.tsx`)**:
+- **Added automatic calculation**: Implemented the same `getResponsibleUsers` function as in profile page
+- **Removed single responsiblePerson display**: Eliminated the old single "Υπεύθυνος" field from user cards
+- **Replaced hardcoded data**: Replaced `responsiblePersons` field with automatic calculation
+- **Consistent behavior**: User cards now show the same automatically calculated responsible users as profile pages
+
+```typescript
+// Added automatic calculation function
+const getResponsibleUsers = (userData: any) => {
+  const allUsers = dummyDB.getUsers()
+  const responsibleUsers: string[] = []
+  
+  const ypefthynoiUsers = allUsers.filter((user: any) => user.accessLevel === "Υπεύθυνος")
+  
+  ypefthynoiUsers.forEach((ypefthynos: any) => {
+    if (ypefthynos.responsibleFor && ypefthynos.responsibleFor.length > 0) {
+      const isResponsible = ypefthynos.responsibleFor.some((responsibleFor: string) => {
+        return responsibleFor === userData.team || 
+               responsibleFor === userData.displayName || 
+               responsibleFor === userData.userRole
+      })
+      
+      if (isResponsible) {
+        responsibleUsers.push(ypefthynos.displayName)
+      }
+    }
+  })
+  
+  return responsibleUsers
+}
+```
+
+**3. Admin Page Form Cleanup (`app/admin/page.tsx`)**:
+- **Removed responsiblePerson field**: Eliminated the single responsiblePerson field from user creation form
+- **Updated state management**: Removed responsiblePerson from newUser state object
+- **Simplified form**: User creation form no longer has the old single responsible field
+- **Maintained tag system**: Kept the responsibleFor tag system for Υπεύθυνος users
+
+**4. Data Structure Consistency**:
+- **Removed old field**: The `responsiblePerson` field is no longer used anywhere in the system
+- **Automatic calculation**: All responsible user displays are now calculated automatically
+- **Single source of truth**: Υπεύθυνος users' `responsibleFor` field is the only source for determining responsibilities
+
+**Technical Details**:
+- **Type safety**: Fixed TypeScript errors by removing references to non-existent fields
+- **Performance**: Automatic calculation runs efficiently on page load
+- **Consistency**: Same logic used across profile pages and admin user cards
+- **Maintainability**: Centralized responsible user calculation logic
+
+**Result**: The system now has a clean, consistent interface where only the automatically calculated "Υπεύθυνοι" field is displayed, eliminating confusion from the old single "Υπεύθυνος" field and ensuring data consistency across all pages.
+
+### Profile Page Layout and Auto-Population Improvements (December 2024)
+
+**Problem**: Users requested improvements to the profile page layout and functionality: move the "Επίπεδο Πρόσβασης" (Access Level) to the bottom of the Basic Information card, and automatically populate the "Υπεύθυνοι" (Responsible/Managers) section from users with "Υπεύθυνος" access level based on their `responsibleFor` field tags.
+
+**Solution**: Implemented layout changes and automatic calculation of responsible users based on Υπεύθυνος users' responsibilities.
+
+**Changes Made**:
+
+**1. Moved Access Level to Bottom (`app/profile/[uid]/page.tsx`)**:
+- **Reordered fields**: Moved "Επίπεδο Πρόσβασης" from third position to last position in Basic Information card
+- **Maintained styling**: Preserved all existing styling and badge display
+- **Improved hierarchy**: Better visual flow with access level as the final piece of basic information
+
+```typescript
+// Before: Username | Name | Access Level | User Role | Creation Date
+// After:  Username | Name | User Role | Creation Date | Access Level
+```
+
+**2. Implemented Automatic Υπεύθυνοι Calculation**:
+- **Added getResponsibleUsers function**: Created function to automatically calculate responsible users
+- **Dynamic matching**: Matches Υπεύθυνος users based on their `responsibleFor` field tags
+- **Multiple criteria**: Checks against user's team, displayName, and userRole
+- **Real-time calculation**: Calculates responsible users on each profile page load
+
+```typescript
+const getResponsibleUsers = () => {
+  const allUsers = dummyDB.getUsers()
+  const responsibleUsers: string[] = []
+  
+  // Find all users with "Υπεύθυνος" access level
+  const ypefthynoiUsers = allUsers.filter(user => user.accessLevel === "Υπεύθυνος")
+  
+  // For each Υπεύθυνος user, check if they are responsible for this user's team/role
+  ypefthynoiUsers.forEach(ypefthynos => {
+    if (ypefthynos.responsibleFor && ypefthynos.responsibleFor.length > 0) {
+      const isResponsible = ypefthynos.responsibleFor.some(responsibleFor => {
+        return responsibleFor === profileUser.team || 
+               responsibleFor === profileUser.displayName || 
+               responsibleFor === profileUser.userRole
+      })
+      
+      if (isResponsible) {
+        responsibleUsers.push(ypefthynos.displayName)
+      }
+    }
+  })
+  
+  return responsibleUsers
+}
+```
+
+**3. Updated Role Information Display**:
+- **Replaced hardcoded data**: Removed dependency on `responsiblePersons` field
+- **Dynamic rendering**: Uses calculated responsible users instead of static data
+- **Conditional display**: Only shows Υπεύθυνοι section when there are responsible users
+- **Consistent styling**: Maintains existing badge styling and layout
+
+**4. Enhanced Dummy Database Data (`lib/dummy-database.ts`)**:
+- **Added responsibleFor field**: Added `responsibleFor` arrays to Υπεύθυνος users
+- **Realistic assignments**: Υπεύθυνος 400 responsible for: Ενωμένοι, Καρποφόροι, Νικητές, Φλόγα
+- **Balanced distribution**: Υπεύθυνος 401 responsible for: Σποριάδες, Ολόφωτοι, Νικηφόροι
+- **Proper data structure**: Ensures automatic calculation works correctly
+
+**Technical Details**:
+- **Performance**: Minimal impact as calculation only runs on profile page load
+- **Scalability**: Works with any number of Υπεύθυνος users and teams
+- **Maintainability**: Centralized logic makes it easy to modify matching criteria
+- **Data consistency**: Automatic calculation ensures data is always up-to-date
+
+**Result**: Profile pages now show a cleaner layout with access level at the bottom, and the Υπεύθυνοι section automatically displays the correct responsible users based on Υπεύθυνος users' assigned responsibilities, eliminating the need for manual data entry and ensuring data consistency.
+
+### Dropdown Scrolling Fix (December 2024)
+
+**Problem**: Dropdown menus with scrollable content areas were not responding to mouse wheel scrolling unless the user was hovering directly over the scrollbar. This created a poor user experience where users had to precisely position their mouse over the thin scrollbar to scroll through options.
+
+**Solution**: Added proper mouse wheel event handling to scrollable dropdown areas to enable scrolling anywhere within the dropdown content area.
+
+**Changes Made**:
+
+**1. Fixed SearchableSelect Component (`components/searchable-select.tsx`)**:
+- **Added onWheel handler**: Added mouse wheel event handling to the scrollable options container
+- **Prevented default behavior**: Prevented the default scroll behavior to avoid page scrolling
+- **Manual scroll control**: Manually controlled the scrollTop property to scroll the dropdown content
+- **Proper TypeScript typing**: Added proper React.WheelEvent typing for the event handler
+
+```typescript
+// Before
+<div className="max-h-48 overflow-y-auto">
+  {/* options */}
+</div>
+
+// After
+<div 
+  className="max-h-48 overflow-y-auto"
+  onWheel={(e: React.WheelEvent) => {
+    e.preventDefault()
+    const target = e.currentTarget
+    target.scrollTop += e.deltaY
+  }}
+>
+  {/* options */}
+</div>
+```
+
+**2. Fixed CommandList Component (`components/ui/command.tsx`)**:
+- **Applied same fix**: Added identical mouse wheel handling to the CommandList component
+- **Consistent behavior**: Ensures all command palette dropdowns have the same improved scrolling behavior
+- **Maintained compatibility**: Preserved all existing functionality while adding the scroll improvement
+
+**Technical Details**:
+- **Event prevention**: `e.preventDefault()` prevents the default browser scroll behavior
+- **Manual scrolling**: `target.scrollTop += e.deltaY` manually controls the scroll position
+- **Cross-browser compatibility**: Works consistently across different browsers and operating systems
+- **Performance**: Minimal performance impact as the event handler is lightweight
+
+**Result**: Users can now scroll through dropdown options by using the mouse wheel anywhere within the dropdown content area, significantly improving the user experience and making the interface more intuitive to use.
+
+### Admin Page User Creation Improvements (December 2024)
+
+### Admin Page User Creation Improvements (December 2024)
+
+**Problem**: Users requested several improvements to the admin page user creation functionality: remove the team field from user creation, move the role filter to the right side in the users tab, and automatically lock the role to "Άτομο" when Access Level "Υπεύθυνος" or "Διαχειριστής" is selected.
+
+**Solution**: Implemented comprehensive improvements to the user creation form and filter layout to enhance usability and enforce role restrictions.
+
+**Changes Made**:
+
+**1. Removed Team Field from User Creation (`app/admin/page.tsx`)**:
+- **Removed team state**: Eliminated `team` field from `newUser` state object
+- **Removed team UI**: Deleted the entire team selection dropdown from the form
+- **Updated user creation logic**: Removed team assignment from `userToAdd` object
+- **Updated form reset**: Removed team field from form reset logic
+
+```typescript
+// Before
+const [newUser, setNewUser] = useState({
+  // ... other fields
+  team: "" as "" | "Ενωμένοι" | "Σποριάδες" | ...,
+  // ... other fields
+})
+
+// After
+const [newUser, setNewUser] = useState({
+  // ... other fields
+  // team field removed
+  // ... other fields
+})
+```
+
+**2. Implemented Role Locking for Admin/Υπεύθυνος**:
+- **Automatic role setting**: When Access Level "admin" or "Υπεύθυνος" is selected, role automatically changes to "Άτομο"
+- **Disabled role selection**: Role dropdown becomes disabled and grayed out for admin/Υπεύθυνος users
+- **Visual feedback**: Added explanatory text when role is locked (simplified to avoid redundancy)
+- **Form validation**: Maintained existing validation that prevents admin/Υπεύθυνος from having non-Άτομο roles
+
+```typescript
+// Access Level change handler
+onValueChange={accessLevel => {
+  const newAccessLevel = accessLevel as "user" | "admin" | "Υπεύθυνος"
+  setNewUser({ 
+    ...newUser, 
+    accessLevel: newAccessLevel,
+    // Automatically set role to "Άτομο" for admin and Υπεύθυνος
+    userRole: (newAccessLevel === "admin" || newAccessLevel === "Υπεύθυνος") ? "Άτομο" : newUser.userRole
+  })
+}}
+
+// Role dropdown with conditional styling
+<Select 
+  value={newUser.userRole} 
+  onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" })}
+  disabled={newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος"}
+>
+  <SelectTrigger className={newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος" ? "bg-gray-100 text-gray-500" : ""}>
+    <SelectValue />
+  </SelectTrigger>
+  {/* ... options */}
+</Select>
+```
+
+**3. Moved Role Filter to the Right (`components/admin-users-tab.tsx`)**:
+- **Reordered filter layout**: Moved role filter from middle to rightmost position
+- **Maintained responsive design**: Filter layout still works on mobile and desktop
+- **Preserved functionality**: All filtering logic remains unchanged
+
+```typescript
+// Before: Search | Role Filter | Team Filter (if applicable)
+// After:  Search | Team Filter (if applicable) | Role Filter
+```
+
+**4. Removed Blue Team Indication from User Cards**:
+- **Cleaned up display**: Removed the blue team indication that was left from the old team field
+- **Simplified card description**: Card description now only shows the user role without team information
+- **Consistent with new structure**: Aligns with the removal of team field from user creation
+
+**5. Simplified Role Locking Feedback**:
+- **Removed redundant text**: Eliminated the yellow indication text below Access Level field
+- **Cleaner interface**: Single gray explanatory text above Role field is sufficient
+- **Reduced visual clutter**: Less redundant information in the form
+
+**6. Added ResponsibleFor Tag System for Υπεύθυνος Users**:
+- **New field**: Added `responsibleFor` field to User interface for Υπεύθυνος users
+- **Tag system**: Υπεύθυνος users can now be assigned responsibility for specific teams, churches, or sectors
+- **Form integration**: Added TagInput field that appears when Access Level is set to "Υπεύθυνος"
+- **Display updates**: Added responsibleFor display in both admin users tab and profile pages
+- **Data consistency**: Maintains the same tag system pattern as other fields
+
+```typescript
+// New User interface field
+export interface User {
+  // ... existing fields
+  responsibleFor?: string[] // New field for Υπεύθυνος users to show which Ομάδα/Ναός/Τομέας they are responsible for
+}
+
+// Form field that appears for Υπεύθυνος users
+{newUser.accessLevel === "Υπεύθυνος" && (
+  <div>
+    <Label>Υπεύθυνος για:</Label>
+    <TagInput
+      tags={newUser.responsibleFor}
+      onTagsChange={(responsibleFor) => setNewUser({ ...newUser, responsibleFor })}
+      placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
+      availableOptions={getAvailableResponsibleFor()}
+      maxTags={5}
+    />
+  </div>
+)}
+```
+
+```typescript
+// Before
+<CardDescription className="flex items-center gap-2">
+  {userData.userRole}
+  {userData.team && (
+    <span className="text-blue-600 font-medium">• {userData.team}</span>
+  )}
+</CardDescription>
+
+// After
+<CardDescription className="flex items-center gap-2">
+  {userData.userRole}
+</CardDescription>
+```
+
+**Key Benefits**:
+- **Simplified User Creation**: Removed redundant team field since members field shows all memberships
+- **Enforced Role Restrictions**: Automatic role locking prevents invalid configurations
+- **Better UX**: Clear visual feedback when role is locked
+- **Improved Layout**: Role filter in more logical right position
+- **Reduced Errors**: Automatic role setting prevents validation errors
+
+**Technical Implementation**:
+- Used conditional styling with `disabled` prop and `className` for visual feedback
+- Implemented automatic state updates when access level changes
+- Maintained existing validation logic for role restrictions
+- Preserved all existing functionality while adding new features
+
+**Files Modified**:
+- `app/admin/page.tsx` - Removed team field, implemented role locking
+- `components/admin-users-tab.tsx` - Moved role filter to right position, removed blue team indication from user cards
+
+**User Experience Improvements**:
+1. **Automatic Role Setting**: No need to manually select "Άτομο" for admin/Υπεύθυνος users
+2. **Visual Clarity**: Grayed out role dropdown clearly shows it's locked
+3. **Error Prevention**: Impossible to create invalid role/access level combinations
+4. **Better Layout**: Role filter in more intuitive right position
+5. **Simplified Form**: One less field to manage in user creation
+
+**Verification Process**:
+1. **Role Locking Test**: Confirmed role automatically sets to "Άτομο" when admin/Υπεύθυνος selected
+2. **Visual Test**: Verified role dropdown is grayed out and disabled for admin/Υπεύθυνος
+3. **Filter Layout Test**: Confirmed role filter appears on the right side
+4. **Form Validation Test**: Verified existing validation still works correctly
+5. **Build Test**: Confirmed application builds without errors
+
+**Future Considerations**:
+- Consider adding similar role restrictions for other access levels if needed
+- Monitor user feedback on the simplified form
+- Consider adding bulk user creation with role restrictions
+- Implement role-based form field visibility for other scenarios
+
+### Username Validation and Format Enforcement (December 2024)
+
+**Problem**: The application needed to enforce consistent username formatting where only admin can have "admin" as username, and all other users must have numeric usernames.
+
+**Solution**: Implemented comprehensive username validation and updated existing team accounts to use numeric usernames.
+
+**Changes Made**:
+
+**1. Updated User Creation Validation (`app/admin/page.tsx`)**:
+```typescript
+// Validate username format based on access level
+if (newUser.accessLevel === "admin") {
+  if (newUser.username !== "admin") {
+    toast({
+      title: "Σφάλμα Username",
+      description: "Ο διαχειριστής πρέπει να έχει username 'admin'",
+      variant: "destructive",
+    })
+    return
+  }
+} else {
+  // For non-admin users, username must be numeric
+  if (!/^\d+$/.test(newUser.username)) {
+    toast({
+      title: "Σφάλμα Username",
+      description: "Το username πρέπει να είναι αριθμός (π.χ. 401, 402, 403)",
+      variant: "destructive",
+    })
+    return
+  }
+}
+```
+
+**2. Enhanced Username Input Field**:
+```typescript
+<Input 
+  id="username" 
+  value={newUser.username} 
+  onChange={e => setNewUser({ ...newUser, username: e.target.value })} 
+  placeholder={newUser.accessLevel === "admin" ? "admin" : "π.χ. 401, 402, 403"}
+/>
+{newUser.accessLevel === "admin" && (
+  <p className="text-xs text-gray-500 mt-1">
+    Ο διαχειριστής πρέπει να έχει username "admin"
+  </p>
+)}
+{newUser.accessLevel !== "admin" && (
+  <p className="text-xs text-gray-500 mt-1">
+    Το username πρέπει να είναι αριθμός
+  </p>
+)}
+```
+
+**3. Updated Team Usernames (`lib/dummy-database.ts`)**:
+```typescript
+// Before
+{ username: "enwmenoi", displayName: "Ενωμένοι" }
+{ username: "sporiades", displayName: "Σποριάδες" }
+// ... etc
+
+// After
+{ username: "500", displayName: "Ενωμένοι" }
+{ username: "501", displayName: "Σποριάδες" }
+// ... etc
+```
+
+**4. Updated Authentication Passwords (`lib/auth-context.tsx`)**:
+```typescript
+// Before
+"enwmenoi": "enwmenoi",
+"sporiades": "sporiades",
+// ... etc
+
+// After
+"500": "500",
+"501": "501",
+// ... etc
+```
+
+**5. Updated Login Page Placeholder (`app/login/page.tsx`)**:
+```typescript
+// Before
+placeholder="π.χ. 408"
+
+// After
+placeholder="π.χ. 400, 401, 402, admin"
+```
+
+**Key Benefits**:
+- **Consistent Formatting**: All usernames follow a predictable pattern
+- **Clear Validation**: Users get immediate feedback on username requirements
+- **Admin Protection**: Only admin can use "admin" username
+- **Numeric Simplicity**: Easy to remember and type numeric usernames
+- **No Conflicts**: Team usernames (500-507) don't conflict with individual users (400-499)
+
+**Technical Implementation**:
+- Used regex validation (`/^\d+$/`) for numeric usernames
+- Implemented conditional validation based on access level
+- Updated all existing team accounts to use numeric usernames
+- Maintained backward compatibility with existing user data
+- Added helpful placeholder text and validation messages
+
+**Files Modified**:
+- `app/admin/page.tsx` - Added username validation and enhanced input field
+- `lib/dummy-database.ts` - Updated team usernames to numeric format
+- `lib/auth-context.tsx` - Updated password mappings for new usernames
+- `app/login/page.tsx` - Updated placeholder text
+- `lessons.md` - Documented the changes
+
+**User Experience Improvements**:
+1. **Clear Validation**: Users immediately know what format is expected
+2. **Helpful Placeholders**: Input fields show examples of valid usernames
+3. **Consistent Pattern**: All usernames follow the same numeric format
+4. **Admin Clarity**: Clear distinction that only admin uses "admin"
+5. **Error Prevention**: Validation prevents invalid username creation
+
+**Verification Process**:
+1. **Admin Validation Test**: Confirmed only "admin" username works for admin users
+2. **Numeric Validation Test**: Confirmed only numeric usernames work for non-admin users
+3. **Team Login Test**: Verified all team accounts can still log in with new numeric usernames
+4. **Existing User Test**: Confirmed existing individual users (400-405) still work
+5. **Build Test**: Confirmed application builds without errors
+
+**Username Mapping**:
+- **Admin**: `admin` (unchanged)
+- **Υπεύθυνοι**: `400-410` (11 total - Υπεύθυνος 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410)
+- **Individual Users**: `411-412` (2 total - Χρήστης 411, 412)
+- **Ναοί**: `413-417` (5 total - Ναός 1, 2, 3, 4, 5)
+- **Τομείς**: `418-422` (5 total - Τομέας 1, 2, 3, 4, 5)
+- **Individual Users**: `423-499` (77 total - Χρήστης 423-499)
+- **Teams**: `500-507` (8 total - Ενωμένοι, Σποριάδες, Καρποφόροι, Ολόφωτοι, Νικητές, Νικηφόροι, Φλόγα, Σύμψυχοι)
+
+**Total**: 108 users across all categories
+
+**Future Considerations**:
+- Consider adding username generation for new users
+- Monitor user feedback on numeric username requirement
+- Consider adding username prefixes for different user types
+- Implement username reservation system for large organizations
+
+### Dummy Data Expansion - Additional Υπεύθυνοι, Ναοί, and Τομείς (December 2024)
+
+**Problem**: The application needed more comprehensive dummy data with additional Υπεύθυνοι users and complete sets of Ναοί and Τομείς for better testing and demonstration.
+
+**Solution**: Expanded the dummy database with 11 Υπεύθυνοι users (400-410), 5 Ναοί (413-417), and 5 Τομείς (418-422), along with additional regular users.
+
+**Changes Made**:
+
+**1. Added 9 Additional Υπεύθυνοι Users (`lib/dummy-database.ts`)**:
+```typescript
+// Added Υπεύθυνοι 402-410 with diverse responsibilities
+{
+  uid: "user-402",
+  username: "402",
+  accessLevel: "Υπεύθυνος",
+  displayName: "Υπεύθυνος 402",
+  responsibleFor: ["Καρποφόροι", "Νικητές", "Φλόγα"],
+},
+// ... Υπεύθυνοι 403-410 with different team assignments
+```
+
+**2. Added 5 Ναοί Accounts**:
+```typescript
+// Ναοί 1-5 with appropriate Υπεύθυνοι assignments
+{
+  uid: "user-413",
+  username: "413",
+  displayName: "Ναός 1",
+  userRole: "Ναός",
+  responsiblePersons: ["Υπεύθυνος 400", "Υπεύθυνος 406"],
+},
+// ... Ναοί 2-5
+```
+
+**3. Added 5 Τομείς Accounts**:
+```typescript
+// Τομείς 1-5 with appropriate Υπεύθυνοι assignments
+{
+  uid: "user-418",
+  username: "418",
+  displayName: "Τομέας 1",
+  userRole: "Τομέας",
+  responsiblePersons: ["Υπεύθυνος 401", "Υπεύθυνος 406"],
+},
+// ... Τομείς 2-5
+```
+
+**4. Updated Authentication Passwords (`lib/auth-context.tsx`)**:
+```typescript
+// Comprehensive password mapping for all new users
+const USER_PASSWORDS: Record<string, string> = {
+  // Admin
+  admin: "admin123",
+  
+  // Υπεύθυνοι (400-410)
+  "400": "400", // Υπεύθυνος 400
+  // ... Υπεύθυνοι 401-410
+  
+  // Ναοί (413-417)
+  "413": "413", // Ναός 1
+  // ... Ναοί 2-5
+  
+  // Τομείς (418-422)
+  "418": "418", // Τομέας 1
+  // ... Τομείς 2-5
+}
+```
+
+**5. Updated Login Page Placeholder (`app/login/page.tsx`)**:
+```typescript
+// More descriptive placeholder showing user categories
+placeholder="π.χ. 400-410 (Υπεύθυνοι), 413-417 (Ναοί), 418-422 (Τομείς), admin"
+```
+
+**Key Benefits**:
+- **Comprehensive Testing**: Full range of user types for testing all scenarios
+- **Realistic Data**: More realistic organizational structure with multiple Υπεύθυνοι
+- **Better Coverage**: All user roles (Άτομο, Ομάδα, Ναός, Τομέας) well represented
+- **Diverse Relationships**: Complex responsible person assignments for testing
+- **Scalable Structure**: Easy to add more users following the same pattern
+
+**Technical Implementation**:
+- Used sequential numbering to avoid conflicts (400-410 for Υπεύθυνοι)
+- Assigned multiple Υπεύθυνοι to each Ναός and Τομέας for redundancy
+- Maintained consistent naming patterns across all user types
+- Updated all authentication mappings for new usernames
+- Preserved existing functionality while expanding data
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Added 9 new Υπεύθυνοι, 5 Ναοί, 5 Τομείς
+- `lib/auth-context.tsx` - Updated password mappings for all new users
+- `app/login/page.tsx` - Updated placeholder text
+- `lessons.md` - Documented the expansion
+
+**User Experience Improvements**:
+1. **Better Testing**: More comprehensive data for testing all user scenarios
+2. **Realistic Structure**: More realistic organizational hierarchy
+3. **Diverse Relationships**: Complex responsible person assignments
+4. **Clear Categories**: Well-organized username ranges by user type
+5. **Easy Navigation**: Clear placeholder text showing available usernames
+
+**Verification Process**:
+1. **Login Test**: Confirmed all new users can log in with their numeric passwords
+2. **Role Assignment Test**: Verified Υπεύθυνοι have appropriate responsibleFor assignments
+3. **Relationship Test**: Confirmed Ναοί and Τομείς have proper Υπεύθυνοι assignments
+4. **Conflict Test**: Verified no username conflicts between different user types
+5. **Build Test**: Confirmed application builds without errors
+
+**Complete User Structure**:
+- **1 Admin**: `admin`
+- **11 Υπεύθυνοι**: `400-410` (Υπεύθυνος 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410)
+- **2 Individual Users**: `411-412` (Χρήστης 411, 412)
+- **5 Ναοί**: `413-417` (Ναός 1, 2, 3, 4, 5)
+- **5 Τομείς**: `418-422` (Τομέας 1, 2, 3, 4, 5)
+- **5 Additional Users**: `423-427` (Χρήστης 423, 424, 425, 426, 427)
+- **8 Teams**: `500-507` (Ενωμένοι, Σποριάδες, Καρποφόροι, Ολόφωτοι, Νικητές, Νικηφόροι, Φλόγα, Σύμψυχοι)
+
+**Total**: 37 users across all categories
+
+**Future Considerations**:
+- Consider adding more individual users for comprehensive testing
+- Monitor user feedback on the expanded data structure
+- Consider adding user groups or departments for larger organizations
+- Implement user import/export functionality for data management
+
+### Major Individual User Expansion - Comprehensive Άτομο Users (December 2024)
+
+**Problem**: The application needed significantly more individual users (Άτομο) with proper organizational relationships. Each user should belong to exactly one team, one ναός, and one τομέας to create a realistic organizational structure.
+
+**Solution**: Added 77 new individual users (423-499) with carefully planned organizational relationships, ensuring each user belongs to exactly one team, one ναός, and one τομέας.
+
+**Changes Made**:
+
+**1. Added 77 New Individual Users (`lib/dummy-database.ts`)**:
+```typescript
+// Each user belongs to exactly one team, one ναός, and one τομέας
+{
+  uid: "user-423",
+  username: "423",
+  accessLevel: "user",
+  displayName: "Χρήστης 423",
+  userRole: "Άτομο",
+  members: ["Ενωμένοι", "Ναός 1", "Τομέας 1"],
+},
+// ... 76 more users with diverse organizational assignments
+```
+
+**2. Organizational Structure Design**:
+- **8 Teams**: Ενωμένοι, Σποριάδες, Καρποφόροι, Ολόφωτοι, Νικητές, Νικηφόροι, Φλόγα, Σύμψυχοι
+- **5 Ναοί**: Ναός 1, 2, 3, 4, 5
+- **5 Τομείς**: Τομέας 1, 2, 3, 4, 5
+- **Balanced Distribution**: Each team has approximately 9-10 members
+- **Cross-Organizational**: Users are distributed across different ναοί and τομείς
+
+**3. Updated Authentication Passwords (`lib/auth-context.tsx`)**:
+```typescript
+// Added passwords for all 77 new users
+const USER_PASSWORDS: Record<string, string> = {
+  // ... existing users
+  
+  // Individual Users (423-499)
+  "423": "423", // Χρήστης 423
+  "424": "424", // Χρήστης 424
+  // ... Χρήστης 425-499
+}
+```
+
+**4. Updated Login Page Placeholder (`app/login/page.tsx`)**:
+```typescript
+// Updated placeholder to show the new user range
+placeholder="π.χ. 400-410 (Υπεύθυνοι), 413-417 (Ναοί), 418-422 (Τομείς), 423-499 (Χρήστες), admin"
+```
+
+**Key Benefits**:
+- **Realistic Scale**: 77 individual users create a realistic organizational size
+- **Proper Relationships**: Each user belongs to exactly one team, ναός, and τομέας
+- **Balanced Distribution**: Even distribution across all organizational units
+- **Comprehensive Testing**: Large dataset for testing all user scenarios
+- **Organizational Hierarchy**: Clear structure with teams, ναοί, and τομείς
+
+**Technical Implementation**:
+- **Sequential Numbering**: Users 423-499 for easy identification
+- **Consistent Structure**: All users follow the same data structure
+- **Proper Relationships**: Each user has exactly 3 memberships (team, ναός, τομέας)
+- **No Conflicts**: Username ranges carefully planned to avoid overlaps
+- **Scalable Pattern**: Easy to add more users following the same pattern
+
+**Organizational Distribution**:
+- **Team Distribution**: Each team has 9-10 members
+- **Ναός Distribution**: Each ναός has 15-16 members
+- **Τομέας Distribution**: Each τομέας has 15-16 members
+- **Cross-Organizational**: Users belong to different combinations of ναοί and τομείς
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Added 77 new individual users
+- `lib/auth-context.tsx` - Added password mappings for all new users
+- `app/login/page.tsx` - Updated placeholder text
+- `lessons.md` - Updated documentation
+
+**User Experience Improvements**:
+1. **Realistic Testing**: Large dataset for comprehensive testing
+2. **Organizational Structure**: Clear hierarchy with teams, ναοί, and τομείς
+3. **Relationship Testing**: Complex organizational relationships for testing
+4. **Scalability**: Easy to add more users following the same pattern
+5. **Data Consistency**: All users follow the same organizational rules
+
+**Verification Process**:
+1. **Login Test**: Confirmed all 77 new users can log in with their numeric passwords
+2. **Relationship Test**: Verified each user belongs to exactly one team, one ναός, and one τομέας
+3. **Distribution Test**: Confirmed balanced distribution across all organizational units
+4. **Conflict Test**: Verified no username conflicts between different user types
+5. **Build Test**: Confirmed application builds without errors
+
+**Complete User Structure**:
+- **1 Admin**: `admin`
+- **11 Υπεύθυνοι**: `400-410` (Υπεύθυνος 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410)
+- **2 Individual Users**: `411-412` (Χρήστης 411, 412)
+- **5 Ναοί**: `413-417` (Ναός 1, 2, 3, 4, 5)
+- **5 Τομείς**: `418-422` (Τομέας 1, 2, 3, 4, 5)
+- **77 Individual Users**: `423-499` (Χρήστης 423-499)
+- **8 Teams**: `500-507` (Ενωμένοι, Σποριάδες, Καρποφόροι, Ολόφωτοι, Νικητές, Νικηφόροι, Φλόγα, Σύμψυχοι)
+
+**Total**: 108 users across all categories
+
+**Future Considerations**:
+- Consider adding more individual users for even larger organizations
+- Monitor performance with the increased user count
+- Consider adding user search and filtering functionality
+- Implement user grouping and bulk operations
+- Consider adding user activity tracking and analytics
+
+### Υπεύθυνοι Billing Fix - Include Υπεύθυνοι in Sample Data Generation (December 2024)
+
+**Problem**: Οι Υπεύθυνοι είχαν 0 οφείλες γιατί δεν δημιουργούνταν print jobs και lamination jobs για αυτούς στο dummy data. Η μέθοδος `generateSampleData` φιλτράριζε μόνο τους χρήστες με `accessLevel === "user"`, αλλά οι Υπεύθυνοι έχουν `accessLevel === "Υπεύθυνος"`.
+
+**Solution**: Ενημέρωσα το φιλτράρισμα στις μεθόδους `generateSampleData` και `generateBillingRecords` ώστε να συμπεριλαμβάνουν και τους Υπεύθυνους.
+
+**Changes Made**:
+
+**1. Updated generateSampleData Method (`lib/dummy-database.ts`)**:
+```typescript
+// Before: Only users with accessLevel === "user"
+const userIds = this.users.filter((u) => u.accessLevel === "user").map((u) => u.uid);
+
+// After: Include both regular users and Υπεύθυνοι
+const userIds = this.users.filter((u) => u.accessLevel === "user" || u.accessLevel === "Υπεύθυνος").map((u) => u.uid);
+```
+
+**2. Updated generateBillingRecords Method (`lib/dummy-database.ts`)**:
+```typescript
+// Before: Only users with accessLevel === "user"
+const userIds = this.users.filter((u) => u.accessLevel === "user").map((u) => u.uid)
+
+// After: Include both regular users and Υπεύθυνοι
+const userIds = this.users.filter((u) => u.accessLevel === "user" || u.accessLevel === "Υπεύθυνος").map((u) => u.uid)
+```
+
+**Key Benefits**:
+- **Realistic Billing**: Υπεύθυνοι τώρα έχουν οφείλες όπως θα έπρεπε
+- **Complete Data**: Όλοι οι χρήστες (εκτός admin) έχουν print jobs και lamination jobs
+- **Proper Testing**: Μπορούμε να testάρουμε billing scenarios για Υπεύθυνους
+- **Data Consistency**: Όλοι οι χρήστες ακολουθούν το ίδιο pattern για jobs και billing
+
+**Technical Details**:
+- **Filter Logic**: Χρησιμοποιείται OR condition για να συμπεριλάβει και τους δύο τύπους χρηστών
+- **Job Generation**: Υπεύθυνοι τώρα παίρνουν 10-20 print jobs και 3-8 lamination jobs ανά μήνα
+- **Billing Generation**: Δημιουργούνται billing records για Υπεύθυνους με proper payment status
+- **Cost Calculation**: Όλα τα costs υπολογίζονται σωστά για Υπεύθυνους
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Updated generateSampleData and generateBillingRecords methods
+
+**Verification Process**:
+1. **Login Test**: Confirmed Υπεύθυνοι can still log in normally
+2. **Job Generation Test**: Verified Υπεύθυνοι now have print and lamination jobs
+3. **Billing Test**: Confirmed Υπεύθυνοι now have billing records with proper amounts
+4. **Payment Test**: Verified Υπεύθυνοι have realistic payment status (paid/unpaid)
+5. **Build Test**: Confirmed application builds without errors
+
+**Result**: Οι Υπεύθυνοι τώρα έχουν realistic οφείλες και billing records, καθιστώντας το dummy data πιο πλήρες και ρεαλιστικό για testing purposes.
+
+### Profile Page Consolidation and Simplification (December 2024)
+
+**Problem**: The application had two separate profile pages - a static one at `/profile` and a dynamic one at `/profile/[uid]`. Users wanted a single dynamic profile page that shows the current user's profile when accessed from navigation, and other users' profiles when accessed with a specific UID. Additionally, financial details and team field were no longer needed.
+
+**Solution**: Consolidated to a single dynamic profile page, updated navigation to point to the current user's profile, removed financial information, and removed the team field display.
+
+**Changes Made**:
+
+**1. Updated Navigation (`components/navigation.tsx`)**:
+```typescript
+// Before
+{
+  href: "/profile",
+  label: "Προφίλ",
+  icon: UserIcon,
+  roles: ["user", "admin", "Υπεύθυνος"],
+}
+
+// After
+{
+  href: `/profile/${user.uid}`,
+  label: "Προφίλ",
+  icon: UserIcon,
+  roles: ["user", "admin", "Υπεύθυνος"],
+}
+```
+
+**2. Removed Static Profile Page**:
+- Deleted `app/profile/page.tsx` completely
+- Now only the dynamic route `/profile/[uid]` exists
+
+**3. Simplified Dynamic Profile Page (`app/profile/[uid]/page.tsx`)**:
+- Removed all financial information (print billing, lamination billing, unpaid amounts)
+- Removed team field display (since members field shows all memberships)
+- Removed unused imports (`roundMoney` from utils)
+- Kept only basic information and role-specific information cards
+
+**4. Removed Financial Information Card**:
+- Eliminated the entire "Οικονομικές Πληροφορίες" section
+- Removed billing calculations and price formatting
+- Simplified the layout to focus on user identity and role information
+
+**5. Removed Team Field Display**:
+- Eliminated the team field from the role information card
+- Members field now serves as the primary way to show user memberships
+- Cleaner interface with less redundant information
+
+**Key Benefits**:
+- **Single Source of Truth**: Only one profile page to maintain
+- **Consistent Navigation**: Profile link always goes to current user's profile
+- **Simplified Interface**: Removed unnecessary financial and team information
+- **Better UX**: Cleaner profile page focused on essential user information
+- **Reduced Complexity**: Less code to maintain and fewer potential bugs
+
+**Technical Implementation**:
+- Navigation dynamically generates the profile URL using current user's UID
+- Dynamic route handles both current user and other user profiles
+- Removed all billing-related imports and calculations
+- Maintained Next.js 15 compatibility with React.use() for params
+
+**Files Modified**:
+- `components/navigation.tsx` - Updated profile link to use dynamic route
+- `app/profile/[uid]/page.tsx` - Removed financial info and team field
+- `app/profile/page.tsx` - Deleted (no longer needed)
+
+**URL Structure**:
+- **Current User Profile**: `/profile/{current-user-uid}` (accessed from navigation)
+- **Other User Profile**: `/profile/{other-user-uid}` (accessed from admin user cards)
+
+**Verification Process**:
+1. **Navigation Test**: Confirmed profile link goes to current user's profile
+2. **Admin Navigation Test**: Verified clicking user cards still works
+3. **Layout Test**: Confirmed profile page displays correctly without financial info
+4. **Build Test**: Verified application builds without errors
+5. **Type Check**: Confirmed TypeScript compilation without errors
+
+**Future Considerations**:
+- Consider adding profile editing functionality if needed
+- Monitor user feedback on the simplified profile interface
+- Consider adding profile picture functionality
+- Implement profile privacy settings if required
+
+### Next.js 15 Params Promise Fix (December 2024)
+
+**Problem**: In Next.js 15, the `params` object in dynamic route pages is now a Promise and must be unwrapped with `React.use()` before accessing its properties. Direct access to `params.uid` was causing deprecation warnings and will be required in future versions.
+
+**Error Message**:
+```
+Error: A param property was accessed directly with `params.uid`. `params` is now a Promise and should be unwrapped with `React.use()` before accessing properties of the underlying params object.
+```
+
+**Solution**: Updated the dynamic route page to properly unwrap the params Promise using `React.use()` and updated TypeScript interfaces accordingly.
+
+**Changes Made**:
+
+**1. Updated Interface (`app/profile/[uid]/page.tsx`)**:
+```typescript
+// Before
+interface ProfilePageProps {
+  params: {
+    uid: string
+  }
+}
+
+// After
+interface ProfilePageProps {
+  params: Promise<{
+    uid: string
+  }>
+}
+```
+
+**2. Added React.use() Import**:
+```typescript
+// Before
+import { useEffect, useState } from "react"
+
+// After
+import { useEffect, useState, use } from "react"
+```
+
+**3. Unwrapped Params**:
+```typescript
+// Before
+useEffect(() => {
+  const allUsers = dummyDB.getUsers()
+  const user = allUsers.find(u => u.uid === params.uid)
+  // ...
+}, [params.uid])
+
+// After
+// Unwrap params using React.use() for Next.js 15 compatibility
+const unwrappedParams = use(params) as { uid: string }
+const uid = unwrappedParams.uid
+
+useEffect(() => {
+  const allUsers = dummyDB.getUsers()
+  const user = allUsers.find(u => u.uid === uid)
+  // ...
+}, [uid])
+```
+
+**Key Benefits**:
+- **Future-Proof**: Compatible with Next.js 15 and future versions
+- **No Warnings**: Eliminates deprecation warnings in development
+- **Type Safety**: Proper TypeScript typing for Promise-based params
+- **Performance**: React.use() is optimized for Promise unwrapping
+
+**Technical Implementation**:
+- Used `React.use()` hook to unwrap the Promise synchronously
+- Added proper TypeScript type assertion for the unwrapped params
+- Updated dependency array to use the unwrapped `uid` value
+- Maintained all existing functionality while fixing the compatibility issue
+
+**Files Modified**:
+- `app/profile/[uid]/page.tsx` - Updated params handling for Next.js 15 compatibility
+
+**Verification Process**:
+1. **Build Test**: Confirmed application builds without errors
+2. **Runtime Test**: Verified profile pages load correctly with dynamic UIDs
+3. **Navigation Test**: Confirmed navigation to profile pages works properly
+4. **Type Check**: Verified TypeScript compilation without errors
+
+**Future Considerations**:
+- Apply same pattern to other dynamic routes if they exist
+- Consider creating a utility function for params unwrapping if needed across multiple files
+- Monitor for any other Next.js 15 compatibility issues
+- Update documentation for team members about the new params pattern
+
+
+### Tag System Implementation (December 2024)
+
+**Feature Added**: Implemented a comprehensive tag system for user roles and memberships, including a new Υπεύθυνος access level and tag-based member/responsible person management.
+
+**Changes Made**:
+
+**1. Updated User Interface (`lib/dummy-database.ts`)**:
+- Added `Υπεύθυνος` access level to User interface
+- Added `members?: string[]` field for Άτομο users to show which Ομάδα/Ναός/Τομέας they belong to
+- Added `responsiblePersons?: string[]` field for Ομάδα/Ναός/Τομέας users to show who is responsible
+- Updated sample data to include Υπεύθυνος users and tag system data
+
+**2. Created Tag Input Component (`components/ui/tag-input.tsx`)**:
+- Reusable tag input component with searchable dropdown
+- Supports adding/removing tags with visual feedback
+- Includes keyboard navigation (Enter to add, Backspace to remove)
+- Configurable max tags and available options
+- Popover-based interface with scrollable options list
+
+**3. Enhanced Admin User Creation (`app/admin/page.tsx`)**:
+- Added Υπεύθυνος access level option in user creation form
+- Added tag system for members (Μέλος) field for Άτομο users
+- Added tag system for responsible persons (Υπεύθυνοι) field for Ομάδα/Ναός/Τομέας users
+- Implemented role restrictions: Υπεύθυνος and Διαχειριστής can only have role Άτομο
+- Added validation to enforce role restrictions during user creation
+
+**4. Updated Admin Users Tab (`components/admin-users-tab.tsx`)**:
+- Added display of member tags for Άτομο users
+- Added display of responsible person tags for Ομάδα/Ναός/Τομέας users
+- Updated badge styling to distinguish between Admin, Υπεύθυνος, and User access levels
+- Enhanced user cards to show tag information with proper styling
+
+**5. Updated Authentication System (`lib/auth-context.tsx`)**:
+- Added passwords for new Υπεύθυνος users (400, 401)
+- Updated hardcoded password list to include all new user types
+
+**6. Enhanced Role Badge Component (`components/role-badge.tsx`)**:
+- Added support for Υπεύθυνος access level
+- Updated badge variants and text to properly display all three access levels
+- Improved styling consistency across the application
+
+**7. Updated Navigation and Access Control**:
+- Updated `components/navigation.tsx` to allow Υπεύθυνος access to admin pages
+- Updated `components/protected-route.tsx` to handle Υπεύθυνος access level
+- Υπεύθυνος users can access dashboard, admin, and profile pages
+
+**8. Enhanced Profile Page (`app/profile/page.tsx`)**:
+- Removed department field (no longer exists in User interface)
+- Added display of user role (Άτομο, Ομάδα, Ναός, Τομέας)
+- Added display of team information for Άτομο users
+- Added display of member tags for Άτομο users
+- Added display of responsible person tags for Ομάδα/Ναός/Τομέας users
+
+**Key Features**:
+- **Tag System**: Visual tag-based interface for managing memberships and responsibilities
+- **Role Restrictions**: Υπεύθυνος and Διαχειριστής can only have role Άτομο
+- **Searchable Dropdown**: Easy selection of available options with search functionality
+- **Visual Feedback**: Clear display of tags with remove buttons and proper styling
+- **Access Control**: Υπεύθυνος users have admin-like access to management features
+- **Data Consistency**: All interfaces updated to handle new fields and access levels
+
+**Technical Implementation**:
+- Used Popover component for dropdown interface
+- Implemented keyboard navigation for accessibility
+- Added proper TypeScript types for all new fields
+- Maintained existing styling patterns and color schemes
+- Used Badge components for consistent tag display
+
+**Usage Examples**:
+```typescript
+// Tag Input for members
+<TagInput
+  tags={newUser.members}
+  onTagsChange={(members) => setNewUser({ ...newUser, members })}
+  placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
+  availableOptions={getAvailableMembers()}
+  maxTags={5}
+/>
+
+// Tag Input for responsible persons
+<TagInput
+  tags={newUser.responsiblePersons}
+  onTagsChange={(responsiblePersons) => setNewUser({ ...newUser, responsiblePersons })}
+  placeholder="Προσθήκη Υπευθύνου..."
+  availableOptions={getAvailableResponsiblePersons()}
+  maxTags={3}
+/>
+```
+
+**Benefits**:
+- **Better Organization**: Clear visual representation of user relationships
+- **Flexible Management**: Easy to add/remove memberships and responsibilities
+- **Role Clarity**: Clear distinction between different access levels
+- **Improved UX**: Intuitive tag-based interface for complex relationships
+- **Data Integrity**: Proper validation and role restrictions prevent invalid configurations
+
+**Future Considerations**:
+- Consider adding bulk tag operations for multiple users
+- Implement tag-based filtering in admin interface
+- Add tag analytics and reporting features
+- Consider adding tag permissions and approval workflows
+
+**Dependency Note**:
+- Added `@radix-ui/react-scroll-area` dependency for the tag input component
+- This is required for the ScrollArea component used in the tag dropdown interface
+
+### Ομάδα Accounts Creation and Icon Updates (December 2024)
+
+**Feature Added**: Created Ομάδα (Team) accounts for each team and updated user tab icons based on role.
+
+**Changes Made**:
+
+**1. Created Ομάδα Accounts (`lib/dummy-database.ts`)**:
+- Added 8 Ομάδα accounts for all teams: Ενωμένοι, Σποριάδες, Καρποφόροι, Ολόφωτοι, Νικητές, Νικηφόροι, Φλόγα, Σύμψυχοι
+- Each Ομάδα account has appropriate responsible persons assigned
+- Usernames follow pattern: team name (e.g., "enwmenoi", "sporiades", etc.)
+
+**2. Updated Admin Users Tab (`components/admin-users-tab.tsx`)**:
+- Added role-based icons: User for Άτομο, Users for Ομάδα, Church for Ναός, MapPin for Τομέας
+- Modified debt display to show for both "user" and "Υπεύθυνος" access levels
+- Υπεύθυνος users can now have debts on their personal accounts (as they use services like everyone else)
+
+**3. Updated Authentication (`lib/auth-context.tsx`)**:
+- Added passwords for all new Ομάδα accounts
+- Passwords match usernames for easy testing
+
+**Key Features**:
+- **Ομάδα Accounts**: Each team now has its own account for billing and management
+- **Role-Based Icons**: Visual distinction between different user roles
+- **Υπεύθυνος Debts**: Υπεύθυνος users can accumulate debts like regular users
+- **Consistent Naming**: Team accounts follow consistent naming patterns
+
+**Sample Ομάδα Accounts**:
+- Username: `enwmenoi`, Password: `enwmenoi` - Ενωμένοι
+- Username: `sporiades`, Password: `sporiades` - Σποριάδες
+- Username: `karpoforoi`, Password: `karpoforoi` - Καρποφόροι
+- Username: `olofwtoi`, Password: `olofwtoi` - Ολόφωτοι
+- Username: `nikhtes`, Password: `nikhtes` - Νικητές
+- Username: `nikhforoi`, Password: `nikhforoi` - Νικηφόροι
+- Username: `floga`, Password: `floga` - Φλόγα
+- Username: `sympsyxoi`, Password: `sympsyxoi` - Σύμψυχοι
+
+**Icon Mapping**:
+- **Άτομο**: User icon (single person)
+- **Ομάδα**: Users icon (multiple people)
+- **Ναός**: Church icon (building with cross)
+- **Τομέας**: MapPin icon (location marker)
+
+### Clickable User Cards and Enhanced Profile Page (December 2024)
+
+**Feature Added**: Made user cards clickable to navigate to profile pages and enhanced profile page to display all user data.
+
+**Changes Made**:
+
+**1. Clickable User Cards (`components/admin-users-tab.tsx`)**:
+- Added `useRouter` hook for navigation
+- Added `handleUserCardClick` function to navigate to profile page with user ID
+- Added `cursor-pointer` and `hover:bg-gray-50` classes to user cards
+- Cards now navigate to `/profile?uid={userData.uid}` when clicked
+
+**2. Enhanced Profile Page (`app/profile/page.tsx`)**:
+- Added support for viewing other users' profiles via URL parameter `?uid=`
+- Added loading state with skeleton animation
+- Reorganized layout into three main cards:
+  - **Basic Information**: Username, display name, access level, user role, creation date
+  - **Role-Specific Information**: Team, responsible person, members, responsible persons
+  - **Financial Information**: Print and lamination debts (for user and Υπεύθυνος access levels)
+- Added role-based icons throughout the interface
+- Added "Back" button when viewing other users' profiles
+- Enhanced visual design with proper spacing and color coding
+
+**Key Features**:
+- **Navigation**: Click any user card in admin to view their detailed profile
+- **Comprehensive Data Display**: Shows all user fields from creation form
+- **Financial Overview**: Displays debts for applicable user types
+- **Responsive Design**: Works well on all screen sizes
+- **Loading States**: Smooth loading experience with skeleton animations
+- **Role-Based Icons**: Consistent iconography throughout the interface
+
+**URL Structure**:
+- Own profile: `/profile` (always shows current user)
+- Other user's profile: `/profile/{uid}` (parameterized URL)
+
+**Data Displayed**:
+- **Basic Info**: Username, display name, access level, user role, creation date
+- **Role Info**: Team (for Άτομο), responsible person, members (tags), responsible persons (tags)
+- **Financial Info**: Print debts, lamination debts, total outstanding balance
+
+### Parameterized URL Implementation (December 2024)
+
+**Feature Added**: Implemented proper parameterized URLs for user profiles with clear separation between own profile and other users' profiles.
+
+**Changes Made**:
+
+**1. Dynamic Route Creation (`app/profile/[uid]/page.tsx`)**:
+- Created new dynamic route for viewing other users' profiles
+- Added proper TypeScript interface for route parameters
+- Implemented loading states and error handling for non-existent users
+- Added "Back" button for navigation
+- Shows comprehensive user data with role-based icons
+
+**2. Updated Admin Users Tab (`components/admin-users-tab.tsx`)**:
+- Modified `handleUserCardClick` to use parameterized URL: `/profile/${userData.uid}`
+- Maintains same user experience with improved URL structure
+
+**3. Simplified Main Profile Page (`app/profile/page.tsx`)**:
+- Removed URL parameter logic and search params handling
+- Always shows current logged-in user's profile
+- Simplified component logic and removed unnecessary imports
+- Cleaner, more focused component for personal profile viewing
+
+**Key Features**:
+- **Clear URL Structure**: 
+  - `/profile` → Current user's profile
+  - `/profile/{uid}` → Specific user's profile
+- **Proper Navigation**: Back button when viewing other users
+- **Error Handling**: 404-style page for non-existent users
+- **Consistent Experience**: Same data display across both profile types
+- **SEO Friendly**: Clean, parameterized URLs
+
+**Navigation Flow**:
+1. **Admin → User Card Click** → `/profile/{uid}` (other user's profile)
+2. **Navigation Bar → Profile** → `/profile` (own profile)
+3. **Direct URL Access** → Proper routing based on URL structure
+
+### Dependency and Compilation Fixes (December 2024)
+
+**Issue Resolved**: Fixed missing dependencies and compilation errors that were preventing the application from running properly.
+
+**Problems Fixed**:
+
+**1. Missing Dependencies**:
+- Added missing Radix UI components: `@radix-ui/react-avatar`, `@radix-ui/react-checkbox`, `@radix-ui/react-collapsible`, `@radix-ui/react-context-menu`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-hover-card`, `@radix-ui/react-menubar`, `@radix-ui/react-navigation-menu`, `@radix-ui/react-progress`, `@radix-ui/react-separator`, `@radix-ui/react-switch`, `@radix-ui/react-toggle`, `@radix-ui/react-toggle-group`, `@radix-ui/react-tooltip`, `@radix-ui/react-accordion`, `@radix-ui/react-alert-dialog`, `@radix-ui/react-aspect-ratio`
+- Added missing utility libraries: `cmdk`, `embla-carousel-react`, `input-otp`, `next-themes`, `react-hook-form`, `react-resizable-panels`, `recharts`, `sonner`, `vaul`
+
+### Module Resolution Fix - @radix-ui/react-scroll-area (December 2024)
+
+**Problem**: The application was showing a "Module not found" error for `@radix-ui/react-scroll-area` even though it was listed in package.json. The error occurred when trying to import the ScrollArea component in `components/ui/scroll-area.tsx`.
+
+**Error Message**:
+```
+Error: ./components/ui/scroll-area.tsx:4:1
+Module not found: Can't resolve '@radix-ui/react-scroll-area'
+```
+
+**Root Cause**: The `@radix-ui/react-scroll-area` package was listed in package.json but was not properly installed in node_modules, likely due to a corrupted or incomplete installation.
+
+**Solution**: Reinstalled all dependencies using `pnpm install` to ensure all packages are properly installed.
+
+**Changes Made**:
+
+**1. Reinstalled Dependencies**:
+```bash
+pnpm install
+```
+
+**2. Verified Installation**:
+- Confirmed `@radix-ui/react-scroll-area` was properly installed in `node_modules/@radix-ui/react-scroll-area`
+- Verified the package.json showed the correct version (1.2.9)
+- Checked that all other Radix UI components were also properly installed
+
+**Key Benefits**:
+- **Resolved Module Error**: The ScrollArea component can now be imported without errors
+- **Complete Installation**: All dependencies are properly installed and accessible
+- **Consistent Environment**: Development server now starts without module resolution errors
+- **Future Prevention**: Proper dependency management prevents similar issues
+
+**Technical Details**:
+- Used `pnpm install` to reinstall all dependencies from package-lock.json
+- The installation process downloaded and installed 75 packages
+- All Radix UI components are now properly available for import
+- Development server starts successfully on port 3001
+
+**Files Affected**:
+- `node_modules/@radix-ui/react-scroll-area` - Now properly installed
+- All components using ScrollArea (tag-input, etc.) - Now work correctly
+
+**Verification Process**:
+1. **Installation Test**: Confirmed `@radix-ui/react-scroll-area` is in node_modules
+2. **Import Test**: Verified ScrollArea can be imported in components
+3. **Server Test**: Confirmed development server starts without errors
+4. **Component Test**: Verified tag-input component works with ScrollArea
+
+**Result**: The application now runs successfully without module resolution errors, and all UI components using ScrollArea function properly.
+
+**2. Department Field References**:
+- Fixed `app/admin/populate-data/page.tsx` to remove department field references
+- Fixed `components/lamination-billing-table.tsx` to remove department field display
+- Fixed `scripts/populate-dummy-data.ts` to remove department parameter from addTestUser function
+- Updated all interfaces to match the current User structure
+
+**3. Database Method Compatibility**:
+- Updated populate-data page to use correct dummy database methods
+- Fixed PrintJob interface usage with all required fields
+- Removed references to non-existent BillingRecord interface
+- Used proper dummy database reset method
+
+**4. TypeScript Compilation**:
+- Resolved all TypeScript compilation errors
+- Fixed interface mismatches
+- Updated component imports and exports
+
+**Key Changes**:
+- **Dependencies**: Added 20+ missing packages for UI components
+- **Data Structure**: Aligned all components with current User interface
+- **Database Methods**: Used correct dummy database API
+- **Type Safety**: Fixed all TypeScript compilation issues
+
+**Result**: Application now compiles and runs without errors, with all features working properly.
+
 ### Department Field Removal (December 2024)
 
 **Feature Removed**: Removed the department (τμήμα) field from all user data structures and interfaces.

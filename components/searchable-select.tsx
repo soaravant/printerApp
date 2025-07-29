@@ -86,7 +86,7 @@ export function SearchableSelect({
     <div ref={containerRef} className={cn("relative", className)}>
       <div
         className={cn(
-          "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 h-10",
           !selectedOption && "text-muted-foreground",
           disabled && "cursor-not-allowed opacity-50"
         )}
@@ -143,7 +143,14 @@ export function SearchableSelect({
             </div>
           </div>
           
-          <div className="max-h-48 overflow-y-auto">
+          <div 
+            className="max-h-48 overflow-y-auto"
+            onWheel={(e: React.WheelEvent) => {
+              e.preventDefault()
+              const target = e.currentTarget
+              target.scrollTop += e.deltaY
+            }}
+          >
             {filteredOptions.length === 0 ? (
               <div className="p-3 text-center text-gray-500 text-sm">
                 Δεν βρέθηκαν αποτελέσματα

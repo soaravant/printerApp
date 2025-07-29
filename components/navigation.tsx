@@ -24,13 +24,13 @@ export function Navigation() {
       href: "/dashboard",
       label: "Πίνακας Ελέγχου",
       icon: Printer,
-      roles: ["user", "admin"],
+      roles: ["user", "admin", "Υπεύθυνος"],
     },
     {
       href: "/admin",
       label: "Διαχείριση",
       icon: Settings,
-      roles: ["admin"],
+      roles: ["admin", "Υπεύθυνος"],
     },
     {
       href: "/prices",
@@ -39,10 +39,10 @@ export function Navigation() {
       roles: ["admin"],
     },
     {
-      href: "/profile",
+      href: `/profile/${user.uid}`,
       label: "Προφίλ",
       icon: UserIcon,
-      roles: ["user", "admin"],
+      roles: ["user", "admin", "Υπεύθυνος"],
     },
   ]
 

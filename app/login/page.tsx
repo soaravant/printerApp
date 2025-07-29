@@ -59,7 +59,7 @@ export default function LoginPage() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="π.χ. 408"
+                  placeholder="π.χ. 400-410 (Υπεύθυνοι), 413-417 (Ναοί), 418-422 (Τομείς), 423-499 (Χρήστες), admin"
                   required
                   autoFocus
                 />

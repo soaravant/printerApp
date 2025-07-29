@@ -25,9 +25,10 @@ interface LaminationJobsTableProps {
   pageSize: number
   onPageChange: (page: number) => void
   userRole: string
+  onRowHover?: (hoveredJob: { machine: string; type: string } | null) => void
 }
 
-export default function LaminationJobsTable({ data, page, pageSize, onPageChange, userRole }: LaminationJobsTableProps) {
+export default function LaminationJobsTable({ data, page, pageSize, onPageChange, userRole, onRowHover }: LaminationJobsTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
   const [sortedData, setSortedData] = useState(data)
 
@@ -123,18 +124,28 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
                 </TableCell>
               </TableRow>
             ) : (
-              sortedData.slice((page-1)*pageSize, page*pageSize).map((job: LaminationJob) => (
-                <TableRow key={job.jobId}>
-                  <TableCell className="text-center">{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
-                  {userRole === "admin" && <TableCell className="text-center">{job.username}</TableCell>}
-                  {userRole === "admin" && <TableCell className="text-center">{job.userDisplayName}</TableCell>}
-                  <TableCell className="text-center">
-                    <Badge variant="outline">{getLaminationTypeLabel(job.type)}</Badge>
-                  </TableCell>
-                  <TableCell className="text-center">{job.quantity}</TableCell>
-                  <TableCell className="text-center">{formatPrice(job.totalCost)}</TableCell>
-                </TableRow>
-              ))
+              sortedData.slice((page-1)*pageSize, page*pageSize).map((job: LaminationJob) => {
+                // Determine machine type based on job type
+                const machine = ["A3", "A4", "A5", "cards"].includes(job.type) ? "laminator" : "binding"
+                
+                return (
+                  <TableRow 
+                    key={job.jobId}
+                    className="hover:bg-green-50 cursor-pointer transition-colors duration-200"
+                    onMouseEnter={() => onRowHover?.({ machine, type: job.type })}
+                    onMouseLeave={() => onRowHover?.(null)}
+                  >
+                    <TableCell className="text-center">{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
+                    {userRole === "admin" && <TableCell className="text-center">{job.username}</TableCell>}
+                    {userRole === "admin" && <TableCell className="text-center">{job.userDisplayName}</TableCell>}
+                    <TableCell className="text-center">
+                      <Badge variant="outline">{getLaminationTypeLabel(job.type)}</Badge>
+                    </TableCell>
+                    <TableCell className="text-center">{job.quantity}</TableCell>
+                    <TableCell className="text-center">{formatPrice(job.totalCost)}</TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

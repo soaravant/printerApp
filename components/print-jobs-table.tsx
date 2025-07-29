@@ -29,6 +29,8 @@ interface PrintJobsTableProps {
   pageSize: number
   onPageChange: (page: number) => void
   userRole: string
+  onRowHover?: (hoveredJob: { deviceName: string; printType: string } | null) => void
+  printTypeFilter?: string // New prop for filtering expanded rows
 }
 
 // Helper function to expand a print job into individual rows
@@ -79,25 +81,47 @@ const expandPrintJob = (job: PrintJob) => {
     })
   }
   
-  if (job.pagesRizocharto > 0) {
+  if (job.pagesRizochartoA3 > 0) {
     rows.push({
       ...job,
-      printType: "Ριζόχαρτο",
-      quantity: job.pagesRizocharto,
-      cost: job.costRizocharto, // Use the actual calculated cost from database
+      printType: "Ριζόχαρτο A3",
+      quantity: job.pagesRizochartoA3,
+      cost: job.costRizochartoA3, // Use the actual calculated cost from database
       originalJobId: job.jobId,
-      rowId: `${job.jobId}-rizocharto`
+      rowId: `${job.jobId}-rizocharto-a3`
     })
   }
   
-  if (job.pagesChartoni > 0) {
+  if (job.pagesRizochartoA4 > 0) {
     rows.push({
       ...job,
-      printType: "Χαρτόνι",
-      quantity: job.pagesChartoni,
-      cost: job.costChartoni, // Use the actual calculated cost from database
+      printType: "Ριζόχαρτο A4",
+      quantity: job.pagesRizochartoA4,
+      cost: job.costRizochartoA4, // Use the actual calculated cost from database
       originalJobId: job.jobId,
-      rowId: `${job.jobId}-chartoni`
+      rowId: `${job.jobId}-rizocharto-a4`
+    })
+  }
+  
+  if (job.pagesChartoniA3 > 0) {
+    rows.push({
+      ...job,
+      printType: "Χαρτόνι A3",
+      quantity: job.pagesChartoniA3,
+      cost: job.costChartoniA3, // Use the actual calculated cost from database
+      originalJobId: job.jobId,
+      rowId: `${job.jobId}-chartoni-a3`
+    })
+  }
+  
+  if (job.pagesChartoniA4 > 0) {
+    rows.push({
+      ...job,
+      printType: "Χαρτόνι A4",
+      quantity: job.pagesChartoniA4,
+      cost: job.costChartoniA4, // Use the actual calculated cost from database
+      originalJobId: job.jobId,
+      rowId: `${job.jobId}-chartoni-a4`
     })
   }
   
@@ -115,15 +139,45 @@ const expandPrintJob = (job: PrintJob) => {
   return rows
 }
 
-export default function PrintJobsTable({ data, page, pageSize, onPageChange, userRole }: PrintJobsTableProps) {
+// Helper function to filter expanded rows by print type
+const filterExpandedRowsByType = (rows: any[], printTypeFilter: string) => {
+  if (!printTypeFilter || printTypeFilter === "all") {
+    return rows
+  }
+  
+  const filterMap: { [key: string]: string } = {
+    "a4BW": "A4 Ασπρόμαυρο",
+    "a4Color": "A4 Έγχρωμο",
+    "a3BW": "A3 Ασπρόμαυρο",
+    "a3Color": "A3 Έγχρωμο",
+    "rizochartoA3": "Ριζόχαρτο A3",
+    "rizochartoA4": "Ριζόχαρτο A4",
+    "chartoniA3": "Χαρτόνι A3",
+    "chartoniA4": "Χαρτόνι A4",
+    "autokollito": "Αυτοκόλλητο"
+  }
+  
+  const targetPrintType = filterMap[printTypeFilter]
+  if (!targetPrintType) {
+    return rows
+  }
+  
+  return rows.filter(row => row.printType === targetPrintType)
+}
+
+export default function PrintJobsTable({ data, page, pageSize, onPageChange, userRole, onRowHover, printTypeFilter }: PrintJobsTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
   const [sortedData, setSortedData] = useState<any[]>([])
 
   useEffect(() => {
     // Expand each print job into individual rows
     const expandedData = data.flatMap(expandPrintJob)
-    setSortedData(sortData(expandedData, sortConfig))
-  }, [data, sortConfig])
+    
+    // Apply print type filter to expanded rows
+    const filteredExpandedData = filterExpandedRowsByType(expandedData, printTypeFilter || "all")
+    
+    setSortedData(sortData(filteredExpandedData, sortConfig))
+  }, [data, sortConfig, printTypeFilter])
 
   const handleSort = (key: string) => {
     const newSortConfig = toggleSort(sortConfig, key)
@@ -209,7 +263,12 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
               </TableRow>
             ) : (
               sortedData.slice((page-1)*pageSize, page*pageSize).map((row: any) => (
-                <TableRow key={row.rowId}>
+                <TableRow 
+                  key={row.rowId}
+                  className="hover:bg-blue-50 cursor-pointer transition-colors duration-200"
+                  onMouseEnter={() => onRowHover?.({ deviceName: row.deviceName, printType: row.printType })}
+                  onMouseLeave={() => onRowHover?.(null)}
+                >
                   <TableCell className="text-center">{row.timestamp.toLocaleString("el-GR")}</TableCell>
                   {userRole === "admin" && <TableCell className="text-center">{row.username}</TableCell>}
                   {userRole === "admin" && <TableCell className="text-center">{row.userDisplayName}</TableCell>}

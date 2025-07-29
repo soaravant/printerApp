@@ -5,7 +5,7 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
 import { dummyDB } from "@/lib/dummy-database"
-import type { PrintJob, LaminationJob, PrintBilling, LaminationBilling, User } from "@/lib/dummy-database"
+import type { PrintJob, LaminationJob, PrintBilling, LaminationBilling, User, Transaction } from "@/lib/dummy-database"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -48,8 +48,16 @@ const PrintBillingTable = dynamic(() => import("@/components/print-billing-table
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση χρεώσεων εκτυπώσεων...</div>,
   ssr: false,
 })
+const CombinedDebtTable = dynamic(() => import("@/components/combined-debt-table"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση συγκεντρωτικού πίνακα...</div>,
+  ssr: false,
+})
 const LaminationBillingTable = dynamic(() => import("@/components/lamination-billing-table"), {
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση χρεώσεων πλαστικοποιήσεων...</div>,
+  ssr: false,
+})
+const TransactionHistoryTable = dynamic(() => import("@/components/transaction-history-table"), {
+  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση ιστορικού συναλλαγών...</div>,
   ssr: false,
 })
 
@@ -74,6 +82,7 @@ export default function DashboardPage() {
   const [printBilling, setPrintBilling] = useState<PrintBilling[]>([])
   const [laminationBilling, setLaminationBilling] = useState<LaminationBilling[]>([])
   const [allUsers, setAllUsers] = useState<User[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
 
   // Unified filtering states
   const [searchTerm, setSearchTerm] = useState("")
@@ -109,7 +118,12 @@ export default function DashboardPage() {
   const [laminationJobsPage, setLaminationJobsPage] = useState(1)
   const [printBillingPage, setPrintBillingPage] = useState(1)
   const [laminationBillingPage, setLaminationBillingPage] = useState(1)
+  const [transactionHistoryPage, setTransactionHistoryPage] = useState(1)
   const PAGE_SIZE = 10
+
+  // Hover state for highlighting statistics
+  const [hoveredPrintJob, setHoveredPrintJob] = useState<{ deviceName: string; printType: string } | null>(null)
+  const [hoveredLaminationJob, setHoveredLaminationJob] = useState<{ machine: string; type: string } | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -127,6 +141,7 @@ export default function DashboardPage() {
       setPrintBilling(allPrintBilling)
       setLaminationBilling(allLaminationBilling)
       setAllUsers(users)
+      setTransactions(dummyDB.getTransactions())
     } else {
       // Regular user sees only their data
       const pJobs = dummyDB.getPrintJobs(user.uid)
@@ -176,6 +191,13 @@ export default function DashboardPage() {
     setPrintBillingPage(1)
     setLaminationBillingPage(1)
   }, [searchTerm, dateFrom, dateTo, statusFilter, typeFilter, deviceFilter, userFilter])
+
+  // Auto-set print type filter when Canon B/W or Brother is selected
+  useEffect(() => {
+    if (deviceFilter === "Canon B/W" || deviceFilter === "Brother") {
+      setPrintTypeFilter("a4BW")
+    }
+  }, [deviceFilter])
 
   // Calculate price distribution for billing table filtering
   const calculateBillingPriceDistribution = () => {
@@ -337,10 +359,14 @@ export default function DashboardPage() {
             return item.pagesA3BW > 0
           case "a3Color":
             return item.pagesA3Color > 0
-          case "rizocharto":
-            return item.pagesRizocharto > 0
-          case "chartoni":
-            return item.pagesChartoni > 0
+          case "rizochartoA3":
+            return item.pagesRizochartoA3 > 0
+          case "rizochartoA4":
+            return item.pagesRizochartoA4 > 0
+          case "chartoniA3":
+            return item.pagesChartoniA3 > 0
+          case "chartoniA4":
+            return item.pagesChartoniA4 > 0
           case "autokollito":
             return item.pagesAutokollito > 0
           default:
@@ -350,8 +376,59 @@ export default function DashboardPage() {
     }
     setFilteredPrintJobs(filteredPJ)
 
-    // Filter Lamination Billing
+    // Filter Lamination Billing with billing-specific filters
     let filteredLB = [...laminationBilling]
+    
+    // Apply billing search filter
+    if (billingSearchTerm) {
+      filteredLB = filteredLB.filter(
+        (item) =>
+          item.period.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
+          item.userDisplayName.toLowerCase().includes(billingSearchTerm.toLowerCase()),
+      )
+    }
+
+    // Apply billing debt filter
+    if (billingDebtFilter !== "all") {
+      filteredLB = filteredLB.filter((item) => {
+        if (billingDebtFilter === "paid") return item.paid
+        if (billingDebtFilter === "unpaid") return !item.paid
+        return true
+      })
+    }
+
+    // Apply billing price range filter
+    if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
+      filteredLB = filteredLB.filter((item) => {
+        return item.remainingBalance >= billingPriceRange[0] && item.remainingBalance <= billingPriceRange[1]
+      })
+    }
+
+    // Apply billing amount filter
+    if (billingAmountFilter !== "all") {
+      filteredLB = filteredLB.filter((item) => {
+        switch (billingAmountFilter) {
+          case "under10":
+            return item.remainingBalance < 10
+          case "10to50":
+            return item.remainingBalance >= 10 && item.remainingBalance <= 50
+          case "over50":
+            return item.remainingBalance > 50
+          default:
+            return true
+        }
+      })
+    }
+
+    // Apply billing role filter
+    if (billingRoleFilter !== "all") {
+      filteredLB = filteredLB.filter((item) => {
+        const userData = dummyDB.getUserById(item.uid)
+        return userData?.userRole === billingRoleFilter
+      })
+    }
+
+    // Apply legacy filters for backward compatibility
     if (searchTerm) {
       filteredLB = filteredLB.filter(
         (item) =>
@@ -544,6 +621,35 @@ export default function DashboardPage() {
     .reduce((sum, b) => sum + b.remainingBalance, 0)
   const totalUnpaid = printUnpaid + laminationUnpaid
 
+  // Calculate totals without filters for percentage calculations
+  const totalPrintBilling = user.accessLevel === "admin" ? printBilling : printBilling
+  const totalLaminationBilling = user.accessLevel === "admin" ? laminationBilling : laminationBilling
+  
+  const totalPrintUnpaid = totalPrintBilling.filter((b) => !b.paid).reduce((sum, b) => sum + b.remainingBalance, 0)
+  const totalLaminationUnpaid = totalLaminationBilling
+    .filter((b) => !b.paid)
+    .reduce((sum, b) => sum + b.remainingBalance, 0)
+
+  // Check if any filters are applied
+  const hasFilters = billingSearchTerm || 
+                    billingDebtFilter !== "all" || 
+                    billingPriceRange[0] !== billingPriceDistribution.min || 
+                    billingPriceRange[1] !== billingPriceDistribution.max ||
+                    billingAmountFilter !== "all" || 
+                    billingRoleFilter !== "all" ||
+                    searchTerm || 
+                    statusFilter !== "all" || 
+                    userFilter !== "all"
+
+  // Calculate percentages for debt cards
+  // Each type shows percentage of its own total (without filters)
+  const printUnpaidPercentage = totalPrintUnpaid > 0 ? (printUnpaid / totalPrintUnpaid) * 100 : 0
+  const laminationUnpaidPercentage = totalLaminationUnpaid > 0 ? (laminationUnpaid / totalLaminationUnpaid) * 100 : 0
+  
+  // Calculate total percentage (combined debts)
+  const totalCombinedUnpaid = totalPrintUnpaid + totalLaminationUnpaid
+  const totalUnpaidPercentage = totalCombinedUnpaid > 0 ? (totalUnpaid / totalCombinedUnpaid) * 100 : 0
+
   const currentMonth = new Date().toISOString().slice(0, 7)
   const currentMonthPrintJobs = relevantPrintJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
   const currentMonthLaminationJobs = relevantLaminationJobs.filter(
@@ -570,7 +676,7 @@ export default function DashboardPage() {
   const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
 
   // Calculate print statistics
-  const calculatePrintStatistics = () => {
+  const calculatePrintStatistics = (hoveredJob?: { deviceName: string; printType: string } | null) => {
     const stats = {
       canonBW: {
         a4BW: 0
@@ -617,7 +723,7 @@ export default function DashboardPage() {
   }
 
   // Calculate lamination statistics
-  const calculateLaminationStatistics = () => {
+  const calculateLaminationStatistics = (hoveredJob?: { machine: string; type: string } | null) => {
     const stats = {
       laminator: {
         a3: 0,
@@ -648,14 +754,101 @@ export default function DashboardPage() {
     return stats
   }
 
-  const printStats = calculatePrintStatistics()
-  const laminationStats = calculateLaminationStatistics()
+  const printStats = calculatePrintStatistics(hoveredPrintJob)
+  const laminationStats = calculateLaminationStatistics(hoveredLaminationJob)
+
+  // Helper functions to determine if a statistic should be highlighted
+  const isPrintStatHighlighted = (deviceName: string, printType: string) => {
+    if (!hoveredPrintJob) return false
+    return hoveredPrintJob.deviceName === deviceName && hoveredPrintJob.printType === printType
+  }
+
+  const isLaminationStatHighlighted = (machine: string, type: string) => {
+    if (!hoveredLaminationJob) return false
+    return hoveredLaminationJob.machine === machine && hoveredLaminationJob.type === type
+  }
 
   // Generate chart data for last 6 months
 
 
   // Get unique devices for filter
   const uniqueDevices = [...new Set(printJobs.map((job) => job.deviceName).filter(Boolean))]
+
+  // Calculate combined debt data for the total debt table
+  const calculateCombinedDebtData = () => {
+    const userDebtMap = new Map<string, {
+      uid: string
+      userDisplayName: string
+      userRole: string
+      responsiblePerson: string
+      printDebt: number
+      laminationDebt: number
+      totalDebt: number
+      lastPayment: Date | null
+    }>()
+
+    // Process print billing data
+    filteredPrintBilling.forEach(billing => {
+      const userData = dummyDB.getUserById(billing.uid)
+      const responsiblePerson = userData?.userRole === "Άτομο" 
+        ? userData.displayName 
+        : userData?.responsiblePerson || "-"
+      
+      const existing = userDebtMap.get(billing.uid)
+      if (existing) {
+        existing.printDebt += billing.remainingBalance
+        existing.totalDebt += billing.remainingBalance
+        // Keep the most recent payment date
+        if (billing.lastPayment && (!existing.lastPayment || billing.lastPayment > existing.lastPayment)) {
+          existing.lastPayment = billing.lastPayment
+        }
+      } else {
+        userDebtMap.set(billing.uid, {
+          uid: billing.uid,
+          userDisplayName: billing.userDisplayName,
+          userRole: userData?.userRole || "-",
+          responsiblePerson: responsiblePerson,
+          printDebt: billing.remainingBalance,
+          laminationDebt: 0,
+          totalDebt: billing.remainingBalance,
+          lastPayment: billing.lastPayment || null
+        })
+      }
+    })
+
+    // Process lamination billing data
+    filteredLaminationBilling.forEach(billing => {
+      const userData = dummyDB.getUserById(billing.uid)
+      const responsiblePerson = userData?.userRole === "Άτομο" 
+        ? userData.displayName 
+        : userData?.responsiblePerson || "-"
+      
+      const existing = userDebtMap.get(billing.uid)
+      if (existing) {
+        existing.laminationDebt += billing.remainingBalance
+        existing.totalDebt += billing.remainingBalance
+        // Keep the most recent payment date
+        if (billing.lastPayment && (!existing.lastPayment || billing.lastPayment > existing.lastPayment)) {
+          existing.lastPayment = billing.lastPayment
+        }
+      } else {
+        userDebtMap.set(billing.uid, {
+          uid: billing.uid,
+          userDisplayName: billing.userDisplayName,
+          userRole: userData?.userRole || "-",
+          responsiblePerson: responsiblePerson,
+          printDebt: 0,
+          laminationDebt: billing.remainingBalance,
+          totalDebt: billing.remainingBalance,
+          lastPayment: billing.lastPayment || null
+        })
+      }
+    })
+
+    return Array.from(userDebtMap.values())
+  }
+
+  const combinedDebtData = calculateCombinedDebtData()
 
   return (
     <ProtectedRoute>
@@ -677,47 +870,50 @@ export default function DashboardPage() {
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Total Debts Card - Yellow Theme */}
-              <div className="bg-yellow-50 rounded-lg border border-yellow-200 shadow-sm h-full">
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
-                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
-                    <div className="flex items-center gap-3">
-                      <Receipt className="h-8 w-8 text-yellow-700" />
-                      <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Οφειλών</h3>
-                    </div>
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
+                <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                  <div className="flex items-center gap-3">
+                    <Receipt className="h-8 w-8 text-yellow-700" />
+                    <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Οφειλών</h3>
                   </div>
-                  <div className="p-6 flex-1 flex items-center">
-                    <div className="text-3xl font-bold text-red-600">{formatPrice(totalUnpaid)}</div>
-                  </div>
+                </div>
+                <div className={`p-6 flex-1 flex ${hasFilters && totalUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+                  <div className="text-3xl font-bold text-red-600">{formatPrice(totalUnpaid)}</div>
+                  {hasFilters && totalUnpaidPercentage < 100 && (
+                    <div className="text-sm text-gray-500 pb-0.5">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
+                  )}
                 </div>
               </div>
 
               {/* Print Debts Card - Blue Theme */}
-              <div className="bg-blue-50 rounded-lg border border-blue-200 shadow-sm h-full">
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
-                  <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
-                    <div className="flex items-center gap-3">
-                      <Printer className="h-6 w-6 text-blue-700" />
-                      <h3 className="text-lg font-semibold text-blue-900">Οφειλές ΤΟ. ΦΩ.</h3>
-                    </div>
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
+                <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
+                  <div className="flex items-center gap-3">
+                    <Printer className="h-6 w-6 text-blue-700" />
+                    <h3 className="text-lg font-semibold text-blue-900">Οφειλές ΤΟ. ΦΩ.</h3>
                   </div>
-                  <div className="p-6 flex-1 flex items-center">
-                    <div className="text-3xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
-                  </div>
+                </div>
+                <div className={`p-6 flex-1 flex ${hasFilters && printUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+                  <div className="text-3xl font-bold text-blue-600">{formatPrice(printUnpaid)}</div>
+                  {hasFilters && printUnpaidPercentage < 100 && (
+                    <div className="text-sm text-gray-500 pb-0.5">({printUnpaidPercentage.toFixed(1)}% του {formatPrice(totalPrintUnpaid)})</div>
+                  )}
                 </div>
               </div>
 
               {/* Lamination Debts Card - Green Theme */}
-              <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm h-full">
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
-                  <div className="bg-green-100 px-6 py-4 border-b border-green-200">
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="h-6 w-6 text-green-700" />
-                      <h3 className="text-lg font-semibold text-green-900">Οφειλές ΠΛΑ. ΤΟ.</h3>
-                    </div>
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
+                <div className="bg-green-100 px-6 py-4 border-b border-green-200">
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="h-6 w-6 text-green-700" />
+                    <h3 className="text-lg font-semibold text-green-900">Οφειλές ΠΛΑ. ΤΟ.</h3>
                   </div>
-                  <div className="p-6 flex-1 flex items-center">
-                    <div className="text-3xl font-bold text-green-600">{formatPrice(laminationUnpaid)}</div>
-                  </div>
+                </div>
+                <div className={`p-6 flex-1 flex ${hasFilters && laminationUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
+                  <div className="text-3xl font-bold text-green-600">{formatPrice(laminationUnpaid)}</div>
+                  {hasFilters && laminationUnpaidPercentage < 100 && (
+                    <div className="text-sm text-gray-500 pb-0.5">({laminationUnpaidPercentage.toFixed(1)}% του {formatPrice(totalLaminationUnpaid)})</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -738,6 +934,7 @@ export default function DashboardPage() {
               setBillingRoleFilter={setBillingRoleFilter}
               billingPriceDistribution={billingPriceDistribution}
               printBilling={printBilling}
+              users={dummyDB.getUsers()}
               clearFilters={clearFilters}
             />
             
@@ -758,26 +955,23 @@ export default function DashboardPage() {
                     <Button
                       onClick={() =>
                         exportTableXLSX(
-                          filteredPrintBilling.map((b) => {
-                            const userData = dummyDB.getUserById(b.uid)
-                            const responsiblePerson = userData?.userRole === "Άτομο" 
-                              ? userData.displayName 
-                              : userData?.responsiblePerson || "-"
-                            
-                            return {
-                              userRole: userData?.userRole || "-",
-                              userDisplayName: b.userDisplayName,
-                              responsiblePerson: responsiblePerson,
-                              remainingBalance: formatPrice(b.remainingBalance),
-                              lastPayment: b.lastPayment ? b.lastPayment.toLocaleDateString("el-GR") : "-",
-                            }
-                          }),
-                          "print_billing",
+                          combinedDebtData.map((item) => ({
+                            userRole: item.userRole,
+                            userDisplayName: item.userDisplayName,
+                            responsiblePerson: item.responsiblePerson,
+                            printDebt: formatPrice(item.printDebt),
+                            laminationDebt: formatPrice(item.laminationDebt),
+                            totalDebt: formatPrice(item.totalDebt),
+                            lastPayment: item.lastPayment ? item.lastPayment.toLocaleDateString("el-GR") : "-",
+                          })),
+                          "combined_debt",
                           [
                             { key: "userRole", label: "Ρόλος" },
                             { key: "userDisplayName", label: "Όνομα" },
                             { key: "responsiblePerson", label: "Υπεύθυνος" },
-                            { key: "remainingBalance", label: "Συνολικό Χρέος" },
+                            { key: "printDebt", label: "Εκτυπώσεις" },
+                            { key: "laminationDebt", label: "Πλαστικοποιήσεις" },
+                            { key: "totalDebt", label: "Τρέχων Χρέος" },
                             { key: "lastPayment", label: "Τελευταία Εξόφληση" }
                           ],
                           "EAB308",
@@ -796,17 +990,76 @@ export default function DashboardPage() {
               </div>
               
               <div className="p-6">
-                <PrintBillingTable
-                  data={filteredPrintBilling}
+                <CombinedDebtTable
+                  data={combinedDebtData}
                   page={printBillingPage}
                   pageSize={PAGE_SIZE}
                   onPageChange={setPrintBillingPage}
                   userRole={user.accessLevel}
+                  onRowHover={setHoveredPrintJob}
                 />
               </div>
             </div>
 
-
+            {/* Transaction History Table */}
+            <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden mb-8">
+              <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <Receipt className="h-6 w-6 text-yellow-700" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-yellow-900">Ιστορικό Συναλλαγών</h3>
+                      <p className="text-sm text-yellow-700">Ιστορικό πληρωμών και εξοφλήσεων</p>
+                    </div>
+                  </div>
+                  {user.accessLevel === "admin" && (
+                    <Button
+                      onClick={() =>
+                        exportTableXLSX(
+                          transactions.map((transaction) => ({
+                            timestamp: transaction.timestamp.toLocaleDateString("el-GR"),
+                            userDisplayName: transaction.userDisplayName,
+                            amount: formatPrice(transaction.amount),
+                            type: transaction.type === "payment" ? "Πληρωμή" : "Επιστροφή",
+                            description: transaction.description || "-",
+                            adminDisplayName: transaction.adminDisplayName,
+                          })),
+                          "transaction_history",
+                          [
+                            { key: "timestamp", label: "Ημερομηνία" },
+                            { key: "userDisplayName", label: "Χρήστης" },
+                            { key: "amount", label: "Ποσό" },
+                            { key: "type", label: "Τύπος" },
+                            { key: "description", label: "Περιγραφή" },
+                            { key: "adminDisplayName", label: "Διαχειριστής" }
+                          ],
+                          "EAB308",
+                          "Ιστορικό Συναλλαγών"
+                        )
+                      }
+                      variant="outline"
+                      size="sm"
+                      className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Εξαγωγή XLSX
+                    </Button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <ErrorBoundary fallback={<div>Φόρτωση ιστορικού συναλλαγών...</div>}>
+                  <TransactionHistoryTable
+                    data={transactions}
+                    page={transactionHistoryPage}
+                    pageSize={PAGE_SIZE}
+                    onPageChange={setTransactionHistoryPage}
+                    userRole={user.accessLevel}
+                  />
+                </ErrorBoundary>
+              </div>
+            </div>
 
             {/* Tabs for Print and Lamination */}
             <Tabs defaultValue="printing" className="w-full mb-8 mt-12" onValueChange={setActiveTab}>
@@ -929,27 +1182,51 @@ export default function DashboardPage() {
                                   })
                                 }
                                 
-                                if (job.pagesRizocharto > 0) {
+                                if (job.pagesRizochartoA3 > 0) {
                                   rows.push({
                                     timestamp: job.timestamp.toLocaleString("el-GR"),
                                     uid: job.uid,
                                     userDisplayName: job.userDisplayName,
                                     deviceName: job.deviceName,
-                                    printType: "Ριζόχαρτο",
-                                    quantity: job.pagesRizocharto,
-                                    cost: formatPrice(job.pagesRizocharto * 0.10)
+                                    printType: "Ριζόχαρτο A3",
+                                    quantity: job.pagesRizochartoA3,
+                                    cost: formatPrice(job.pagesRizochartoA3 * 0.10)
                                   })
                                 }
                                 
-                                if (job.pagesChartoni > 0) {
+                                if (job.pagesRizochartoA4 > 0) {
                                   rows.push({
                                     timestamp: job.timestamp.toLocaleString("el-GR"),
                                     uid: job.uid,
                                     userDisplayName: job.userDisplayName,
                                     deviceName: job.deviceName,
-                                    printType: "Χαρτόνι",
-                                    quantity: job.pagesChartoni,
-                                    cost: formatPrice(job.pagesChartoni * 0.10)
+                                    printType: "Ριζόχαρτο A4",
+                                    quantity: job.pagesRizochartoA4,
+                                    cost: formatPrice(job.pagesRizochartoA4 * 0.10)
+                                  })
+                                }
+                                
+                                if (job.pagesChartoniA3 > 0) {
+                                  rows.push({
+                                    timestamp: job.timestamp.toLocaleString("el-GR"),
+                                    uid: job.uid,
+                                    userDisplayName: job.userDisplayName,
+                                    deviceName: job.deviceName,
+                                    printType: "Χαρτόνι A3",
+                                    quantity: job.pagesChartoniA3,
+                                    cost: formatPrice(job.pagesChartoniA3 * 0.10)
+                                  })
+                                }
+                                
+                                if (job.pagesChartoniA4 > 0) {
+                                  rows.push({
+                                    timestamp: job.timestamp.toLocaleString("el-GR"),
+                                    uid: job.uid,
+                                    userDisplayName: job.userDisplayName,
+                                    deviceName: job.deviceName,
+                                    printType: "Χαρτόνι A4",
+                                    quantity: job.pagesChartoniA4,
+                                    cost: formatPrice(job.pagesChartoniA4 * 0.10)
                                   })
                                 }
                                 
@@ -1004,6 +1281,8 @@ export default function DashboardPage() {
                           pageSize={PAGE_SIZE}
                           onPageChange={setPrintJobsPage}
                           userRole={user.accessLevel}
+                          onRowHover={setHoveredPrintJob}
+                          printTypeFilter={printTypeFilter}
                         />
                       </ErrorBoundary>
                     </div>
@@ -1014,30 +1293,54 @@ export default function DashboardPage() {
                 <div className="mt-6">
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                     {/* Canon Colour Statistics */}
-                    <div className="md:col-span-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                    <div className="md:col-span-4 bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <Printer className="h-5 w-5 text-blue-700" />
                           <h3 className="text-sm font-semibold text-blue-900">Canon Colour</h3>
                         </div>
                       </div>
-                      <div className="bg-white p-4">
+                      <div className="p-4">
                         <div className="grid grid-cols-4 gap-2 text-center">
                           <div>
                             <div className="text-xs text-gray-600">A4 B/W</div>
-                            <div className="text-lg font-bold text-black">{printStats.canonColour.a4BW}</div>
+                            <div className={`text-lg font-bold ${
+                              isPrintStatHighlighted("Canon Colour", "A4 Ασπρόμαυρο") 
+                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                                : "text-black"
+                            }`}>
+                              {printStats.canonColour.a4BW}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">A4 Colour</div>
-                            <div className="text-lg font-bold text-black">{printStats.canonColour.a4Colour}</div>
+                            <div className={`text-lg font-bold ${
+                              isPrintStatHighlighted("Canon Colour", "A4 Έγχρωμο") 
+                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                                : "text-black"
+                            }`}>
+                              {printStats.canonColour.a4Colour}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">A3 B/W</div>
-                            <div className="text-lg font-bold text-black">{printStats.canonColour.a3BW}</div>
+                            <div className={`text-lg font-bold ${
+                              isPrintStatHighlighted("Canon Colour", "A3 Ασπρόμαυρο") 
+                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                                : "text-black"
+                            }`}>
+                              {printStats.canonColour.a3BW}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">A3 Colour</div>
-                            <div className="text-lg font-bold text-black">{printStats.canonColour.a3Colour}</div>
+                            <div className={`text-lg font-bold ${
+                              isPrintStatHighlighted("Canon Colour", "A3 Έγχρωμο") 
+                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                                : "text-black"
+                            }`}>
+                              {printStats.canonColour.a3Colour}
+                            </div>
                           </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2 mt-3 text-center">
@@ -1058,46 +1361,58 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Canon B/W Statistics */}
-                    <div className="md:col-span-2 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                    <div className="md:col-span-2 bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <Printer className="h-5 w-5 text-blue-700" />
                           <h3 className="text-sm font-semibold text-blue-900">Canon B/W</h3>
                         </div>
                       </div>
-                      <div className="bg-white p-4">
+                      <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
-                          <div className="text-xl font-bold text-black">{printStats.canonBW.a4BW}</div>
+                          <div className={`text-xl font-bold ${
+                            isPrintStatHighlighted("Canon B/W", "A4 Ασπρόμαυρο") 
+                              ? "text-blue-600 bg-blue-100 rounded px-1" 
+                              : "text-black"
+                          }`}>
+                            {printStats.canonBW.a4BW}
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Brother Statistics */}
-                    <div className="md:col-span-2 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                    <div className="md:col-span-2 bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <Printer className="h-5 w-5 text-blue-700" />
                           <h3 className="text-sm font-semibold text-blue-900">Brother</h3>
                         </div>
                       </div>
-                      <div className="bg-white p-4">
+                      <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
-                          <div className="text-xl font-bold text-black">{printStats.brother.a4BW}</div>
+                          <div className={`text-xl font-bold ${
+                            isPrintStatHighlighted("Brother", "A4 Ασπρόμαυρο") 
+                              ? "text-blue-600 bg-blue-100 rounded px-1" 
+                              : "text-black"
+                          }`}>
+                            {printStats.brother.a4BW}
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Total Print Statistics */}
-                    <div className="md:col-span-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                    <div className="md:col-span-4 bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <BarChart3 className="h-5 w-5 text-blue-700" />
                           <h3 className="text-sm font-semibold text-blue-900">Σύνολο</h3>
                         </div>
                       </div>
-                      <div className="bg-white p-4">
+                      <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">Συνολικές Εκτυπώσεις</div>
                           <div className="text-2xl font-bold text-black">{printStats.total}</div>
@@ -1164,6 +1479,7 @@ export default function DashboardPage() {
                           pageSize={PAGE_SIZE}
                           onPageChange={setLaminationJobsPage}
                           userRole={user.accessLevel}
+                          onRowHover={setHoveredLaminationJob}
                         />
                       </ErrorBoundary>
                     </div>
@@ -1185,19 +1501,43 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-4 gap-2 text-center">
                           <div>
                             <div className="text-xs text-gray-600">Α3</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.a3}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("laminator", "A3") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.laminator.a3}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Α4</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.a4}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("laminator", "A4") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.laminator.a4}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Α5</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.a5}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("laminator", "A5") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.laminator.a5}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Κάρτες</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.laminator.cards}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("laminator", "cards") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.laminator.cards}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1215,15 +1555,33 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-3 gap-2 text-center">
                           <div>
                             <div className="text-xs text-gray-600">Σπιράλ</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.binding.spiral}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("binding", "spiral") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.binding.spiral}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Χρωματιστά Χαρτόνια</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.binding.coloredCardboard}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("binding", "colored_cardboard") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.binding.coloredCardboard}
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Πλαστικό Κάλυμμα</div>
-                            <div className="text-lg font-bold text-gray-900">{laminationStats.binding.plasticCover}</div>
+                            <div className={`text-lg font-bold ${
+                              isLaminationStatHighlighted("binding", "plastic_cover") 
+                                ? "text-green-600 bg-green-100 rounded px-1" 
+                                : "text-gray-900"
+                            }`}>
+                              {laminationStats.binding.plasticCover}
+                            </div>
                           </div>
                         </div>
                       </div>

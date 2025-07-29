@@ -103,8 +103,10 @@ export default function PricesPage() {
         { value: 'a4Color', label: 'A4 Έγχρωμο' },
         { value: 'a3BW', label: 'A3 Ασπρόμαυρο' },
         { value: 'a3Color', label: 'A3 Έγχρωμο' },
-        { value: 'rizocharto', label: 'Ριζόχαρτο' },
-        { value: 'chartoni', label: 'Χαρτόνι' },
+        { value: 'rizochartoA3', label: 'Ριζόχαρτο A3' },
+        { value: 'rizochartoA4', label: 'Ριζόχαρτο A4' },
+        { value: 'chartoniA3', label: 'Χαρτόνι A3' },
+        { value: 'chartoniA4', label: 'Χαρτόνι A4' },
         { value: 'autokollito', label: 'Αυτοκόλλητο' },
       ]
     } else {
@@ -186,12 +188,20 @@ export default function PricesPage() {
                       <p className="text-xl font-bold text-blue-600">{formatPrice(printingPrices.a3Color)}</p>
                     </div>
                     <div className="p-3 border border-blue-200 rounded-lg bg-blue-100 shadow-sm">
-                      <h3 className="font-medium text-blue-900 text-sm">Ριζόχαρτο</h3>
-                      <p className="text-xl font-bold text-blue-600">{formatPrice(printingPrices.rizocharto)}</p>
+                      <h3 className="font-medium text-blue-900 text-sm">Ριζόχαρτο A3</h3>
+                      <p className="text-xl font-bold text-blue-600">{formatPrice(printingPrices.rizochartoA3)}</p>
                     </div>
                     <div className="p-3 border border-blue-200 rounded-lg bg-blue-100 shadow-sm">
-                      <h3 className="font-medium text-blue-900 text-sm">Χαρτόνι</h3>
-                      <p className="text-xl font-bold text-blue-600">{formatPrice(printingPrices.chartoni)}</p>
+                      <h3 className="font-medium text-blue-900 text-sm">Ριζόχαρτο A4</h3>
+                      <p className="text-xl font-bold text-blue-600">{formatPrice(printingPrices.rizochartoA4)}</p>
+                    </div>
+                    <div className="p-3 border border-blue-200 rounded-lg bg-blue-100 shadow-sm">
+                      <h3 className="font-medium text-blue-900 text-sm">Χαρτόνι A3</h3>
+                      <p className="text-xl font-bold text-blue-600">{formatPrice(printingPrices.chartoniA3)}</p>
+                    </div>
+                    <div className="p-3 border border-blue-200 rounded-lg bg-blue-100 shadow-sm">
+                      <h3 className="font-medium text-blue-900 text-sm">Χαρτόνι A4</h3>
+                      <p className="text-xl font-bold text-blue-600">{formatPrice(printingPrices.chartoniA4)}</p>
                     </div>
                     <div className="p-3 border border-blue-200 rounded-lg bg-blue-100 shadow-sm">
                       <h3 className="font-medium text-blue-900 text-sm">Αυτοκόλλητο</h3>
@@ -262,191 +272,193 @@ export default function PricesPage() {
               </Card>
             </div>
 
-            {/* Price Calculator */}
-            <Card className="border-yellow-200">
-              <CardHeader className="bg-yellow-100 border-b border-yellow-200">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <Calculator className="h-5 w-5 text-yellow-800" />
-                    <div>
-                      <CardTitle className="text-yellow-800">
-                        Υπολογιστής Τιμών
-                      </CardTitle>
-                      <CardDescription className="text-yellow-600">
-                        Υπολογίστε το κόστος για εκτυπώσεις και πλαστικοποιήσεις
-                      </CardDescription>
+            {/* Price Calculator - Only show for non-admin users */}
+            {user && user.accessLevel !== "admin" && (
+              <Card className="border-yellow-200">
+                <CardHeader className="bg-yellow-100 border-b border-yellow-200">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <Calculator className="h-5 w-5 text-yellow-800" />
+                      <div>
+                        <CardTitle className="text-yellow-800">
+                          Υπολογιστής Τιμών
+                        </CardTitle>
+                        <CardDescription className="text-yellow-600">
+                          Υπολογίστε το κόστος για εκτυπώσεις και πλαστικοποιήσεις
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={addCalculatorItem} 
+                        variant="outline" 
+                        size="sm"
+                        className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Προσθήκη Εκτύπωσης
+                      </Button>
+                      <Button 
+                        onClick={addLaminationItem} 
+                        variant="outline" 
+                        size="sm"
+                        className="bg-white border-green-300 text-green-700 hover:bg-green-50 hover:text-green-800"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Προσθήκη Πλαστικοποίησης
+                      </Button>
+                      <Button 
+                        onClick={clearCalculator} 
+                        variant="outline" 
+                        size="sm"
+                        className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={addCalculatorItem} 
-                      variant="outline" 
-                      size="sm"
-                      className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Προσθήκη Εκτύπωσης
-                    </Button>
-                    <Button 
-                      onClick={addLaminationItem} 
-                      variant="outline" 
-                      size="sm"
-                      className="bg-white border-green-300 text-green-700 hover:bg-green-50 hover:text-green-800"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Προσθήκη Πλαστικοποίησης
-                    </Button>
-                    <Button 
-                      onClick={clearCalculator} 
-                      variant="outline" 
-                      size="sm"
-                      className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {calculatorItems.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Calculator className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>Προσθέστε εκτύπωση ή πλαστικοποίηση για να ξεκινήσετε τον υπολογισμό</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {calculatorItems.map((item) => (
-                      <div key={item.id} className="flex items-center gap-4">
-                        <div className={`flex-1 flex items-center gap-4 p-4 border rounded-lg ${
-                          item.type === 'printing' 
-                            ? 'border-blue-200 bg-blue-100' 
-                            : 'border-green-200 bg-green-100'
-                        }`}>
-                          <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700">Τύπος</Label>
-                              <Select
-                                value={item.type}
-                                onValueChange={(value) => updateCalculatorItem(item.id, 'type', value)}
-                              >
-                                <SelectTrigger className={`w-full ${
-                                  item.type === 'printing' 
-                                    ? 'border-blue-300 focus:border-blue-500 focus:ring-blue-500' 
-                                    : 'border-green-300 focus:border-green-500 focus:ring-green-500'
-                                }`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="printing">Εκτύπωση</SelectItem>
-                                  <SelectItem value="lamination">Πλαστικοποίηση</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700">Υπηρεσία</Label>
-                              <Select
-                                value={item.service}
-                                onValueChange={(value) => updateCalculatorItem(item.id, 'service', value)}
-                              >
-                                <SelectTrigger className={`w-full ${
-                                  item.type === 'printing' 
-                                    ? 'border-blue-300 focus:border-blue-500 focus:ring-blue-500' 
-                                    : 'border-green-300 focus:border-green-500 focus:ring-green-500'
-                                }`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {getServiceOptions(item.type).map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                      {option.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <div className="w-10"></div>
-                                <div className="w-16 flex justify-center">
-                                  <Label className="text-sm font-medium text-gray-700">Ποσότητα</Label>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {calculatorItems.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Calculator className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>Προσθέστε εκτύπωση ή πλαστικοποίηση για να ξεκινήσετε τον υπολογισμό</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {calculatorItems.map((item) => (
+                        <div key={item.id} className="flex items-center gap-4">
+                          <div className={`flex-1 flex items-center gap-4 p-4 border rounded-lg ${
+                            item.type === 'printing' 
+                              ? 'border-blue-200 bg-blue-100' 
+                              : 'border-green-200 bg-green-100'
+                          }`}>
+                            <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700">Τύπος</Label>
+                                <Select
+                                  value={item.type}
+                                  onValueChange={(value) => updateCalculatorItem(item.id, 'type', value)}
+                                >
+                                  <SelectTrigger className={`w-full ${
+                                    item.type === 'printing' 
+                                      ? 'border-blue-300 focus:border-blue-500 focus:ring-blue-500' 
+                                      : 'border-green-300 focus:border-green-500 focus:ring-green-500'
+                                  }`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="printing">Εκτύπωση</SelectItem>
+                                    <SelectItem value="lamination">Πλαστικοποίηση</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700">Υπηρεσία</Label>
+                                <Select
+                                  value={item.service}
+                                  onValueChange={(value) => updateCalculatorItem(item.id, 'service', value)}
+                                >
+                                  <SelectTrigger className={`w-full ${
+                                    item.type === 'printing' 
+                                      ? 'border-blue-300 focus:border-blue-500 focus:ring-blue-500' 
+                                      : 'border-green-300 focus:border-green-500 focus:ring-green-500'
+                                  }`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {getServiceOptions(item.type).map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div className="w-10"></div>
+                                  <div className="w-16 flex justify-center">
+                                    <Label className="text-sm font-medium text-gray-700">Ποσότητα</Label>
+                                  </div>
+                                  <div className="w-10"></div>
                                 </div>
-                                <div className="w-10"></div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => updateCalculatorItem(item.id, 'quantity', Math.max(1, item.quantity - 1))}
+                                    className={`h-10 w-10 p-0 bg-white hover:bg-gray-50 ${
+                                      item.type === 'printing' 
+                                        ? 'border-blue-300 text-blue-700' 
+                                        : 'border-green-300 text-green-700'
+                                    }`}
+                                  >
+                                    <Minus className="h-4 w-4" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) => updateCalculatorItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                                    className="w-16 h-10 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => updateCalculatorItem(item.id, 'quantity', item.quantity + 1)}
+                                    className={`h-10 w-10 p-0 bg-white hover:bg-gray-50 ${
+                                      item.type === 'printing' 
+                                        ? 'border-blue-300 text-blue-700' 
+                                        : 'border-green-300 text-green-700'
+                                    }`}
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => updateCalculatorItem(item.id, 'quantity', Math.max(1, item.quantity - 1))}
-                                  className={`h-10 w-10 p-0 bg-white hover:bg-gray-50 ${
-                                    item.type === 'printing' 
-                                      ? 'border-blue-300 text-blue-700' 
-                                      : 'border-green-300 text-green-700'
-                                  }`}
-                                >
-                                  <Minus className="h-4 w-4" />
-                                </Button>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => updateCalculatorItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                                  className="w-16 h-10 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => updateCalculatorItem(item.id, 'quantity', item.quantity + 1)}
-                                  className={`h-10 w-10 p-0 bg-white hover:bg-gray-50 ${
-                                    item.type === 'printing' 
-                                      ? 'border-blue-300 text-blue-700' 
-                                      : 'border-green-300 text-green-700'
-                                  }`}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700">Τιμή ανά μονάδα</Label>
+                                <p className={`text-lg font-bold ${
+                                  item.type === 'printing' 
+                                    ? 'text-blue-600' 
+                                    : 'text-green-600'
+                                }`}>{formatPrice(item.price)}</p>
                               </div>
                             </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700">Τιμή ανά μονάδα</Label>
-                              <p className={`text-lg font-bold ${
-                                item.type === 'printing' 
-                                  ? 'text-blue-600' 
-                                  : 'text-green-600'
-                              }`}>{formatPrice(item.price)}</p>
+                            <div className="flex flex-col items-end gap-2">
+                              <div className="text-right">
+                                <p className="text-sm text-gray-600">Κόστος</p>
+                                <p className="text-xl font-bold text-red-600">{formatPrice(item.price * item.quantity)}</p>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <div className="text-right">
-                              <p className="text-sm text-gray-600">Κόστος</p>
-                              <p className="text-xl font-bold text-red-600">{formatPrice(item.price * item.quantity)}</p>
-                            </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeCalculatorItem(item.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      
+                      {calculatorItems.length > 0 && (
+                        <div className="flex justify-between items-center p-4 border-t border-yellow-200 bg-yellow-50 rounded-lg">
+                          <div>
+                            <p className="text-sm text-gray-600">Συνολικό κόστος για {calculatorItems.length} υπηρεσίες</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-3xl font-bold text-yellow-800">{formatPrice(calculateTotal())}</p>
                           </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeCalculatorItem(item.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    
-                    {calculatorItems.length > 0 && (
-                      <div className="flex justify-between items-center p-4 border-t border-yellow-200 bg-yellow-50 rounded-lg">
-                        <div>
-                          <p className="text-sm text-gray-600">Συνολικό κόστος για {calculatorItems.length} υπηρεσίες</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-3xl font-bold text-yellow-800">{formatPrice(calculateTotal())}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </main>
       </div>

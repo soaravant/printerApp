@@ -228,32 +228,38 @@ class PrinterCollector:
                 # Default pricing
                 prices = {
                     'a4BW': 0.05,
-                    'a4Color': 0.15,
+                    'a4Color': 0.25,
                     'a3BW': 0.10,
-                    'a3Color': 0.30,
-                    'rizocharto': 0.10,
-                    'chartoni': 0.10,
+                    'a3Color': 0.50,
+                    'rizochartoA3': 0.20,
+                    'rizochartoA4': 0.15,
+                    'chartoniA3': 0.20,
+                    'chartoniA4': 0.15,
                     'autokollito': 0.10,
                 }
             
             # Calculate individual costs
-            cost_a4_bw = job_data['pagesA4BW'] * prices['a4BW']
-            cost_a4_color = job_data['pagesA4Color'] * prices['a4Color']
-            cost_a3_bw = job_data['pagesA3BW'] * prices['a3BW']
-            cost_a3_color = job_data['pagesA3Color'] * prices['a3Color']
-            cost_rizocharto = job_data['pagesRizocharto'] * prices['rizocharto']
-            cost_chartoni = job_data['pagesChartoni'] * prices['chartoni']
-            cost_autokollito = job_data['pagesAutokollito'] * prices['autokollito']
+            cost_a4_bw = job_data.get('pagesA4BW', 0) * prices['a4BW']
+            cost_a4_color = job_data.get('pagesA4Color', 0) * prices['a4Color']
+            cost_a3_bw = job_data.get('pagesA3BW', 0) * prices['a3BW']
+            cost_a3_color = job_data.get('pagesA3Color', 0) * prices['a3Color']
+            cost_rizocharto_a3 = job_data.get('pagesRizochartoA3', 0) * prices['rizochartoA3']
+            cost_rizocharto_a4 = job_data.get('pagesRizochartoA4', 0) * prices['rizochartoA4']
+            cost_chartoni_a3 = job_data.get('pagesChartoniA3', 0) * prices['chartoniA3']
+            cost_chartoni_a4 = job_data.get('pagesChartoniA4', 0) * prices['chartoniA4']
+            cost_autokollito = job_data.get('pagesAutokollito', 0) * prices['autokollito']
             
-            total_cost = cost_a4_bw + cost_a4_color + cost_a3_bw + cost_a3_color + cost_rizocharto + cost_chartoni + cost_autokollito
+            total_cost = cost_a4_bw + cost_a4_color + cost_a3_bw + cost_a3_color + cost_rizocharto_a3 + cost_rizocharto_a4 + cost_chartoni_a3 + cost_chartoni_a4 + cost_autokollito
             
             job_data.update({
                 'costA4BW': round(cost_a4_bw, 2),
                 'costA4Color': round(cost_a4_color, 2),
                 'costA3BW': round(cost_a3_bw, 2),
                 'costA3Color': round(cost_a3_color, 2),
-                'costRizocharto': round(cost_rizocharto, 2),
-                'costChartoni': round(cost_chartoni, 2),
+                'costRizochartoA3': round(cost_rizocharto_a3, 2),
+                'costRizochartoA4': round(cost_rizocharto_a4, 2),
+                'costChartoniA3': round(cost_chartoni_a3, 2),
+                'costChartoniA4': round(cost_chartoni_a4, 2),
                 'costAutokollito': round(cost_autokollito, 2),
                 'totalCost': round(total_cost, 2)
             })
@@ -263,7 +269,8 @@ class PrinterCollector:
             # Set default costs to 0
             job_data.update({
                 'costA4BW': 0, 'costA4Color': 0, 'costA3BW': 0,
-                'costA3Color': 0, 'costRizocharto': 0, 'costChartoni': 0, 'costAutokollito': 0,
+                'costA3Color': 0, 'costRizochartoA3': 0, 'costRizochartoA4': 0,
+                'costChartoniA3': 0, 'costChartoniA4': 0, 'costAutokollito': 0,
                 'totalCost': 0
             })
         
