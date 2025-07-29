@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, Building, Printer, Search, Users, Church, MapPin } from "lucide-react";
+import { User, Building, Printer, Search, Users, Church, MapPin, CreditCard } from "lucide-react";
 import { roundMoney, getDynamicFilterOptions } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
@@ -158,11 +158,10 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredUsers.map((userData) => {
-          const printBilling = dummyDB.getPrintBilling(userData.uid);
-          const laminationBilling = dummyDB.getLaminationBilling(userData.uid);
-          const printUnpaid = printBilling.filter((b: any) => !b.paid).reduce((sum: number, b: any) => sum + b.remainingBalance, 0);
-          const laminationUnpaid = laminationBilling.filter((b: any) => !b.paid).reduce((sum: number, b: any) => sum + b.remainingBalance, 0);
-          const totalUnpaid = printUnpaid + laminationUnpaid;
+          // Use the actual debt fields from user data
+          const printDebt = userData.printDebt || 0;
+          const laminationDebt = userData.laminationDebt || 0;
+          const totalDebt = userData.totalDebt || 0;
           return (
             <Card 
               key={userData.uid} 
@@ -282,22 +281,22 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                         <span className="flex items-center gap-1">
                           <Printer className="h-3 w-3" /> Εκτυπώσεις:
                         </span>
-                        <span className={printUnpaid > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
-                          {formatPrice(printUnpaid)}
+                        <span className={printDebt > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
+                          {printDebt > 0 ? formatPrice(printDebt) : printDebt < 0 ? `-${formatPrice(Math.abs(printDebt))}` : formatPrice(printDebt)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="flex items-center gap-1">
-                          <Printer className="h-3 w-3" /> Πλαστικοποιήσεις:
+                          <CreditCard className="h-3 w-3" /> Πλαστικοποιήσεις:
                         </span>
-                        <span className={laminationUnpaid > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
-                          {formatPrice(laminationUnpaid)}
+                        <span className={laminationDebt > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
+                          {laminationDebt > 0 ? formatPrice(laminationDebt) : laminationDebt < 0 ? `-${formatPrice(Math.abs(laminationDebt))}` : formatPrice(laminationDebt)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center border-t pt-2">
                         <span className="font-medium">Σύνολο:</span>
-                        <span className={totalUnpaid > 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>
-                          {formatPrice(roundMoney(printUnpaid + laminationUnpaid))}
+                        <span className={totalDebt > 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>
+                          {totalDebt > 0 ? formatPrice(totalDebt) : totalDebt < 0 ? `-${formatPrice(Math.abs(totalDebt))}` : formatPrice(totalDebt)}
                         </span>
                       </div>
                     </div>

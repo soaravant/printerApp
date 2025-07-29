@@ -193,9 +193,9 @@ export default function DashboardPage() {
     setLaminationBillingPage(1)
   }, [searchTerm, dateFrom, dateTo, statusFilter, typeFilter, deviceFilter, userFilter])
 
-  // Auto-set print type filter when Canon B/W or Brother is selected
+  // Auto-set print type filter when Canon B/W, Brother, or Κυδωνιών is selected
   useEffect(() => {
-    if (deviceFilter === "Canon B/W" || deviceFilter === "Brother") {
+    if (deviceFilter === "Canon B/W" || deviceFilter === "Brother" || deviceFilter === "Κυδωνιών") {
       setPrintTypeFilter("a4BW")
     }
   }, [deviceFilter])
@@ -683,6 +683,10 @@ export default function DashboardPage() {
       brother: {
         a4BW: 0
       },
+      kydonion: {
+        a4BW: 0,
+        total: 0
+      },
       total: 0
     }
 
@@ -690,13 +694,16 @@ export default function DashboardPage() {
       if (job.deviceName === "Canon B/W") {
         stats.canonBW.a4BW += job.pagesA4BW
         stats.total += job.pagesA4BW
-      } else if (job.deviceName === "Canon Colour") {
+      } else if (job.deviceName === "Canon Color") {
         stats.canonColour.a4BW += job.pagesA4BW
         stats.canonColour.a4Colour += job.pagesA4Color
         stats.canonColour.a3BW += job.pagesA3BW
         stats.canonColour.a3Colour += job.pagesA3Color
       } else if (job.deviceName === "Brother") {
         stats.brother.a4BW += job.pagesA4BW
+        stats.total += job.pagesA4BW
+      } else if (job.deviceName === "Κυδωνιών") {
+        stats.kydonion.a4BW += job.pagesA4BW
         stats.total += job.pagesA4BW
       }
     })
@@ -705,9 +712,10 @@ export default function DashboardPage() {
     stats.canonColour.a4Total = stats.canonColour.a4BW + stats.canonColour.a4Colour
     stats.canonColour.a3Total = stats.canonColour.a3BW + stats.canonColour.a3Colour
     stats.canonColour.total = stats.canonColour.a4Total + stats.canonColour.a3Total
+    stats.kydonion.total = stats.kydonion.a4BW
     
     // Calculate overall total
-    stats.total = stats.canonBW.a4BW + stats.canonColour.total + stats.brother.a4BW
+    stats.total = stats.canonBW.a4BW + stats.canonColour.total + stats.brother.a4BW + stats.kydonion.total
 
     return stats
   }
@@ -761,8 +769,9 @@ export default function DashboardPage() {
   // Generate chart data for last 6 months
 
 
-  // Get unique devices for filter
-  const uniqueDevices = [...new Set(printJobs.map((job) => job.deviceName).filter(Boolean))]
+  // Get unique devices for filter with specific order
+  const allDevices = [...new Set(printJobs.map((job) => job.deviceName).filter(Boolean))]
+  const uniqueDevices = ["Canon Color", "Canon B/W", "Brother", "Κυδωνιών"].filter(device => allDevices.includes(device))
 
   // Calculate combined debt data for the total debt table
   const calculateCombinedDebtData = () => {
@@ -874,7 +883,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className={`p-6 flex-1 flex ${hasFilters && printUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
-                  <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-red-600' : printUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                  <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-blue-600' : printUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                     {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
                   </div>
                   {hasFilters && printUnpaidPercentage < 100 && (
@@ -892,7 +901,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className={`p-6 flex-1 flex ${hasFilters && laminationUnpaidPercentage < 100 ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
-                  <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-red-600' : laminationUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                  <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-green-600' : laminationUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                     {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
                   </div>
                   {hasFilters && laminationUnpaidPercentage < 100 && (
@@ -1266,12 +1275,12 @@ export default function DashboardPage() {
                 {/* Print Statistics Cards */}
                 <div className="mt-6">
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                    {/* Canon Colour Statistics */}
+                    {/* Canon Color Statistics */}
                     <div className="md:col-span-4 bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <Printer className="h-5 w-5 text-blue-700" />
-                          <h3 className="text-sm font-semibold text-blue-900">Canon Colour</h3>
+                          <h3 className="text-sm font-semibold text-blue-900">Canon Color</h3>
                         </div>
                       </div>
                       <div className="p-4">
@@ -1279,7 +1288,7 @@ export default function DashboardPage() {
                           <div>
                             <div className="text-xs text-gray-600">A4 B/W</div>
                             <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Colour", "A4 Ασπρόμαυρο") 
+                              isPrintStatHighlighted("Canon Color", "A4 Ασπρόμαυρο") 
                                 ? "text-blue-600 bg-blue-100 rounded px-1" 
                                 : "text-black"
                             }`}>
@@ -1289,7 +1298,7 @@ export default function DashboardPage() {
                           <div>
                             <div className="text-xs text-gray-600">A4 Colour</div>
                             <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Colour", "A4 Έγχρωμο") 
+                              isPrintStatHighlighted("Canon Color", "A4 Έγχρωμο") 
                                 ? "text-blue-600 bg-blue-100 rounded px-1" 
                                 : "text-black"
                             }`}>
@@ -1299,7 +1308,7 @@ export default function DashboardPage() {
                           <div>
                             <div className="text-xs text-gray-600">A3 B/W</div>
                             <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Colour", "A3 Ασπρόμαυρο") 
+                              isPrintStatHighlighted("Canon Color", "A3 Ασπρόμαυρο") 
                                 ? "text-blue-600 bg-blue-100 rounded px-1" 
                                 : "text-black"
                             }`}>
@@ -1309,7 +1318,7 @@ export default function DashboardPage() {
                           <div>
                             <div className="text-xs text-gray-600">A3 Colour</div>
                             <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Colour", "A3 Έγχρωμο") 
+                              isPrintStatHighlighted("Canon Color", "A3 Έγχρωμο") 
                                 ? "text-blue-600 bg-blue-100 rounded px-1" 
                                 : "text-black"
                             }`}>
@@ -1378,8 +1387,30 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
+                    {/* Κυδωνιών Statistics */}
+                    <div className="md:col-span-2 bg-white rounded-lg border border-blue-200 shadow-sm">
+                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                        <div className="flex items-center gap-2">
+                          <Printer className="h-5 w-5 text-blue-700" />
+                          <h3 className="text-sm font-semibold text-blue-900">Κυδωνιών</h3>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="text-center">
+                          <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
+                          <div className={`text-xl font-bold ${
+                            isPrintStatHighlighted("Κυδωνιών", "A4 Ασπρόμαυρο") 
+                              ? "text-blue-600 bg-blue-100 rounded px-1" 
+                              : "text-black"
+                          }`}>
+                            {printStats.kydonion.a4BW}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Total Print Statistics */}
-                    <div className="md:col-span-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                    <div className="md:col-span-2 bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <BarChart3 className="h-5 w-5 text-blue-700" />

@@ -178,18 +178,18 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
                   <TableCell className="text-center font-medium">{item.userRole}</TableCell>
                   <TableCell className="text-center">{item.userDisplayName}</TableCell>
                   <TableCell className="text-center">{item.responsiblePerson}</TableCell>
-                  <TableCell className={`text-center ${item.totalDebt > 0 ? "text-red-600 font-semibold" : item.totalDebt < 0 ? "text-green-600 font-semibold" : "text-gray-600"}`}>
+                  <TableCell className={`text-center ${item.totalDebt > 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"}`}>
                     <div className="text-center">
                       <div className="text-sm">
-                        <span className={item.printDebt > 0 ? "text-red-600" : item.printDebt < 0 ? "text-green-600" : "text-gray-600"}>
+                        <span className={`${item.printDebt > 0 ? "text-red-600" : "text-green-600"} font-normal`}>
                           {item.printDebt > 0 ? formatPrice(item.printDebt) : item.printDebt < 0 ? `-${formatPrice(Math.abs(item.printDebt))}` : formatPrice(item.printDebt)}
                         </span>
                         {" | "}
-                        <span className={item.laminationDebt > 0 ? "text-red-600" : item.laminationDebt < 0 ? "text-green-600" : "text-gray-600"}>
+                        <span className={`${item.laminationDebt > 0 ? "text-red-600" : "text-green-600"} font-normal`}>
                           {item.laminationDebt > 0 ? formatPrice(item.laminationDebt) : item.laminationDebt < 0 ? `-${formatPrice(Math.abs(item.laminationDebt))}` : formatPrice(item.laminationDebt)}
                         </span>
                         {" | "}
-                        <span className={item.totalDebt > 0 ? "text-red-600" : item.totalDebt < 0 ? "text-green-600" : "text-gray-600"}>
+                        <span className={`${item.totalDebt > 0 ? "text-red-600" : "text-green-600"} font-bold`}>
                           {item.totalDebt > 0 ? formatPrice(item.totalDebt) : item.totalDebt < 0 ? `-${formatPrice(Math.abs(item.totalDebt))}` : formatPrice(item.totalDebt)}
                         </span>
                       </div>

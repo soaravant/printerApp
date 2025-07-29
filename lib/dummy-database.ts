@@ -121,6 +121,7 @@ export interface PriceTable {
 export interface Income {
   incomeId: string
   uid: string
+  username: string
   userDisplayName: string
   amount: number
   timestamp: Date
@@ -1220,7 +1221,7 @@ class DummyDatabase {
   }
 
   private getRandomPrinterName(): string {
-    const printers = ["Canon Colour", "Canon B/W", "Brother"];
+    const printers = ["Canon Color", "Canon B/W", "Brother", "Κυδωνιών"];
     return printers[Math.floor(Math.random() * printers.length)];
   }
 
@@ -1270,8 +1271,8 @@ class DummyDatabase {
           };
 
           // Generate pages based on printer capabilities
-          if (deviceName === "Canon Colour") {
-            // Canon Colour can print everything
+          if (deviceName === "Canon Color") {
+            // Canon Color can print everything
             printJob.pagesA4BW = Math.floor(Math.random() * 8) + 1; // 1-8
             printJob.pagesA4Color = Math.floor(Math.random() * 4);   // 0-3
             printJob.pagesA3BW = Math.floor(Math.random() * 3);      // 0-2
@@ -1281,6 +1282,10 @@ class DummyDatabase {
             printJob.pagesChartoniA3 = Math.floor(Math.random() * 3); // 0-2
             printJob.pagesChartoniA4 = Math.floor(Math.random() * 4); // 0-3
             printJob.pagesAutokollito = Math.floor(Math.random() * 5); // 0-4
+          } else if (deviceName === "Κυδωνιών") {
+            // Κυδωνιών can only print A4 B/W
+            printJob.pagesA4BW = Math.floor(Math.random() * 8) + 1; // 1-8
+            // All other page types remain 0
           } else if (deviceName === "Canon B/W" || deviceName === "Brother") {
             // Canon B/W and Brother can only print A4 B/W
             printJob.pagesA4BW = Math.floor(Math.random() * 8) + 1; // 1-8
@@ -1516,6 +1521,7 @@ class DummyDatabase {
           const incomeRecord: Income = {
             incomeId: `income-${userId}-${period}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             uid: userId,
+            username: user.username,
             userDisplayName: user.displayName,
             amount: income.amount,
             timestamp: income.timestamp,
@@ -1847,8 +1853,21 @@ class DummyDatabase {
 
   // Method to regenerate income data dynamically
   regenerateIncome(): void {
+    // Store manually added income records (those with recent timestamps)
+    const now = new Date()
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const manuallyAddedIncome = this.income.filter(income => 
+      income.timestamp > oneDayAgo
+    )
+    
     this.income = []
     this.generateIncomeHistory()
+    
+    // Restore manually added income records
+    this.income.push(...manuallyAddedIncome)
+    
+    // Sort by timestamp (newest first)
+    this.income.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
   }
 
   // Method to get fresh income data (regenerates if needed)

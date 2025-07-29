@@ -2,6 +2,132 @@
 
 ## Recent Lessons & Improvements (December 2024)
 
+### Κυδωνιών Printer Configuration Update (December 2024)
+
+**Problem**: The Κυδωνιών printer was configured to print both A4 B/W and A4 Color, but it should only print A4 B/W like the Canon B/W and Brother printers. Also, the printer filter dropdown needed to be reordered for better user experience.
+
+**Requirements**:
+- Make Κυδωνιών printer only print A4 B/W
+- Update printer filter sequence to: Όλοι, Canon Color, Canon B/W, Brother, Κυδωνιών
+- Gray out print type filter when Κυδωνιών is selected (like Canon B/W and Brother)
+- Update statistics display to show only A4 B/W for Κυδωνιών
+
+**Solution**: Updated the database generation logic and UI components to restrict Κυδωνιών to A4 B/W only.
+
+**Changes Made**:
+
+**1. Updated Database Generation (`lib/dummy-database.ts`)**:
+- **Modified print job generation**: Removed A4 Color generation for Κυδωνιών printer
+- **Updated comment**: Changed from "can print A4 B/W and A4 Color" to "can only print A4 B/W"
+- **Consistent behavior**: Now matches Canon B/W and Brother printer behavior
+
+```typescript
+} else if (deviceName === "Κυδωνιών") {
+  // Κυδωνιών can only print A4 B/W
+  printJob.pagesA4BW = Math.floor(Math.random() * 8) + 1; // 1-8
+  // All other page types remain 0
+}
+```
+
+**2. Updated Dashboard Page (`app/dashboard/page.tsx`)**:
+- **Reordered printer filter**: Changed from alphabetical order to specific sequence
+- **Updated statistics calculation**: Removed A4 Color calculations for Κυδωνιών
+- **Simplified statistics display**: Changed from 2-column grid to single centered display
+- **Updated auto-set logic**: Already included Κυδωνιών in the auto-set for A4 B/W
+
+```typescript
+// Get unique devices for filter with specific order
+const allDevices = [...new Set(printJobs.map((job) => job.deviceName).filter(Boolean))]
+const uniqueDevices = ["Canon Color", "Canon B/W", "Brother", "Κυδωνιών"].filter(device => allDevices.includes(device))
+```
+
+**3. Updated Print Filters Component (`components/print-filters.tsx`)**:
+- **Added Κυδωνιών to disabled list**: Print type filter is now disabled when Κυδωνιών is selected
+- **Updated visual feedback**: Grayed out styling and helper text for Κυδωνιών
+- **Consistent behavior**: Now matches Canon B/W and Brother printer behavior
+
+```typescript
+disabled={deviceFilter === "Canon B/W" || deviceFilter === "Brother" || deviceFilter === "Κυδωνιών"}
+```
+
+**4. Updated Statistics Display**:
+- **Removed A4 Color column**: Κυδωνιών statistics now show only A4 B/W
+- **Simplified layout**: Changed from 2-column grid to single centered display
+- **Updated totals calculation**: Removed A4 Color from total calculations
+
+**Technical Details**:
+- **Backward compatibility**: Existing data structure remains unchanged
+- **Automatic filtering**: Export functionality automatically handles the new behavior
+- **Type safety**: Maintained full TypeScript support
+- **Performance**: No performance impact as the change only affects data generation
+
+**Result**: 
+- Κυδωνιών printer now only generates A4 B/W print jobs
+- Printer filter dropdown shows the desired sequence
+- Print type filter is properly disabled and grayed out when Κυδωνιών is selected
+- Statistics display correctly shows only A4 B/W for Κυδωνιών
+- Consistent behavior across all B/W-only printers (Canon B/W, Brother, Κυδωνιών)
+
+### Date Column Sorting Default to Latest First (December 2024)
+
+### Date Column Sorting Default to Latest First (December 2024)
+
+**Problem**: When users first clicked sort on date columns (timestamp, period, dueDate, lastPayment), the oldest dates appeared first (ascending order). Users wanted the latest dates to appear first by default for better user experience.
+
+**Solution**: Modified the sorting logic to default to descending order for date columns so that the latest dates appear first when initially clicking sort.
+
+**Changes Made**:
+
+**1. Enhanced Sort Utils (`lib/sort-utils.ts`)**:
+- **Added date column detection**: Identified date columns that should default to descending order
+- **Modified toggleSort function**: Added logic to detect date columns and default to 'desc' direction
+- **Maintained existing behavior**: Non-date columns still default to ascending order as before
+
+```typescript
+export function toggleSort(currentSort: SortConfig | null, newKey: string): SortConfig {
+  if (currentSort?.key === newKey) {
+    return {
+      key: newKey,
+      direction: currentSort.direction === 'asc' ? 'desc' : 'asc'
+    }
+  }
+  
+  // Date columns should default to descending order (latest first)
+  const dateColumns = ['timestamp', 'period', 'dueDate', 'lastPayment']
+  const isDateColumn = dateColumns.includes(newKey)
+  
+  // Money amount columns should default to descending order (largest first)
+  const moneyColumns = ['totalCost', 'remainingBalance', 'paidAmount', 'amount', 'cost']
+  const isMoneyColumn = moneyColumns.includes(newKey)
+  
+  return {
+    key: newKey,
+    direction: (isDateColumn || isMoneyColumn) ? 'desc' : 'asc'
+  }
+}
+```
+
+**Affected Date Columns**:
+- **timestamp**: Job timestamps in print jobs and lamination jobs tables
+- **period**: Billing periods in billing tables
+- **dueDate**: Due dates in billing tables
+- **lastPayment**: Last payment dates in billing and debt tables
+
+**Affected Money Amount Columns**:
+- **totalCost**: Job costs in print jobs and lamination jobs tables
+- **remainingBalance**: Debt amounts in billing tables
+- **paidAmount**: Payment amounts in billing tables
+- **amount**: Income amounts in income table
+- **cost**: Individual print costs in print jobs table
+
+**Technical Details**:
+- **Backward compatibility**: Existing sort behavior for non-date and non-money columns remains unchanged
+- **Toggle functionality**: Users can still toggle between ascending and descending order
+- **Performance**: No performance impact as the change only affects the initial sort direction
+- **Type safety**: Maintained full TypeScript support
+
+**Result**: When users first click sort on any date column, the latest dates now appear first, and when they click sort on any money amount column, the largest amounts now appear first, providing a more intuitive user experience that matches common expectations for sorting.
+
 ### Ξεχρέωση (Debt Reduction) Feature Implementation (December 2024)
 
 **Problem**: Admins needed a way to record payments from users to reduce their debt. There was no system to track payments and maintain a transaction history.
@@ -328,7 +454,7 @@ useEffect(() => {
   - Proper cost calculation for each specific variant
 
 **3. Printer Capability Integration**:
-- **Canon Colour**: Can filter by all print types (full capability)
+- **Canon Color**: Can filter by all print types (full capability)
 - **Canon B/W & Brother**: Automatically restricted to A4 Ασπρόμαυρο only
 - **Filter Disabling**: Type filter is disabled and auto-set when B/W printers are selected
 
@@ -1339,6 +1465,57 @@ export interface User {
 {newUser.accessLevel === "Υπεύθυνος" && (
   <div>
     <Label>Υπεύθυνος για:</Label>
+```
+
+**Result**: The admin page user creation form is now more streamlined and user-friendly, with proper role restrictions and improved layout. The removal of the team field simplifies the form while maintaining all necessary functionality through the memberOf tag system.
+
+### Income Table Integration with Debt Reduction (December 2024)
+
+**Problem**: When income is added from the "Ξεχρέωση" (Debt Reduction) tab in the admin page, it was not being displayed in the "Έσοδα" (Income) table on the dashboard page. The income data was being overwritten when the dashboard refreshed.
+
+**Solution**: Modified the `regenerateIncome()` method in the dummy database to preserve manually added income records while still regenerating historical income data.
+
+**Changes Made**:
+
+**1. Updated regenerateIncome Method (`lib/dummy-database.ts`)**:
+- **Preserve recent income**: Store income records with timestamps from the last 24 hours before regeneration
+- **Restore after regeneration**: Add back the manually added income records after historical data is regenerated
+- **Maintain sorting**: Ensure all income records are sorted by timestamp (newest first)
+
+```typescript
+// Before
+regenerateIncome(): void {
+  this.income = []
+  this.generateIncomeHistory()
+}
+
+// After
+regenerateIncome(): void {
+  // Store manually added income records (those with recent timestamps)
+  const now = new Date()
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  const manuallyAddedIncome = this.income.filter(income => 
+    income.timestamp > oneDayAgo
+  )
+  
+  this.income = []
+  this.generateIncomeHistory()
+  
+  // Restore manually added income records
+  this.income.push(...manuallyAddedIncome)
+  
+  // Sort by timestamp (newest first)
+  this.income.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+}
+```
+
+**Technical Details**:
+- **24-hour threshold**: Income records added within the last 24 hours are considered "manually added"
+- **Timestamp comparison**: Uses `income.timestamp > oneDayAgo` to identify recent records
+- **Array preservation**: Uses spread operator to add back preserved records
+- **Sorting**: Maintains chronological order with newest records first
+
+**Result**: Income added through the debt reduction tab now persists and appears in the income table on the dashboard, providing a complete view of all income transactions including both historical and manually added records.
     <TagInput
       tags={newUser.responsibleFor}
       onTagsChange={(responsibleFor) => setNewUser({ ...newUser, responsibleFor })}
@@ -2689,7 +2866,7 @@ This fix ensures that all monetary calculations throughout the application are p
 
 **1. Print Statistics Cards**:
 - **Canon B/W Section**: Shows A4 B/W statistics
-- **Canon Colour Section**: Shows A4 B/W, A4 Colour, A3 B/W, A3 Colour with subtotals for A4 Total, A3 Total, and overall Total
+- **Canon Color Section**: Shows A4 B/W, A4 Colour, A3 B/W, A3 Colour with subtotals for A4 Total, A3 Total, and overall Total
 - **Brother Section**: Shows A4 B/W statistics
 - **Overall Total Section**: Shows total print count across all devices
 
@@ -2712,7 +2889,7 @@ This fix ensures that all monetary calculations throughout the application are p
 
 **Key Features**:
 - **Real-time Statistics**: All statistics update based on current filtered data
-- **Device-specific Breakdowns**: Separate sections for each printer type (Canon B/W, Canon Colour, Brother)
+- **Device-specific Breakdowns**: Separate sections for each printer type (Canon B/W, Canon Color, Brother)
 - **Machine-specific Breakdowns**: Separate sections for lamination types (Πλαστικοποιητής, Βιβλιοδεσία)
 - **Subtotal Calculations**: Automatic calculation of subtotals and totals
 - **Consistent UI**: Matches existing dashboard card design patterns
@@ -3718,7 +3895,7 @@ className="p-2 rounded-full border border-gray-300 bg-white hover:bg-gray-50 tra
 
 ### Printer Configuration Update (December 2024)
 
-**Problem**: The system needed to be updated to include 3 specific printers: Canon Colour, Canon B/W, and Brother, replacing the previous generic printer names.
+**Problem**: The system needed to be updated to include 3 specific printers: Canon Color, Canon B/W, and Brother, replacing the previous generic printer names.
 
 **Solution**: Updated both the dummy database and Python data collection service to use the 3 specific printer names and their corresponding models.
 
@@ -3731,7 +3908,7 @@ className="p-2 rounded-full border border-gray-300 bg-white hover:bg-gray-50 tra
 
 ```typescript
 private getRandomPrinterName(): string {
-  const printers = ["Canon Colour", "Canon B/W", "Brother"];
+  const printers = ["Canon Color", "Canon B/W", "Brother"];
   return printers[Math.floor(Math.random() * printers.length)];
 }
 
@@ -3750,7 +3927,7 @@ deviceName: this.getRandomPrinterName(),
 printer_config = os.getenv('PRINTER_CONFIG', '''[
     {
         "ip": "192.168.3.41",
-        "name": "Canon Colour",
+        "name": "Canon Color",
         "model": "canon_color",
         "username": "admin",
         "password": "admin"
@@ -3816,7 +3993,7 @@ else:
 - **Realistic Configuration**: Matches the actual printer setup in the environment
 
 **Technical Notes**:
-- Canon printers are distinguished as "Canon Colour" and "Canon B/W" for clarity
+- Canon printers are distinguished as "Canon Color" and "Canon B/W" for clarity
 - Brother printer uses the "brother" model type for data collection
 - IP addresses are assigned sequentially (192.168.3.41, 192.168.3.42, 192.168.3.43)
 - All printers use the same admin credentials for consistency

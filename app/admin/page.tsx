@@ -232,6 +232,7 @@ export default function AdminPage() {
       const newIncome: Income = {
         incomeId: `income-${Date.now()}`,
         uid: debtReductionUser,
+        username: selectedUserData.username,
         userDisplayName: selectedUserData.displayName,
         amount: amount,
         timestamp: new Date(debtReductionDate),
@@ -936,16 +937,7 @@ export default function AdminPage() {
                               </div>
                             </div>
                           </div>
-                          {paymentAmount > 0 && (
-                            <div className="mt-3 text-center">
-                              <div className="text-sm text-gray-600">
-                                                              {remainingTotal < 0 ? 
-                                `Θα δημιουργηθεί πίστωση €${Math.abs(remainingTotal).toFixed(2).replace('.', ',')}` :
-                                `Θα μειωθεί το χρέος κατά €${Math.min(paymentAmount, currentTotalDebt).toFixed(2).replace('.', ',')}`
-                              }
-                              </div>
-                            </div>
-                          )}
+
                         </div>
                       )
                     })()}

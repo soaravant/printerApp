@@ -120,10 +120,10 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
             <Select 
               value={printTypeFilter} 
               onValueChange={setPrintTypeFilter}
-              disabled={deviceFilter === "Canon B/W" || deviceFilter === "Brother"}
+              disabled={deviceFilter === "Canon B/W" || deviceFilter === "Brother" || deviceFilter === "Κυδωνιών"}
             >
               <SelectTrigger className={`border-gray-200 focus:border-blue-500 ${
-                deviceFilter === "Canon B/W" || deviceFilter === "Brother" 
+                deviceFilter === "Canon B/W" || deviceFilter === "Brother" || deviceFilter === "Κυδωνιών"
                   ? "bg-gray-100 text-gray-500 cursor-not-allowed" 
                   : ""
               }`}>
@@ -142,7 +142,7 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
                 <SelectItem value="autokollito">Αυτοκόλλητο</SelectItem>
               </SelectContent>
             </Select>
-            {(deviceFilter === "Canon B/W" || deviceFilter === "Brother") && (
+            {(deviceFilter === "Canon B/W" || deviceFilter === "Brother" || deviceFilter === "Κυδωνιών") && (
               <p className="text-xs text-gray-500 mt-1">
                 Μόνο A4 Ασπρόμαυρο διαθέσιμο για αυτόν τον εκτυπωτή
               </p>

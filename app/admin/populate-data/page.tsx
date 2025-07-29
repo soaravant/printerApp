@@ -62,7 +62,7 @@ export default function PopulateDataPage() {
           pagesChartoniA4: Math.floor(Math.random() * 3) + 1,
           pagesAutokollito: Math.floor(Math.random() * 2) + 1,
           deviceIP: "192.168.1.100",
-          deviceName: "Canon Colour",
+          deviceName: "Canon Color",
           timestamp: new Date(),
           costA4BW: 0.05,
           costA4Color: 0.25,

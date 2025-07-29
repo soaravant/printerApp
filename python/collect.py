@@ -65,7 +65,7 @@ class PrinterCollector:
             printer_config = os.getenv('PRINTER_CONFIG', '''[
                 {
                     "ip": "192.168.3.41",
-                    "name": "Canon Colour",
+                    "name": "Canon Color",
                     "model": "canon_color",
                     "username": "admin",
                     "password": "admin"
@@ -81,6 +81,13 @@ class PrinterCollector:
                     "ip": "192.168.3.43",
                     "name": "Brother",
                     "model": "brother",
+                    "username": "admin",
+                    "password": "admin"
+                },
+                {
+                    "ip": "192.168.3.44",
+                    "name": "Κυδωνιών",
+                    "model": "canon_color",
                     "username": "admin",
                     "password": "admin"
                 }

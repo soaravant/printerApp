@@ -53,8 +53,17 @@ export function toggleSort(currentSort: SortConfig | null, newKey: string): Sort
       direction: currentSort.direction === 'asc' ? 'desc' : 'asc'
     }
   }
+  
+  // Date columns should default to descending order (latest first)
+  const dateColumns = ['timestamp', 'period', 'dueDate', 'lastPayment']
+  const isDateColumn = dateColumns.includes(newKey)
+  
+  // Money amount columns should default to descending order (largest first)
+  const moneyColumns = ['totalCost', 'remainingBalance', 'paidAmount', 'amount', 'cost']
+  const isMoneyColumn = moneyColumns.includes(newKey)
+  
   return {
     key: newKey,
-    direction: 'asc'
+    direction: (isDateColumn || isMoneyColumn) ? 'desc' : 'asc'
   }
 } 
