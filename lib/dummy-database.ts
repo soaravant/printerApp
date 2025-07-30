@@ -67,14 +67,30 @@ export interface Income {
   timestamp: Date
 }
 
+export interface Bank {
+  bankId: string
+  printBank: number // Total money collected for print debt reduction
+  laminationBank: number // Total money collected for lamination debt reduction
+  timestamp: Date
+  lastUpdated: Date
+}
+
 class DummyDatabase {
   private users: User[] = []
   private printJobs: PrintJob[] = []
   private laminationJobs: LaminationJob[] = []
   private priceTables: PriceTable[] = []
   private income: Income[] = []
+  private bank: Bank
 
   constructor() {
+    this.bank = {
+      bankId: "main-bank",
+      printBank: 0,
+      laminationBank: 0,
+      timestamp: new Date(),
+      lastUpdated: new Date()
+    }
     this.initializeData()
   }
 
@@ -880,6 +896,13 @@ class DummyDatabase {
     return this.users.find((u) => u.uid === uid)
   }
 
+  updateUser(updatedUser: User): void {
+    const index = this.users.findIndex(user => user.uid === updatedUser.uid)
+    if (index !== -1) {
+      this.users[index] = { ...updatedUser }
+    }
+  }
+
   // Print job methods
   getPrintJobs(uid?: string): PrintJob[] {
     if (uid) {
@@ -1004,8 +1027,82 @@ class DummyDatabase {
   addIncome(incomeRecord: Income): void {
     this.income.push(incomeRecord)
     
-    // Update user's debt fields (income reduces debt)
-    this.updateUserDebtFields(incomeRecord.uid)
+    // Apply the new debt reduction logic and update bank
+    this.applyDebtReduction(incomeRecord.uid, incomeRecord.amount)
+  }
+
+  // New method to apply debt reduction with the specified logic
+  private applyDebtReduction(uid: string, amount: number): void {
+    const user = this.users.find(u => u.uid === uid)
+    if (!user) return
+
+    // Get current debt amounts
+    const currentPrintDebt = user.printDebt || 0
+    const currentLaminationDebt = user.laminationDebt || 0
+    
+    let remainingAmount = amount
+    let printBankIncrease = 0
+    let laminationBankIncrease = 0
+
+    // Step 1: First subtract from lamination debt
+    if (currentLaminationDebt > 0 && remainingAmount > 0) {
+      const laminationPayment = Math.min(remainingAmount, currentLaminationDebt)
+      user.laminationDebt = currentLaminationDebt - laminationPayment
+      remainingAmount -= laminationPayment
+      laminationBankIncrease += laminationPayment
+    }
+
+    // Step 2: If lamination debt is 0 and there's still money, subtract from print debt
+    if ((user.laminationDebt || 0) <= 0 && remainingAmount > 0 && currentPrintDebt > 0) {
+      const printPayment = Math.min(remainingAmount, currentPrintDebt)
+      user.printDebt = currentPrintDebt - printPayment
+      remainingAmount -= printPayment
+      printBankIncrease += printPayment
+    }
+
+    // Step 3: If there's still money, create negative debt (credit)
+    if (remainingAmount > 0) {
+      // Apply remaining amount as credit to print first, then lamination
+      if ((user.printDebt || 0) <= 0) {
+        user.printDebt = (user.printDebt || 0) - remainingAmount
+        printBankIncrease += remainingAmount
+      } else {
+        user.laminationDebt = (user.laminationDebt || 0) - remainingAmount
+        laminationBankIncrease += remainingAmount
+      }
+      remainingAmount = 0
+    }
+
+    // Update total debt
+    user.totalDebt = (user.printDebt || 0) + (user.laminationDebt || 0)
+
+    // Update bank amounts
+    this.bank.printBank += printBankIncrease
+    this.bank.laminationBank += laminationBankIncrease
+    this.bank.lastUpdated = new Date()
+  }
+
+  // Bank methods
+  getBank(): Bank {
+    return { ...this.bank }
+  }
+
+  getBankAmounts(): { printBank: number; laminationBank: number } {
+    return {
+      printBank: this.bank.printBank,
+      laminationBank: this.bank.laminationBank
+    }
+  }
+
+  // Bank reset methods
+  resetPrintBank(): void {
+    this.bank.printBank = 0
+    this.bank.lastUpdated = new Date()
+  }
+
+  resetLaminationBank(): void {
+    this.bank.laminationBank = 0
+    this.bank.lastUpdated = new Date()
   }
 
   // Public method to refresh all user debt fields
@@ -1032,6 +1129,13 @@ class DummyDatabase {
     this.printJobs = []
     this.laminationJobs = []
     this.income = []
+    this.bank = {
+      bankId: "main-bank",
+      printBank: 0,
+      laminationBank: 0,
+      timestamp: new Date(),
+      lastUpdated: new Date()
+    }
     this.initializeData()
   }
 

@@ -43,7 +43,7 @@ export default function IncomeTable({
   const formatDate = (date: Date) => date.toLocaleDateString("el-GR")
 
   return (
-    <div className="border rounded-lg">
+    <div className="border rounded-lg flex flex-col h-full">
       {/* Fixed (non-scrolling) header */}
       <Table className="min-w-full">
         <TableHeader className="bg-gray-100">
@@ -85,7 +85,7 @@ export default function IncomeTable({
       </Table>
 
       {/* Scrollable body only */}
-      <div className="max-h-[400px] overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         <Table className="min-w-full">
           <TableBody>
             {paginatedData.length === 0 ? (

@@ -1,5 +1,230 @@
 # Development Lessons & Solutions
 
+## Debt Reduction Logic and Bank System Implementation (December 2024)
+
+### New Debt Reduction Logic and Bank Tracking System
+
+**Problem**: The debt reduction (ξεχρέωση) system needed to be updated to follow a specific priority order and track money flow properly. The system needed to:
+1. First subtract money from lamination debt
+2. If lamination debt reaches 0, subtract from print debt
+3. If there's still money, create negative debt (credit)
+4. Track the money flow in separate "bank" accounts for print and lamination
+
+**Requirements**:
+- Implement new debt reduction logic with priority order (lamination first, then print)
+- Create a new "bank" table to track printBank and laminationBank amounts
+- Connect bank amounts to the Έσοδα numbers in dashboard cards
+- Update the debt reduction preview to show correct remaining debt calculation
+- Ensure negative debt values are properly displayed
+
+**Solution**: Implemented new debt reduction logic and bank tracking system.
+
+**Changes Made**:
+
+**1. Added Bank Interface (`lib/dummy-database.ts`)**:
+- Created new `Bank` interface with `printBank` and `laminationBank` fields
+- Added `bank` property to `DummyDatabase` class
+- Initialized bank with zero amounts in constructor
+
+**2. Updated Debt Reduction Logic (`lib/dummy-database.ts`)**:
+- Replaced old `updateUserDebtFields` method with new `applyDebtReduction` method
+- Implemented priority-based debt reduction:
+  - Step 1: Subtract from lamination debt first
+  - Step 2: If lamination debt is 0, subtract from print debt
+  - Step 3: If there's still money, create negative debt (credit) in print debt
+- Added bank tracking: money subtracted from each debt type is added to corresponding bank account
+- Updated `addIncome` method to use new debt reduction logic
+
+**3. Added Bank Methods (`lib/dummy-database.ts`)**:
+- `getBank()`: Returns complete bank object
+- `getBankAmounts()`: Returns print and lamination bank amounts
+- Updated `reset()` method to reset bank amounts
+
+**4. Updated Dashboard Income Display (`app/dashboard/page.tsx`)**:
+- Replaced old income calculation with bank amounts
+- `currentMonthPrintIncome` now uses `bankAmounts.printBank`
+- `currentMonthLaminationIncome` now uses `bankAmounts.laminationBank`
+- `currentMonthTotalIncome` is sum of both bank amounts
+
+**5. Debt Reduction Preview Logic (`app/admin/page.tsx`)**:
+- The existing preview logic was already correctly implemented
+- Shows remaining debt after payment following the new priority order
+- Displays negative values (credit) in green color
+- Updates in real-time as user enters payment amount
+
+**Key Benefits**:
+- **Accurate Tracking**: Bank system accurately tracks money flow for each debt type
+- **Priority-Based Reduction**: Debt reduction follows the specified priority order
+- **Credit Support**: System properly handles overpayment as credit
+- **Real-Time Preview**: Users can see exactly how their payment will be applied
+- **Dashboard Integration**: Bank amounts are directly connected to dashboard income display
+- **Consistent Logic**: Same logic used in both preview and actual payment processing
+
+**Technical Implementation**:
+- New `Bank` interface with timestamp tracking
+- Priority-based debt reduction algorithm
+- Bank amount tracking for each payment
+- Integration with existing income system
+- Real-time preview calculation
+- Proper handling of undefined debt values
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Added Bank interface, updated debt reduction logic, added bank methods
+- `app/dashboard/page.tsx` - Updated income display to use bank amounts
+- `app/admin/page.tsx` - Preview logic was already correct
+
+**Testing Considerations**:
+- Verify debt reduction follows priority order (lamination first, then print)
+- Verify bank amounts are correctly updated
+- Verify dashboard income numbers match bank amounts
+- Verify negative debt values are displayed correctly
+- Verify preview calculation matches actual payment processing
+- Test with various payment amounts and debt scenarios
+- Verify reset functionality clears bank amounts
+
+**Result**: The debt reduction system now follows the specified priority order and accurately tracks money flow through the bank system, with the dashboard income numbers directly connected to the bank amounts.
+
+## Data Synchronization Fix (December 2024)
+
+### Critical Fix for Data Corruption During Navigation
+
+**Problem**: When navigating between the admin page and dashboard page, the debt and income data would become corrupted, showing negative numbers and incorrect values. This was caused by a race condition in the data synchronization logic.
+
+**Root Cause**: The dashboard was calling `dummyDB.getFreshIncome()` which triggered `regenerateIncome()`, causing:
+1. All income records to be cleared and regenerated
+2. Interference with manually added debt reduction payments
+3. Data corruption when navigating back and forth between pages
+
+**Solution**: Replaced all calls to `getFreshIncome()` with `getIncome()` to prevent automatic regeneration of income data.
+
+**Changes Made**:
+
+**1. Updated Dashboard Data Loading (`app/dashboard/page.tsx`)**:
+- Replaced `dummyDB.getFreshIncome()` with `dummyDB.getIncome()` for admin users
+- Replaced `dummyDB.getFreshIncome()` with `dummyDB.getIncome()` for Υπεύθυνος users  
+- Replaced `dummyDB.getFreshIncome(user.uid)` with `dummyDB.getIncome(user.uid)` for regular users
+
+**2. Removed Problematic Regeneration Logic**:
+- The `getFreshIncome()` method was calling `regenerateIncome()` which cleared and regenerated all income data
+- This interfered with manually added debt reduction payments
+- Now using stable `getIncome()` method that doesn't regenerate data
+
+**Key Benefits**:
+- **Data Stability**: No more data corruption when navigating between pages
+- **Consistent Values**: Debt and income numbers remain consistent
+- **No Race Conditions**: Eliminated the race condition that was causing negative numbers
+- **Preserved Manual Data**: Manually added debt reduction payments are preserved
+
+**Technical Details**:
+- `getFreshIncome()` was designed to regenerate sample income data for demonstration
+- This was inappropriate for a production system with real user data
+- `getIncome()` simply returns the current income records without modification
+- The bank system now works correctly without interference from regeneration logic
+
+**Testing Considerations**:
+- Verify debt reduction payments are preserved when navigating between pages
+- Verify no negative numbers appear unexpectedly
+- Verify bank amounts remain consistent
+- Test navigation between admin and dashboard pages multiple times
+
+**Result**: The data corruption issue is completely resolved. Users can now navigate between pages without any data inconsistencies or negative numbers appearing.
+
+## Bank Reset Functionality (December 2024)
+
+### Bank Reset Buttons with Confirmation Dialogs
+
+**Problem**: Administrators needed a way to reset the bank amounts (printBank and laminationBank) to zero when needed, with proper confirmation to prevent accidental resets.
+
+**Requirements**:
+- Add reset buttons to the print and lamination cards in the dashboard
+- Implement confirmation dialogs with 2-step confirmation
+- Show current bank amounts in the confirmation dialog
+- Only allow admin users to access this functionality
+- Reset the specific bank amount to 0 when confirmed
+
+**Solution**: Implemented bank reset buttons with AlertDialog confirmation dialogs.
+
+**Changes Made**:
+
+**1. Added Bank Reset Methods (`lib/dummy-database.ts`)**:
+- `resetPrintBank()`: Resets printBank to 0 and updates timestamp
+- `resetLaminationBank()`: Resets laminationBank to 0 and updates timestamp
+
+**2. Updated Dashboard UI (`app/dashboard/page.tsx`)**:
+- Added AlertDialog import for confirmation dialogs
+- Added state management for dialog visibility
+- Added reset handler functions
+- Updated print and lamination card headers to include reset buttons
+- Added confirmation dialogs with current bank amounts display
+
+**3. UI Implementation Details**:
+- Reset buttons are small circular buttons with RotateCcw icons
+- Buttons are positioned in the top-right of each card header
+- Only visible to admin users (`user.accessLevel === "admin"`)
+- Color-coded to match card themes (blue for print, green for lamination)
+- Include tooltips for better UX
+
+**4. Confirmation Dialog Features**:
+- Clear title indicating which bank is being reset
+- Shows current bank amount before reset
+- Warning that the action cannot be undone
+- Cancel and Confirm buttons with appropriate styling
+- Confirmation button matches the card's color theme
+
+**Key Benefits**:
+- **Safety**: Two-step confirmation prevents accidental resets
+- **Transparency**: Shows current amount before reset
+- **Access Control**: Only admins can reset bank amounts
+- **Visual Feedback**: Clear indication of what will be reset
+- **Consistent UI**: Matches existing design patterns
+
+**Technical Implementation**:
+- Uses AlertDialog component for confirmation
+- State management for dialog visibility
+- Database methods for resetting specific bank amounts
+- Page reload after reset to ensure UI updates
+- Proper error handling and user feedback
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Added reset methods
+- `app/dashboard/page.tsx` - Added UI components and handlers
+
+**Testing Considerations**:
+- Verify only admin users see reset buttons
+- Test confirmation dialog functionality
+- Verify bank amounts reset to 0 correctly
+- Test cancel functionality
+- Verify UI updates after reset
+
+**Result**: Administrators can now safely reset bank amounts with proper confirmation, providing better control over the financial tracking system.
+
+### Bank Reset Without Page Refresh (December 2024)
+
+**Problem**: The initial bank reset implementation used `window.location.reload()` which caused the page to refresh and regenerate dummy data, defeating the purpose of the bank reset.
+
+**Solution**: Updated the reset functions to use the refresh context instead of page reload.
+
+**Changes Made**:
+
+**1. Updated Reset Functions (`app/dashboard/page.tsx`)**:
+- Replaced `window.location.reload()` with `triggerRefresh()`
+- Added `triggerRefresh` to the destructured refresh context
+- Now uses the existing refresh mechanism to update UI without page reload
+
+**2. Benefits of the Fix**:
+- **No Data Regeneration**: Bank reset doesn't trigger dummy data regeneration
+- **Immediate UI Update**: Bank amounts update instantly without page refresh
+- **Better UX**: Users stay on the same page with updated data
+- **Consistent Behavior**: Uses the same refresh mechanism as other parts of the app
+
+**Technical Details**:
+- Uses `useRefresh()` context to trigger UI updates
+- `triggerRefresh()` increments the refresh trigger counter
+- This causes the useEffect to re-run and fetch updated bank amounts
+- No page reload means no dummy data regeneration
+
+**Result**: Bank reset now works correctly without causing page refresh or data regeneration, providing a smooth user experience.
+
 ## Dashboard UI Fixes (December 2024)
 
 ### Duplicate Income Table Removal and Yellow Color Theme

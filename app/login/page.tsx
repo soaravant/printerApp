@@ -10,11 +10,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Printer, AlertCircle } from "lucide-react"
+import { Printer, AlertCircle, Eye, EyeOff } from "lucide-react"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const { signIn } = useAuth()
@@ -53,13 +54,13 @@ export default function LoginPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Κωδικός Χρήστη</Label>
+                <Label htmlFor="username">Χρήστης</Label>
                 <Input
                   id="username"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="π.χ. 400-410 (Υπεύθυνοι), 413-417 (Ναοί), 418-422 (Τομείς), 423-499 (Χρήστες), admin"
+                  placeholder="Εισάγετε το χρήστη"
                   required
                   autoFocus
                 />
@@ -67,14 +68,27 @@ export default function LoginPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="password">Κωδικός Πρόσβασης</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Εισάγετε τον κωδικό σας"
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Εισάγετε τον κωδικό πρόσβασης"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {error && (
@@ -88,29 +102,6 @@ export default function LoginPage() {
                 {loading ? "Σύνδεση..." : "Σύνδεση"}
               </Button>
             </form>
-          </CardContent>
-        </Card>
-
-        {/* Demo credentials card */}
-        <Card className="bg-blue-50 border-blue-200">
-          <CardHeader>
-            <CardTitle className="text-lg text-blue-800">Στοιχεία Demo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-sm space-y-2">
-              <div className="flex justify-between">
-                <span className="font-medium">Χρήστης 408:</span>
-                <span className="font-mono">408 / 08</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Χρήστης 409:</span>
-                <span className="font-mono">409 / 09</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Διαχειριστής:</span>
-                <span className="font-mono">admin / admin123</span>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

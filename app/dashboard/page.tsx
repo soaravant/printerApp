@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -71,7 +72,7 @@ function Pagination({ page, total, pageSize, onPageChange }: { page: number; tot
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { refreshTrigger } = useRefresh()
+  const { refreshTrigger, triggerRefresh } = useRefresh()
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([])
   const [laminationJobs, setLaminationJobs] = useState<LaminationJob[]>([])
   const [allUsers, setAllUsers] = useState<User[]>([])
@@ -127,6 +128,11 @@ export default function DashboardPage() {
   const [hoveredPrintJob, setHoveredPrintJob] = useState<{ deviceName: string; printType: string } | null>(null)
   const [hoveredLaminationJob, setHoveredLaminationJob] = useState<{ machine: string; type: string } | null>(null)
 
+  // Bank reset confirmation states
+  const [showPrintBankResetDialog, setShowPrintBankResetDialog] = useState(false)
+  const [showLaminationBankResetDialog, setShowLaminationBankResetDialog] = useState(false)
+  const [showTotalBankResetDialog, setShowTotalBankResetDialog] = useState(false)
+
   useEffect(() => {
     if (!user) return
 
@@ -139,7 +145,7 @@ export default function DashboardPage() {
       setPrintJobs(allPrintJobs)
       setLaminationJobs(allLaminationJobs)
       setAllUsers(users)
-      setIncome(dummyDB.getFreshIncome())
+      setIncome(dummyDB.getIncome())
     } else if (user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
       // Υπεύθυνος users see data for all teams/groups they are responsible for
       const allPrintJobs = dummyDB.getAllPrintJobs()
@@ -149,7 +155,7 @@ export default function DashboardPage() {
       setPrintJobs(allPrintJobs)
       setLaminationJobs(allLaminationJobs)
       setAllUsers(users)
-      setIncome(dummyDB.getFreshIncome())
+      setIncome(dummyDB.getIncome())
     } else {
       // Regular user sees only their data
       const pJobs = dummyDB.getPrintJobs(user.uid)
@@ -157,7 +163,7 @@ export default function DashboardPage() {
 
       setPrintJobs(pJobs)
       setLaminationJobs(lJobs)
-      setIncome(dummyDB.getFreshIncome(user.uid))
+      setIncome(dummyDB.getIncome(user.uid))
     }
   }, [user, refreshTrigger]) // Add refreshTrigger to dependencies
 
@@ -532,6 +538,29 @@ export default function DashboardPage() {
     setIncomeResponsibleForFilter("all")
   }
 
+  // Bank reset functions
+  const handlePrintBankReset = () => {
+    dummyDB.resetPrintBank()
+    setShowPrintBankResetDialog(false)
+    // Trigger refresh to update the UI without page reload
+    triggerRefresh()
+  }
+
+  const handleLaminationBankReset = () => {
+    dummyDB.resetLaminationBank()
+    setShowLaminationBankResetDialog(false)
+    // Trigger refresh to update the UI without page reload
+    triggerRefresh()
+  }
+
+  const handleTotalBankReset = () => {
+    dummyDB.resetPrintBank()
+    dummyDB.resetLaminationBank()
+    setShowTotalBankResetDialog(false)
+    // Trigger refresh to update the UI without page reload
+    triggerRefresh()
+  }
+
   type RGB = string // e.g. "4472C4"
 
   // Helper for friendly Greek column names and dynamic column widths
@@ -669,13 +698,13 @@ export default function DashboardPage() {
   const currentMonthPrintCost = currentMonthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
   const currentMonthLaminationCost = currentMonthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
   
-  // Calculate current month income
-  const currentMonthIncome = income.filter((inc) => inc.timestamp.toISOString().slice(0, 7) === currentMonth)
-  const currentMonthPrintIncome = currentMonthIncome.reduce((sum, inc) => sum + (inc.amount || 0), 0)
-  const currentMonthLaminationIncome = currentMonthIncome.reduce((sum, inc) => sum + (inc.amount || 0), 0)
+  // Get bank amounts for income display
+  const bankAmounts = dummyDB.getBankAmounts()
+  const printBank = bankAmounts.printBank
+  const laminationBank = bankAmounts.laminationBank
   
-  // Total income for total debt card (sum of print and lamination income)
-  const currentMonthTotalIncome = currentMonthPrintIncome + currentMonthLaminationIncome
+  // Total bank amount for total debt card (sum of print and lamination bank)
+  const totalBank = printBank + laminationBank
 
   const getLaminationTypeLabel = (type: string) => {
     switch (type) {
@@ -1123,24 +1152,65 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Total Debts Card - Yellow Theme */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
-                <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
-                  <div className="flex items-center">
-                    <Receipt className="h-6 w-6 text-yellow-700 mr-3" />
-                    <div className="text-center flex-1">
-                      <div className="text-lg font-semibold text-yellow-900">ΣΥΝΟΛΟ</div>
-                      <div className="text-sm font-medium text-yellow-800">Χρέος|Έσοδα</div>
+                                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                    <div className="flex items-center justify-between">
+                      <Receipt className="h-6 w-6 text-yellow-700" />
+                      <div className="text-center flex-1">
+                        <div className="text-lg font-semibold text-yellow-900">ΣΥΝΟΛΟ</div>
+                        <div className="text-sm font-medium text-yellow-800">
+                          {user.accessLevel === "admin" ? "Χρέος|Έσοδα" : "Χρέος"}
+                        </div>
+                      </div>
+                      {user.accessLevel === "admin" && (
+                        <AlertDialog open={showTotalBankResetDialog} onOpenChange={setShowTotalBankResetDialog}>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0 border-yellow-300 bg-white hover:bg-yellow-50 text-yellow-600"
+                              title="Επαναφορά Συνολικού Τραπεζικού Λογαριασμού"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Επαναφορά Συνολικού Τραπεζικού Λογαριασμού</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Είστε σίγουροι ότι θέλετε να επαναφέρετε τον συνολικό τραπεζικό λογαριασμό στο 0;
+                                <br /><br />
+                                <strong>Τρέχουσα τιμή: {formatPrice(totalBank)}</strong>
+                                <br /><br />
+                                <span className="text-red-600 font-medium">Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.</span>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={handleTotalBankReset} 
+                                className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+                              >
+                                Επαναφορά
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </div>
-                </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
                     <div className={`text-3xl font-bold ${totalUnpaid > 0 ? 'text-red-600' : totalUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                       {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
                     </div>
-                    <Separator orientation="vertical" className="mx-4 h-12" />
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatPrice(currentMonthTotalIncome)}
-                    </div>
+                    {user.accessLevel === "admin" && (
+                      <>
+                        <Separator orientation="vertical" className="mx-4 h-12" />
+                        <div className="text-2xl font-bold text-green-600">
+                          {formatPrice(totalBank)}
+                        </div>
+                      </>
+                    )}
                   </div>
                   {hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "admin" && (
                     <div className="text-sm text-gray-500 mt-3">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
@@ -1150,13 +1220,50 @@ export default function DashboardPage() {
 
               {/* Print Debts Card - Blue Theme */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
-                <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
-                  <div className="flex items-center">
-                    <Printer className="h-6 w-6 text-blue-700 mr-3" />
-                    <div className="text-center flex-1">
-                      <div className="text-lg font-semibold text-blue-900">ΤΟ. ΦΩ.</div>
-                      <div className="text-sm font-medium text-blue-800">Χρέος|Έσοδα</div>
-                    </div>
+                                  <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <Printer className="h-6 w-6 text-blue-700" />
+                      <div className="text-center flex-1">
+                        <div className="text-lg font-semibold text-blue-900">ΤΟ. ΦΩ.</div>
+                        <div className="text-sm font-medium text-blue-800">
+                          {user.accessLevel === "admin" ? "Χρέος|Έσοδα" : "Χρέος"}
+                        </div>
+                      </div>
+                    {user.accessLevel === "admin" && (
+                      <AlertDialog open={showPrintBankResetDialog} onOpenChange={setShowPrintBankResetDialog}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0 border-blue-300 bg-white hover:bg-blue-50 text-blue-600"
+                            title="Επαναφορά Τραπεζικού Λογαριασμού Εκτυπώσεων"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Επαναφορά Τραπεζικού Λογαριασμού Εκτυπώσεων</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Είστε σίγουροι ότι θέλετε να επαναφέρετε τον τραπεζικό λογαριασμό εκτυπώσεων στο 0;
+                              <br /><br />
+                              <strong>Τρέχουσα τιμή: {formatPrice(printBank)}</strong>
+                              <br /><br />
+                              <span className="text-red-600 font-medium">Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.</span>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={handlePrintBankReset} 
+                              className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+                            >
+                              Επαναφορά
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </div>
                 <div className="p-6">
@@ -1164,10 +1271,14 @@ export default function DashboardPage() {
                     <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-blue-600' : printUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                       {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
                     </div>
-                    <Separator orientation="vertical" className="mx-4 h-12" />
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatPrice(currentMonthPrintIncome)}
-                    </div>
+                    {user.accessLevel === "admin" && (
+                      <>
+                        <Separator orientation="vertical" className="mx-4 h-12" />
+                        <div className="text-2xl font-bold text-green-600">
+                          {formatPrice(printBank)}
+                        </div>
+                      </>
+                    )}
                   </div>
                   {hasFilters && printUnpaidPercentage < 100 && user.accessLevel === "admin" && (
                     <div className="text-sm text-gray-500 mt-3">({printUnpaidPercentage.toFixed(1)}% του {formatPrice(totalPrintUnpaid)})</div>
@@ -1177,13 +1288,50 @@ export default function DashboardPage() {
 
               {/* Lamination Debts Card - Green Theme */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
-                <div className="bg-green-100 px-6 py-4 border-b border-green-200">
-                  <div className="flex items-center">
-                    <CreditCard className="h-6 w-6 text-green-700 mr-3" />
-                    <div className="text-center flex-1">
-                      <div className="text-lg font-semibold text-green-900">ΠΛΑ. ΤΟ.</div>
-                      <div className="text-sm font-medium text-green-800">Χρέος|Έσοδα</div>
-                    </div>
+                                  <div className="bg-green-100 px-6 py-4 border-b border-green-200">
+                    <div className="flex items-center justify-between">
+                      <CreditCard className="h-6 w-6 text-green-700" />
+                      <div className="text-center flex-1">
+                        <div className="text-lg font-semibold text-green-900">ΠΛΑ. ΤΟ.</div>
+                        <div className="text-sm font-medium text-green-800">
+                          {user.accessLevel === "admin" ? "Χρέος|Έσοδα" : "Χρέος"}
+                        </div>
+                      </div>
+                    {user.accessLevel === "admin" && (
+                      <AlertDialog open={showLaminationBankResetDialog} onOpenChange={setShowLaminationBankResetDialog}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0 border-green-300 bg-white hover:bg-green-50 text-green-600"
+                            title="Επαναφορά Τραπεζικού Λογαριασμού Πλαστικοποιήσεων"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Επαναφορά Τραπεζικού Λογαριασμού Πλαστικοποιήσεων</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Είστε σίγουροι ότι θέλετε να επαναφέρετε τον τραπεζικό λογαριασμό πλαστικοποιήσεων στο 0;
+                              <br /><br />
+                              <strong>Τρέχουσα τιμή: {formatPrice(laminationBank)}</strong>
+                              <br /><br />
+                              <span className="text-red-600 font-medium">Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.</span>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={handleLaminationBankReset} 
+                              className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+                            >
+                              Επαναφορά
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </div>
                 <div className="p-6">
@@ -1191,10 +1339,14 @@ export default function DashboardPage() {
                     <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-green-600' : laminationUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                       {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
                     </div>
-                    <Separator orientation="vertical" className="mx-4 h-12" />
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatPrice(currentMonthLaminationIncome)}
-                    </div>
+                    {user.accessLevel === "admin" && (
+                      <>
+                        <Separator orientation="vertical" className="mx-4 h-12" />
+                        <div className="text-2xl font-bold text-green-600">
+                          {formatPrice(laminationBank)}
+                        </div>
+                      </>
+                    )}
                   </div>
                   {hasFilters && laminationUnpaidPercentage < 100 && user.accessLevel === "admin" && (
                     <div className="text-sm text-gray-500 mt-3">({laminationUnpaidPercentage.toFixed(1)}% του {formatPrice(totalLaminationUnpaid)})</div>
@@ -1236,8 +1388,8 @@ export default function DashboardPage() {
               {/* Right Column: Debt Table */}
               <div className="lg:col-span-3">
                 {/* Consolidated Table Card */}
-                <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden">
-                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden h-full flex flex-col">
+                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200 flex-shrink-0">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-3">
                         <BarChart3 className="h-6 w-6 text-yellow-700" />
@@ -1280,15 +1432,17 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   
-                  <div className="p-6">
-                    <DebtTable
-                      data={combinedDebtData}
-                      page={debtPage}
-                      pageSize={PAGE_SIZE}
-                      onPageChange={setDebtPage}
-                      userRole={user.accessLevel}
-                      onRowHover={setHoveredPrintJob}
-                    />
+                  <div className="p-6 flex-1 flex flex-col">
+                    <div className="flex-1">
+                      <DebtTable
+                        data={combinedDebtData}
+                        page={debtPage}
+                        pageSize={PAGE_SIZE}
+                        onPageChange={setDebtPage}
+                        userRole={user.accessLevel}
+                        onRowHover={setHoveredPrintJob}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1326,8 +1480,8 @@ export default function DashboardPage() {
               {/* Right Column: Income Table */}
               <div className="lg:col-span-3">
                 {/* Income Table Card */}
-                <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden">
-                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden h-full flex flex-col">
+                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200 flex-shrink-0">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-3">
                         <Receipt className="h-6 w-6 text-yellow-700" />
@@ -1366,16 +1520,18 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   
-                  <div className="p-6">
-                    <ErrorBoundary fallback={<div>Φόρτωση εσόδων...</div>}>
-                      <IncomeTable
-                        data={filteredIncome}
-                        page={incomePage}
-                        pageSize={PAGE_SIZE}
-                        onPageChange={setIncomePage}
-                        userRole={user.accessLevel}
-                      />
-                    </ErrorBoundary>
+                  <div className="p-6 flex-1 flex flex-col">
+                    <div className="flex-1">
+                      <ErrorBoundary fallback={<div>Φόρτωση εσόδων...</div>}>
+                        <IncomeTable
+                          data={filteredIncome}
+                          page={incomePage}
+                          pageSize={PAGE_SIZE}
+                          onPageChange={setIncomePage}
+                          userRole={user.accessLevel}
+                        />
+                      </ErrorBoundary>
+                    </div>
                   </div>
                 </div>
               </div>

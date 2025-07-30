@@ -14,18 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+
 import { SearchableSelect } from "@/components/searchable-select"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { useState, useEffect } from "react"
-import { Plus, CreditCard, Users, Building, Printer, RotateCcw, Euro } from "lucide-react"
+import { Plus, CreditCard, Users, Building, Printer, RotateCcw, Euro, Eye, EyeOff } from "lucide-react"
 import type { User, LaminationJob, Income, PrintJob } from "@/lib/dummy-database"
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import { TagInput } from "@/components/ui/tag-input"
@@ -46,7 +39,6 @@ export default function AdminPage() {
   const [quantity, setQuantity] = useState("1")
   const [selectedDate, setSelectedDate] = useState("")
   const [loading, setLoading] = useState(false)
-  const [showAddUserDialog, setShowAddUserDialog] = useState(false)
   const [newUser, setNewUser] = useState({
     username: "",
     password: "",
@@ -56,6 +48,7 @@ export default function AdminPage() {
     memberOf: [] as string[],
     responsibleFor: [] as string[],
   })
+  const [showPassword, setShowPassword] = useState(false)
 
   // Debt reduction state
   const [debtReductionUser, setDebtReductionUser] = useState("")
@@ -192,9 +185,6 @@ export default function AdminPage() {
       // Trigger refresh to update dashboard
       triggerRefresh()
 
-      // Refresh all user debt fields to ensure they're up to date
-      dummyDB.refreshAllUserDebtFields()
-
       // Refresh users list to get updated debt fields
       const updatedUsers = dummyDB.getUsers()
       setUsers(updatedUsers)
@@ -253,9 +243,6 @@ export default function AdminPage() {
 
       // Trigger refresh to update dashboard
       triggerRefresh()
-
-      // Refresh all user debt fields to ensure they're up to date
-      dummyDB.refreshAllUserDebtFields()
 
       // Refresh users list to get updated debt fields
       const updatedUsers = dummyDB.getUsers()
@@ -326,9 +313,6 @@ export default function AdminPage() {
 
       // Trigger refresh to update dashboard
       triggerRefresh()
-
-      // Refresh all user debt fields to ensure they're up to date
-      dummyDB.refreshAllUserDebtFields()
 
       // Refresh users list to get updated debt fields
       const updatedUsers = dummyDB.getUsers()
@@ -558,9 +542,8 @@ export default function AdminPage() {
         variant: "success",
       })
 
-      // Reset form and close dialog
+      // Reset form
       setNewUser({ username: "", password: "", displayName: "", accessLevel: "user", userRole: "Άτομο", memberOf: [], responsibleFor: [] })
-      setShowAddUserDialog(false)
     } catch (error) {
       toast({
         title: "Σφάλμα",
@@ -632,6 +615,19 @@ export default function AdminPage() {
     setUsersTabSearchTerm("")
     setRoleFilter("all")
     setTeamFilter("all")
+  }
+
+  const handleResetUserForm = () => {
+    setNewUser({
+      username: "",
+      password: "",
+      displayName: "",
+      accessLevel: "user" as "user" | "admin" | "Υπεύθυνος",
+      userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας",
+      memberOf: [] as string[],
+      responsibleFor: [] as string[],
+    })
+    setShowPassword(false)
   }
 
   return (
@@ -1008,8 +1004,8 @@ export default function AdminPage() {
                         
                         // If there's still payment remaining, create credit
                         if (remainingPayment > 0) {
-                          // Apply remaining payment as credit to lamination first
-                          remainingLamination -= remainingPayment
+                          // Apply remaining payment as credit to print first
+                          remainingPrint -= remainingPayment
                         }
                       }
                       
@@ -1045,7 +1041,7 @@ export default function AdminPage() {
                       )
                     })()}
 
-                    <Button onClick={handleDebtReduction} disabled={debtReductionLoading} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white">
+                    <Button onClick={handleDebtReduction} disabled={debtReductionLoading} className="w-full bg-yellow-500 hover:bg-yellow-600 text-black">
                       {debtReductionLoading ? "Προσθήκη..." : "Προσθήκη Πληρωμής"}
                     </Button>
                   </CardContent>
@@ -1144,158 +1140,168 @@ export default function AdminPage() {
       return null
     })()}
                 
-                <div className="flex justify-between items-center mb-4">
-                  <Dialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog}>
-                    <DialogTrigger asChild>
-                      <Button
-                        onClick={() => setShowAddUserDialog(true)}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold flex items-center gap-2"
-                      >
-                        Προσθήκη Χρήστη <Plus className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                  <Button
-                    onClick={handleResetUsersFilters}
-                    variant="outline"
-                    className="flex items-center gap-2 border-gray-300 hover:bg-gray-50"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    Επαναφορά Φίλτρων
-                  </Button>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Προσθήκη Χρήστη</DialogTitle>
-                        <DialogDescription>Συμπληρώστε τα στοιχεία του νέου χρήστη.</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
+                {/* User Registration Form Card */}
+                <Card className="border-yellow-200 mb-6">
+                  <CardHeader className="bg-yellow-100">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <Users className="h-6 w-6 text-yellow-800 flex-shrink-0" />
                         <div>
-                          <Label htmlFor="username">Username</Label>
-                          <Input 
-                            id="username" 
-                            value={newUser.username} 
-                            onChange={e => setNewUser({ ...newUser, username: e.target.value })} 
-                            placeholder={newUser.accessLevel === "admin" ? "admin" : "π.χ. 401, 402, 403"}
-                          />
-                          {newUser.accessLevel === "admin" && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Ο διαχειριστής πρέπει να έχει username "admin"
-                            </p>
-                          )}
-                          {newUser.accessLevel !== "admin" && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Το username πρέπει να είναι αριθμός
-                            </p>
-                          )}
+                          <CardTitle className="text-yellow-800">
+                            Προσθήκη Χρήστη
+                          </CardTitle>
+                          <CardDescription className="text-yellow-600">Συμπληρώστε τα στοιχεία του νέου χρήστη</CardDescription>
                         </div>
-                        <div>
-                          <Label htmlFor="password">Password</Label>
-                          <Input id="password" type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
-                        </div>
-                        <div>
-                          <Label htmlFor="displayName">Όνομα</Label>
-                          <Input id="displayName" value={newUser.displayName} onChange={e => setNewUser({ ...newUser, displayName: e.target.value })} />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="userRole">Ρόλος</Label>
-                          <Select 
-                            value={newUser.userRole} 
-                            onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" })}
-                            disabled={newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος"}
-                          >
-                            <SelectTrigger className={newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος" ? "bg-gray-100 text-gray-500" : ""}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Άτομο">Άτομο</SelectItem>
-                              <SelectItem value="Ομάδα">Ομάδα</SelectItem>
-                              <SelectItem value="Ναός">Ναός</SelectItem>
-                              <SelectItem value="Τομέας">Τομέας</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {(newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος") && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Ρόλος κλειδωμένος σε "Άτομο" για Διαχειριστές και Υπεύθυνους
-                            </p>
-                          )}
-                        </div>
-
-
-
-                        
-                        {newUser.userRole === "Άτομο" && (
-                          <div>
-                            <Label>Μέλος (Ομάδα/Ναός/Τομέας)</Label>
-                            <TagInput
-                              tags={newUser.memberOf}
-                              onTagsChange={(memberOf) => setNewUser({ ...newUser, memberOf })}
-                              placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
-                              availableOptions={getAvailableMembers()}
-                              maxTags={5}
-                            />
-                          </div>
-                        )}
-                        
-                        {(newUser.userRole === "Τομέας" || newUser.userRole === "Ναός") && (
-                          <div>
-                            <Label className="flex items-center gap-2">
-                              Υπεύθυνοι
-                              <span className="text-red-500">*</span>
-                            </Label>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Οι {newUser.userRole === "Τομέας" ? "Τομείς" : "Ναοί"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο. 
-                              Οι Υπεύθυνοι πρέπει να έχουν αυτόν τον {newUser.userRole === "Τομέας" ? "Τομέα" : "Ναό"} στη λίστα "Υπεύθυνος για".
-                            </p>
-                          </div>
-                        )}
-                        
-                        {newUser.userRole === "Ομάδα" && (
-                          <div>
-                            <Label>Υπεύθυνοι</Label>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Οι Υπεύθυνοι πρέπει να έχουν αυτή την Ομάδα στη λίστα "Υπεύθυνος για".
-                            </p>
-                          </div>
-                        )}
-                        
-                        {newUser.accessLevel === "Υπεύθυνος" && (
-                          <div>
-                            <Label>Υπεύθυνος για:</Label>
-                            <TagInput
-                              tags={newUser.responsibleFor}
-                              onTagsChange={(responsibleFor) => setNewUser({ ...newUser, responsibleFor })}
-                              placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
-                              availableOptions={getAvailableResponsibleFor()}
-                              maxTags={5}
-                            />
-                          </div>
-                        )}
-                                                  <div>
-                            <Label htmlFor="role">Access Level</Label>
-                            <Select value={newUser.accessLevel} onValueChange={accessLevel => {
-                              const newAccessLevel = accessLevel as "user" | "admin" | "Υπεύθυνος"
-                              setNewUser({ 
-                                ...newUser, 
-                                accessLevel: newAccessLevel,
-                                // Automatically set role to "Άτομο" for admin and Υπεύθυνος
-                                userRole: (newAccessLevel === "admin" || newAccessLevel === "Υπεύθυνος") ? "Άτομο" : newUser.userRole
-                              })
-                            }}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                                                         <SelectContent>
-                             <SelectItem value="user">Χρήστης</SelectItem>
-                             <SelectItem value="Υπεύθυνος">Υπεύθυνος</SelectItem>
-                             <SelectItem value="admin">Διαχειριστής</SelectItem>
-                           </SelectContent>
-                            </Select>
-                          </div>
-                        <Button onClick={handleAddUser} className="w-full">Προσθήκη</Button>
                       </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          aria-label="Επαναφορά φόρμας"
+                          className="w-10 h-10 rounded-full border border-yellow-300 bg-white hover:bg-yellow-50 transition flex items-center justify-center"
+                          onClick={handleResetUserForm}
+                        >
+                          <RotateCcw className="h-4 w-4 text-yellow-600" />
+                        </button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="username">Username</Label>
+                        <Input 
+                          id="username" 
+                          value={newUser.username} 
+                          onChange={e => setNewUser({ ...newUser, username: e.target.value })} 
+                          placeholder="Εισάγετε το username"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="password">Password</Label>
+                        <div className="relative">
+                          <Input 
+                            id="password" 
+                            type={showPassword ? "text" : "password"} 
+                            value={newUser.password} 
+                            onChange={e => setNewUser({ ...newUser, password: e.target.value })} 
+                            placeholder="Εισάγετε τον κωδικό πρόσβασης"
+                          />
+                          <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-gray-400" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="displayName">Όνομα</Label>
+                        <Input id="displayName" value={newUser.displayName} onChange={e => setNewUser({ ...newUser, displayName: e.target.value })} placeholder="Εισάγετε το όνομα" />
+                      </div>
+                    </div>
+
+                    <div className={`grid grid-cols-1 gap-4 ${
+                      (newUser.userRole === "Άτομο" && newUser.accessLevel === "Υπεύθυνος") ? "md:grid-cols-4" : 
+                      (newUser.userRole === "Άτομο" && newUser.accessLevel === "admin") ? "md:grid-cols-2" :
+                      (newUser.userRole === "Άτομο" || newUser.accessLevel === "Υπεύθυνος") ? "md:grid-cols-3" : 
+                      "md:grid-cols-2"
+                    }`}>
+                      <div>
+                        <Label htmlFor="role">Access Level</Label>
+                        <Select value={newUser.accessLevel} onValueChange={accessLevel => {
+                          const newAccessLevel = accessLevel as "user" | "admin" | "Υπεύθυνος"
+                          setNewUser({ 
+                            ...newUser, 
+                            accessLevel: newAccessLevel,
+                            // Automatically set role to "Άτομο" for admin and Υπεύθυνος
+                            userRole: (newAccessLevel === "admin" || newAccessLevel === "Υπεύθυνος") ? "Άτομο" : newUser.userRole
+                          })
+                        }}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="user">Χρήστης</SelectItem>
+                            <SelectItem value="Υπεύθυνος">Υπεύθυνος</SelectItem>
+                            <SelectItem value="admin">Διαχειριστής</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="userRole">Ρόλος</Label>
+                        <Select 
+                          value={newUser.userRole} 
+                          onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" })}
+                          disabled={newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος"}
+                        >
+                          <SelectTrigger className={newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος" ? "bg-gray-100 text-gray-500" : ""}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Άτομο">Άτομο</SelectItem>
+                            <SelectItem value="Ομάδα">Ομάδα</SelectItem>
+                            <SelectItem value="Ναός">Ναός</SelectItem>
+                            <SelectItem value="Τομέας">Τομέας</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {(newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος") && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Ρόλος κλειδωμένος σε "Άτομο" για Διαχειριστές και Υπεύθυνους
+                          </p>
+                        )}
+                      </div>
+
+                      {newUser.userRole === "Άτομο" && newUser.accessLevel !== "admin" && (
+                        <div>
+                          <Label>Μέλος (Ομάδα/Ναός/Τομέας)</Label>
+                          <TagInput
+                            tags={newUser.memberOf}
+                            onTagsChange={(memberOf) => setNewUser({ ...newUser, memberOf })}
+                            placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
+                            availableOptions={getAvailableMembers()}
+                            maxTags={5}
+                          />
+                        </div>
+                      )}
+                      
+                      {newUser.accessLevel === "Υπεύθυνος" && (
+                        <div>
+                          <Label>Υπεύθυνος για:</Label>
+                          <TagInput
+                            tags={newUser.responsibleFor}
+                            onTagsChange={(responsibleFor) => setNewUser({ ...newUser, responsibleFor })}
+                            placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
+                            availableOptions={getAvailableResponsibleFor()}
+                            maxTags={5}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    {(newUser.userRole === "Τομέας" || newUser.userRole === "Ναός" || newUser.userRole === "Ομάδα") && (
+                      <div>
+                        <Label className="flex items-center gap-2">
+                          Υπεύθυνοι
+                          <span className="text-red-500">*</span>
+                        </Label>
+                        <div className="text-xs text-gray-500 mt-1 space-y-1">
+                          <div>1) Οι {newUser.userRole === "Τομέας" ? "Τομείς" : newUser.userRole === "Ναός" ? "Ναοί" : "Ομάδες"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο.</div>
+                          <div>2) Οι Υπεύθυνοι πρέπει να έχουν αυτόν τον {newUser.userRole === "Τομέας" ? "Τομέα" : newUser.userRole === "Ναός" ? "Ναό" : "Ομάδα"} στη λίστα "Υπεύθυνος για".</div>
+                        </div>
+                      </div>
+                    )}
+
+                    <Button onClick={handleAddUser} className="w-full bg-yellow-500 hover:bg-yellow-600 text-black">
+                      Προσθήκη Χρήστη
+                    </Button>
+                  </CardContent>
+                </Card>
                 <AdminUsersTab
                   users={users}
                   usersTabSearchTerm={usersTabSearchTerm}

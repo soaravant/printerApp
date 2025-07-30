@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, Building, Printer, Search, Users, Church, MapPin, CreditCard } from "lucide-react";
+import { User, Building, Printer, Search, Users, Church, MapPin, CreditCard, RotateCcw } from "lucide-react";
 import { roundMoney, getDynamicFilterOptions } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
@@ -124,7 +124,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 placeholder="Αναζήτηση χρηστών..."
                 value={usersTabSearchTerm}
                 onChange={(e) => setUsersTabSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 !focus:outline-none !focus:ring-0 !focus:border-gray-300 !focus-visible:ring-0 !focus-visible:ring-offset-0"
               />
             </div>
           </div>
@@ -171,6 +171,20 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 <SelectItem value="Τομέας">Τομέας</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="flex items-center">
+            <button
+              type="button"
+              aria-label="Επαναφορά φίλτρων"
+              className="w-10 h-10 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition flex items-center justify-center"
+              onClick={() => {
+                setUsersTabSearchTerm("");
+                setRoleFilter("all");
+                setTeamFilter("all");
+              }}
+            >
+              <RotateCcw className="h-4 w-4 text-gray-600" />
+            </button>
           </div>
         </div>
       </div>
