@@ -116,7 +116,6 @@ components/
 ├── protected-route.tsx         # Route protection component
 ├── role-badge.tsx              # User role badge component
 ├── searchable-select.tsx       # Searchable select component
-├── history-filter.tsx          # History filtering component
 ├── print-jobs-table.tsx        # Print job table component (updated for new structure)
 ├── lamination-jobs-table.tsx   # Lamination job table component
 ├── debt-income-filters.tsx     # Debt and income filtering component (renamed from billing-filters)
@@ -233,11 +232,7 @@ public/
 - Accessibility features
 - TypeScript support
 
-**`components/history-filter.tsx`** - History Filter:
-- Advanced filtering for print and lamination history
-- Date range selection
-- Status filtering
-- Search functionality
+
 
 **`components/searchable-select.tsx`** - Searchable Select:
 - Enhanced select component with search functionality

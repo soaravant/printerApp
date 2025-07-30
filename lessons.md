@@ -5310,10 +5310,7 @@ This fix ensures that all monetary calculations throughout the application are p
 )}
 ```
 
-**2. Updated HistoryFilter Component (`components/history-filter.tsx`)**:
-- Replaced basic HTML date inputs with the enhanced GreekDatePicker
-- Maintained all existing filter functionality
-- Improved user experience for date selection
+
 
 **3. Enhanced Navigation Features**:
 - **Month Dropdown**: Quick selection of any month with Greek names
@@ -5342,7 +5339,6 @@ This fix ensures that all monetary calculations throughout the application are p
 
 **Files Modified**:
 - `components/ui/greek-date-picker.tsx` - Enhanced with new interface and navigation
-- `components/history-filter.tsx` - Updated to use enhanced date picker
 - `components/print-filters.tsx` - Already using GreekDatePicker (benefits automatically)
 - `components/lamination-filters.tsx` - Already using GreekDatePicker (benefits automatically)
 
@@ -6110,7 +6106,6 @@ const generateChartData = () => {
 - `components/navigation.tsx` - Used in all pages with navigation
 - `components/role-badge.tsx` - Used in navigation and profile pages
 - `components/searchable-select.tsx` - Used in admin page
-- `components/history-filter.tsx` - Used in printing and lamination pages
 - `components/print-jobs-table.tsx` - Dynamically imported in dashboard
 - `components/lamination-jobs-table.tsx` - Dynamically imported in dashboard
 - `components/usage-chart.tsx` - Dynamically imported in dashboard
@@ -7637,11 +7632,7 @@ function PrintJobsColGroup({ userRole }: { userRole: string }) {
 
 **Changes Made**:
 
-**1. HistoryFilter Component (`components/history-filter.tsx`)**:
-- **Before**: Simple search input without clear functionality
-- **After**: Search input with conditional clear button (X icon) that appears when text is present
-- **Implementation**: Wrapped input in relative container, added conditional button with absolute positioning
-- **Styling**: Button appears on the right side of input with proper spacing and hover effects
+
 
 **2. PrintFilters Component (`components/print-filters.tsx`)**:
 - **Before**: Basic search input in dashboard print filters
@@ -7670,7 +7661,6 @@ function PrintJobsColGroup({ userRole }: { userRole: string }) {
 - **Responsive**: Works well on different screen sizes
 
 **Files Modified**:
-- `components/history-filter.tsx` - Added clear button to search input
 - `components/print-filters.tsx` - Added clear button to print filters search
 - `components/lamination-filters.tsx` - Added clear button to lamination filters search
 
