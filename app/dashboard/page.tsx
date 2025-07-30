@@ -673,6 +673,9 @@ export default function DashboardPage() {
   const currentMonthIncome = income.filter((inc) => inc.timestamp.toISOString().slice(0, 7) === currentMonth)
   const currentMonthPrintIncome = currentMonthIncome.reduce((sum, inc) => sum + (inc.amount || 0), 0)
   const currentMonthLaminationIncome = currentMonthIncome.reduce((sum, inc) => sum + (inc.amount || 0), 0)
+  
+  // Total income for total debt card (sum of print and lamination income)
+  const currentMonthTotalIncome = currentMonthPrintIncome + currentMonthLaminationIncome
 
   const getLaminationTypeLabel = (type: string) => {
     switch (type) {
@@ -1121,17 +1124,26 @@ export default function DashboardPage() {
               {/* Total Debts Card - Yellow Theme */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
                 <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
-                  <div className="flex items-center gap-3">
-                    <Receipt className="h-8 w-8 text-yellow-700" />
-                    <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Χρέους</h3>
+                  <div className="flex items-center">
+                    <Receipt className="h-6 w-6 text-yellow-700 mr-3" />
+                    <div className="text-center flex-1">
+                      <div className="text-lg font-semibold text-yellow-900">ΣΥΝΟΛΟ</div>
+                      <div className="text-sm font-medium text-yellow-800">Χρέος|Έσοδα</div>
+                    </div>
                   </div>
                 </div>
-                <div className={`p-6 flex-1 flex ${hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "admin" ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
-                  <div className={`text-3xl font-bold ${totalUnpaid > 0 ? 'text-red-600' : totalUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                    {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
+                <div className="p-6">
+                  <div className="flex justify-between items-center">
+                    <div className={`text-3xl font-bold ${totalUnpaid > 0 ? 'text-red-600' : totalUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                      {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
+                    </div>
+                    <Separator orientation="vertical" className="mx-4 h-12" />
+                    <div className="text-2xl font-bold text-green-600">
+                      {formatPrice(currentMonthTotalIncome)}
+                    </div>
                   </div>
                   {hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "admin" && (
-                    <div className="text-sm text-gray-500 pb-0.5">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
+                    <div className="text-sm text-gray-500 mt-3">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
                   )}
                 </div>
               </div>

@@ -950,6 +950,42 @@ class DummyDatabase {
     }
   }
 
+  // New method to get net debt (after income payments)
+  getNetDebtForUser(uid: string): { print: number; lamination: number; total: number } {
+    const userDebt = this.getTotalUnpaidForUser(uid)
+    
+    // Calculate total income payments for this user
+    const userIncome = this.income
+      .filter(i => i.uid === uid)
+      .reduce((sum, i) => sum + i.amount, 0)
+    
+    // Calculate net debt (jobs - income)
+    const totalJobCost = userDebt.print + userDebt.lamination
+    
+    if (totalJobCost > 0) {
+      // Apply income proportionally to print and lamination debt
+      const printRatio = userDebt.print / totalJobCost
+      const laminationRatio = userDebt.lamination / totalJobCost
+      
+      const netPrintDebt = userDebt.print - (userIncome * printRatio)
+      const netLaminationDebt = userDebt.lamination - (userIncome * laminationRatio)
+      
+      return {
+        print: netPrintDebt,
+        lamination: netLaminationDebt,
+        total: netPrintDebt + netLaminationDebt,
+      }
+    } else {
+      // If no job costs, income creates credit (negative debt)
+      const credit = userIncome / 2 // Split credit between print and lamination
+      return {
+        print: -credit,
+        lamination: -credit,
+        total: -userIncome,
+      }
+    }
+  }
+
   getJobCountsForUser(uid: string): { print: number; lamination: number } {
     return {
       print: this.printJobs.filter((j) => j.uid === uid).length,
@@ -971,16 +1007,22 @@ class DummyDatabase {
     // Update user's debt fields (income reduces debt)
     this.updateUserDebtFields(incomeRecord.uid)
   }
+
+  // Public method to refresh all user debt fields
+  refreshAllUserDebtFields(): void {
+    this.initializeUserDebtFields()
+  }
   
   private updateUserDebtFields(uid: string): void {
     const user = this.users.find(u => u.uid === uid)
     if (!user) return
     
-    const userDebt = this.getTotalUnpaidForUser(uid)
+    // Get net debt (after income payments)
+    const netDebt = this.getNetDebtForUser(uid)
     
-    user.printDebt = userDebt.print
-    user.laminationDebt = userDebt.lamination
-    user.totalDebt = userDebt.total
+    user.printDebt = netDebt.print
+    user.laminationDebt = netDebt.lamination
+    user.totalDebt = netDebt.total
   }
 
 

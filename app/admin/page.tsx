@@ -26,7 +26,7 @@ import { SearchableSelect } from "@/components/searchable-select"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { useState, useEffect } from "react"
 import { Plus, CreditCard, Users, Building, Printer, RotateCcw, Euro } from "lucide-react"
-import type { User, LaminationJob, Income } from "@/lib/dummy-database"
+import type { User, LaminationJob, Income, PrintJob } from "@/lib/dummy-database"
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import { TagInput } from "@/components/ui/tag-input"
 
@@ -42,7 +42,7 @@ export default function AdminPage() {
   const [teamFilter, setTeamFilter] = useState("all") // all, Ενωμένοι, Σποριάδες, etc.
   const [selectedUser, setSelectedUser] = useState("")
   const [laminationType, setLaminationType] = useState<"A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover">("A4")
-  const [printingType, setPrintingType] = useState<"a4BW" | "a4Color" | "a3BW" | "a3Color" | "rizochartoA3" | "rizochartoA4" | "chartoniA3" | "chartoniA4" | "autokollito">("a4BW")
+  const [printingType, setPrintingType] = useState<"A4BW" | "A4Color" | "A3BW" | "A3Color" | "RizochartoA3" | "RizochartoA4" | "ChartoniA3" | "ChartoniA4" | "Autokollito">("A4BW")
   const [quantity, setQuantity] = useState("1")
   const [selectedDate, setSelectedDate] = useState("")
   const [loading, setLoading] = useState(false)
@@ -86,6 +86,9 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
+    // Refresh all user debt fields to ensure they're up to date
+    dummyDB.refreshAllUserDebtFields()
+    
     const allUsers = dummyDB.getUsers()
     setUsers(allUsers)
     setFilteredUsers(allUsers)
@@ -145,6 +148,69 @@ export default function AdminPage() {
   const laminationPrices = dummyDB.getPriceTable("lamination")?.prices || {}
   const printingPrices = dummyDB.getPriceTable("printing")?.prices || {}
 
+  const handleAddPrinting = async () => {
+    if (!selectedUser || !quantity) {
+      toast({
+        title: "Σφάλμα Επικύρωσης",
+        description: "Παρακαλώ επιλέξτε χρήστη και συμπληρώστε την ποσότητα",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setLoading(true)
+    try {
+      const selectedUserData = users.find((u) => u.uid === selectedUser)
+      if (!selectedUserData) return
+
+      const pricePerUnit = printingPrices[printingType] || 0
+      const totalCost = multiplyMoney(pricePerUnit, Number.parseInt(quantity))
+
+      const newJob: PrintJob = {
+        jobId: `print-job-${Date.now()}`,
+        uid: selectedUser,
+        username: selectedUserData.username,
+        userDisplayName: selectedUserData.displayName,
+        type: printingType,
+        quantity: Number.parseInt(quantity),
+        pricePerUnit,
+        totalCost,
+        deviceIP: "192.168.1.100",
+        deviceName: "Admin Printer",
+        timestamp: new Date(selectedDate),
+        status: "completed",
+      }
+
+      dummyDB.addPrintJob(newJob)
+
+      toast({
+        title: "Επιτυχία",
+        description: `Προστέθηκε εκτύπωση για τον χρήστη ${selectedUserData.displayName}`,
+        variant: "success",
+      })
+
+      // Trigger refresh to update dashboard
+      triggerRefresh()
+
+      // Refresh all user debt fields to ensure they're up to date
+      dummyDB.refreshAllUserDebtFields()
+
+      // Refresh users list to get updated debt fields
+      const updatedUsers = dummyDB.getUsers()
+      setUsers(updatedUsers)
+
+      // Don't reset any form fields - they persist for convenience
+    } catch (error) {
+      toast({
+        title: "Σφάλμα Συστήματος",
+        description: "Αποτυχία προσθήκης εκτύπωσης. Παρακαλώ δοκιμάστε ξανά.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleAddLamination = async () => {
     if (!selectedUser || !quantity) {
       toast({
@@ -187,6 +253,13 @@ export default function AdminPage() {
 
       // Trigger refresh to update dashboard
       triggerRefresh()
+
+      // Refresh all user debt fields to ensure they're up to date
+      dummyDB.refreshAllUserDebtFields()
+
+      // Refresh users list to get updated debt fields
+      const updatedUsers = dummyDB.getUsers()
+      setUsers(updatedUsers)
 
       // Don't reset any form fields - they persist for convenience
     } catch (error) {
@@ -253,6 +326,9 @@ export default function AdminPage() {
 
       // Trigger refresh to update dashboard
       triggerRefresh()
+
+      // Refresh all user debt fields to ensure they're up to date
+      dummyDB.refreshAllUserDebtFields()
 
       // Refresh users list to get updated debt fields
       const updatedUsers = dummyDB.getUsers()
@@ -629,7 +705,7 @@ export default function AdminPage() {
                           onClick={() => {
                             // Reset printing form
                             setSelectedUser("")
-                            setPrintingType("a4BW")
+                            setPrintingType("A4BW")
                             setQuantity("1")
                             setSelectedDate("")
                           }}
@@ -678,15 +754,15 @@ export default function AdminPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="a4BW">A4 Ασπρόμαυρο ({formatPrice(printingPrices.a4BW)})</SelectItem>
-                            <SelectItem value="a4Color">A4 Έγχρωμο ({formatPrice(printingPrices.a4Color)})</SelectItem>
-                            <SelectItem value="a3BW">A3 Ασπρόμαυρο ({formatPrice(printingPrices.a3BW)})</SelectItem>
-                            <SelectItem value="a3Color">A3 Έγχρωμο ({formatPrice(printingPrices.a3Color)})</SelectItem>
-                            <SelectItem value="rizochartoA3">Ριζόχαρτο A3 ({formatPrice(printingPrices.rizochartoA3)})</SelectItem>
-                            <SelectItem value="rizochartoA4">Ριζόχαρτο A4 ({formatPrice(printingPrices.rizochartoA4)})</SelectItem>
-                            <SelectItem value="chartoniA3">Χαρτόνι A3 ({formatPrice(printingPrices.chartoniA3)})</SelectItem>
-                            <SelectItem value="chartoniA4">Χαρτόνι A4 ({formatPrice(printingPrices.chartoniA4)})</SelectItem>
-                            <SelectItem value="autokollito">Αυτοκόλλητο ({formatPrice(printingPrices.autokollito)})</SelectItem>
+                            <SelectItem value="A4BW">A4 Ασπρόμαυρο ({formatPrice(printingPrices.A4BW)})</SelectItem>
+                            <SelectItem value="A4Color">A4 Έγχρωμο ({formatPrice(printingPrices.A4Color)})</SelectItem>
+                            <SelectItem value="A3BW">A3 Ασπρόμαυρο ({formatPrice(printingPrices.A3BW)})</SelectItem>
+                            <SelectItem value="A3Color">A3 Έγχρωμο ({formatPrice(printingPrices.A3Color)})</SelectItem>
+                            <SelectItem value="RizochartoA3">Ριζόχαρτο A3 ({formatPrice(printingPrices.RizochartoA3)})</SelectItem>
+                            <SelectItem value="RizochartoA4">Ριζόχαρτο A4 ({formatPrice(printingPrices.RizochartoA4)})</SelectItem>
+                            <SelectItem value="ChartoniA3">Χαρτόνι A3 ({formatPrice(printingPrices.ChartoniA3)})</SelectItem>
+                            <SelectItem value="ChartoniA4">Χαρτόνι A4 ({formatPrice(printingPrices.ChartoniA4)})</SelectItem>
+                            <SelectItem value="Autokollito">Αυτοκόλλητο ({formatPrice(printingPrices.Autokollito)})</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -711,14 +787,7 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <Button onClick={() => {
-                      // Handle printing charge addition
-                      toast({
-                        title: "Επιτυχία",
-                        description: "Η χρέωση εκτύπωσης προστέθηκε επιτυχώς",
-                        variant: "success",
-                      })
-                    }} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                    <Button onClick={handleAddPrinting} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                       {loading ? "Προσθήκη..." : "Προσθήκη Χρέους ΤΟ. ΦΩ."}
                     </Button>
                   </CardContent>
