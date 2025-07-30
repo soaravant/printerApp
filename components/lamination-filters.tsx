@@ -87,7 +87,7 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
           <div>
             <GreekDatePicker
               id="dateFrom"
-              label="Από Ημερομηνία"
+              label="Από"
               value={dateFrom}
               onChange={setDateFrom}
             />
@@ -97,7 +97,7 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
           <div>
             <GreekDatePicker
               id="dateTo"
-              label="Έως Ημερομηνία"
+              label="Έως"
               value={dateTo}
               onChange={setDateTo}
             />

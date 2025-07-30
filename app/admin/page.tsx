@@ -54,7 +54,6 @@ export default function AdminPage() {
     accessLevel: "user" as "user" | "admin" | "Υπεύθυνος",
     userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας",
     memberOf: [] as string[],
-    responsiblePersons: [] as string[],
     responsibleFor: [] as string[],
   })
 
@@ -112,7 +111,13 @@ export default function AdminPage() {
 
     // Apply team filter (only for Άτομο role or when "all" is selected)
     if (teamFilter !== "all" && (roleFilter === "all" || roleFilter === "Άτομο")) {
-      filtered = filtered.filter((u) => u.team === teamFilter)
+      filtered = filtered.filter((u) => {
+        // Exclude admin accounts when a specific team is selected
+        if (u.accessLevel === "admin") {
+          return false
+        }
+        return u.team === teamFilter
+      })
     }
 
     // Sort users: first by access level, then by role with specific order
@@ -286,13 +291,37 @@ export default function AdminPage() {
       .map(u => u.displayName)
   }
 
+  // Function to dynamically compute responsible persons for Ομάδα/Ναός/Τομέας
+  const getDynamicResponsiblePersons = (userData: any) => {
+    const responsibleUsers: string[] = []
+    
+    // Only compute for Ομάδα, Ναός, and Τομέας
+    if (userData.userRole === "Ομάδα" || userData.userRole === "Ναός" || userData.userRole === "Τομέας") {
+      const ypefthynoiUsers = users.filter((user: any) => user.accessLevel === "Υπεύθυνος")
+      
+      ypefthynoiUsers.forEach((ypefthynos: any) => {
+        if (ypefthynos.responsibleFor && ypefthynos.responsibleFor.length > 0) {
+          const isResponsible = ypefthynos.responsibleFor.some((responsibleFor: string) => {
+            return responsibleFor === userData.displayName
+          })
+          
+          if (isResponsible) {
+            responsibleUsers.push(ypefthynos.displayName)
+          }
+        }
+      })
+    }
+    
+    return responsibleUsers
+  }
+
   // Function to check if all Τομείς and Ναοί have Υπεύθυνοι
   const checkResponsiblePersonsCompliance = () => {
     const tomeisWithoutYpefthynos = users.filter(u => 
-      u.userRole === "Τομέας" && (!u.responsiblePersons || u.responsiblePersons.length === 0)
+      u.userRole === "Τομέας" && getDynamicResponsiblePersons(u).length === 0
     )
     const naoiWithoutYpefthynos = users.filter(u => 
-      u.userRole === "Ναός" && (!u.responsiblePersons || u.responsiblePersons.length === 0)
+      u.userRole === "Ναός" && getDynamicResponsiblePersons(u).length === 0
     )
     
     return {
@@ -400,7 +429,7 @@ export default function AdminPage() {
     }
 
     // Validate that Τομείς and Ναοί have Υπεύθυνοι assigned
-    const responsibleValidation = validateResponsiblePersons(newUser.userRole, newUser.responsiblePersons)
+    const responsibleValidation = validateResponsiblePersons(newUser.userRole, [])
     if (!responsibleValidation.isValid) {
       toast({
         title: "Σφάλμα Επικύρωσης",
@@ -440,7 +469,6 @@ export default function AdminPage() {
         userRole: newUser.userRole,
         team: teamField,
         memberOf: newUser.memberOf,
-        responsiblePersons: newUser.responsiblePersons,
         responsibleFor: newUser.responsibleFor,
       }
 
@@ -455,7 +483,7 @@ export default function AdminPage() {
       })
 
       // Reset form and close dialog
-      setNewUser({ username: "", password: "", displayName: "", accessLevel: "user", userRole: "Άτομο", memberOf: [], responsiblePersons: [], responsibleFor: [] })
+      setNewUser({ username: "", password: "", displayName: "", accessLevel: "user", userRole: "Άτομο", memberOf: [], responsibleFor: [] })
       setShowAddUserDialog(false)
     } catch (error) {
       toast({
@@ -522,6 +550,12 @@ export default function AdminPage() {
         variant: "destructive",
       })
     }, 500)
+  }
+
+  const handleResetUsersFilters = () => {
+    setUsersTabSearchTerm("")
+    setRoleFilter("all")
+    setTeamFilter("all")
   }
 
   return (
@@ -1041,7 +1075,7 @@ export default function AdminPage() {
       return null
     })()}
                 
-                <div className="flex justify-start mb-4">
+                <div className="flex justify-between items-center mb-4">
                   <Dialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog}>
                     <DialogTrigger asChild>
                       <Button
@@ -1051,6 +1085,14 @@ export default function AdminPage() {
                         Προσθήκη Χρήστη <Plus className="h-4 w-4" />
                       </Button>
                     </DialogTrigger>
+                  <Button
+                    onClick={handleResetUsersFilters}
+                    variant="outline"
+                    className="flex items-center gap-2 border-gray-300 hover:bg-gray-50"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Επαναφορά Φίλτρων
+                  </Button>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Προσθήκη Χρήστη</DialogTitle>
@@ -1131,15 +1173,9 @@ export default function AdminPage() {
                               Υπεύθυνοι
                               <span className="text-red-500">*</span>
                             </Label>
-                            <TagInput
-                              tags={newUser.responsiblePersons}
-                              onTagsChange={(responsiblePersons) => setNewUser({ ...newUser, responsiblePersons })}
-                              placeholder="Προσθήκη Υπευθύνου..."
-                              availableOptions={getAvailableResponsiblePersons()}
-                              maxTags={3}
-                            />
                             <p className="text-xs text-gray-500 mt-1">
-                              Οι {newUser.userRole === "Τομέας" ? "Τομείς" : "Ναοί"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο
+                              Οι {newUser.userRole === "Τομέας" ? "Τομείς" : "Ναοί"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο. 
+                              Οι Υπεύθυνοι πρέπει να έχουν αυτόν τον {newUser.userRole === "Τομέας" ? "Τομέα" : "Ναό"} στη λίστα "Υπεύθυνος για".
                             </p>
                           </div>
                         )}
@@ -1147,13 +1183,9 @@ export default function AdminPage() {
                         {newUser.userRole === "Ομάδα" && (
                           <div>
                             <Label>Υπεύθυνοι</Label>
-                            <TagInput
-                              tags={newUser.responsiblePersons}
-                              onTagsChange={(responsiblePersons) => setNewUser({ ...newUser, responsiblePersons })}
-                              placeholder="Προσθήκη Υπευθύνου..."
-                              availableOptions={getAvailableResponsiblePersons()}
-                              maxTags={3}
-                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Οι Υπεύθυνοι πρέπει να έχουν αυτή την Ομάδα στη λίστα "Υπεύθυνος για".
+                            </p>
                           </div>
                         )}
                         

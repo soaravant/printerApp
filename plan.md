@@ -12,6 +12,14 @@
 - [x] **Build System**: Next.js with TypeScript 5.x for fast development and builds
 - [x] **Configuration**: Complete Next.js configuration with App Router and optimization
 
+### Data Model Refactoring (December 2024)
+- [x] **PrintJob Structure Simplification**: Updated from individual page fields to unified type/quantity structure
+- [x] **Billing System Removal**: Eliminated redundant PrintBilling and LaminationBilling interfaces
+- [x] **Direct Debt Tracking**: Implemented debt tracking directly on User objects
+- [x] **Component Updates**: Updated PrintJobsTable and related components for new structure
+- [x] **Filter System Rename**: Renamed billing-filters to debt-income-filters for better clarity
+- [x] **Page Cleanup**: Removed unnecessary printing and lamination pages
+
 ### Core Application Architecture
 - [x] **User Authentication**: Firebase Authentication with username/password login system
 - [x] **Role-Based Access**: User and Admin roles with protected routes

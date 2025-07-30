@@ -117,10 +117,11 @@ components/
 ├── role-badge.tsx              # User role badge component
 ├── searchable-select.tsx       # Searchable select component
 ├── history-filter.tsx          # History filtering component
-├── print-jobs-table.tsx        # Print job table component
-├── print-billing-table.tsx     # Print billing table component
+├── print-jobs-table.tsx        # Print job table component (updated for new structure)
 ├── lamination-jobs-table.tsx   # Lamination job table component
-├── lamination-billing-table.tsx # Lamination billing table component
+├── debt-income-filters.tsx     # Debt and income filtering component (renamed from billing-filters)
+├── combined-debt-table.tsx     # Combined debt display table
+├── income-table.tsx            # Income history table
 ├── usage-chart.tsx             # Usage chart component
 └── admin-users-tab.tsx         # Admin user management tab component
 ```

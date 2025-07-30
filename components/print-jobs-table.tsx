@@ -33,136 +33,58 @@ interface PrintJobsTableProps {
   printTypeFilter?: string // New prop for filtering expanded rows
 }
 
-// Helper function to expand a print job into individual rows
-const expandPrintJob = (job: PrintJob) => {
-  const rows = []
-  
-  if (job.pagesA4BW > 0) {
-    rows.push({
-      ...job,
-      printType: "A4 Ασπρόμαυρο",
-      quantity: job.pagesA4BW,
-      cost: job.costA4BW, // Use the actual calculated cost from database
-      originalJobId: job.jobId,
-      rowId: `${job.jobId}-a4bw`
-    })
+// Helper function to get print type label
+const getPrintTypeLabel = (type: string) => {
+  switch (type) {
+    case "A4BW": return "A4 Ασπρόμαυρο"
+    case "A4Color": return "A4 Έγχρωμο"
+    case "A3BW": return "A3 Ασπρόμαυρο"
+    case "A3Color": return "A3 Έγχρωμο"
+    case "RizochartoA3": return "Ριζόχαρτο A3"
+    case "RizochartoA4": return "Ριζόχαρτο A4"
+    case "ChartoniA3": return "Χαρτόνι A3"
+    case "ChartoniA4": return "Χαρτόνι A4"
+    case "Autokollito": return "Αυτοκόλλητο"
+    default: return type
   }
-  
-  if (job.pagesA4Color > 0) {
-    rows.push({
-      ...job,
-      printType: "A4 Έγχρωμο",
-      quantity: job.pagesA4Color,
-      cost: job.costA4Color, // Use the actual calculated cost from database
-      originalJobId: job.jobId,
-      rowId: `${job.jobId}-a4color`
-    })
-  }
-  
-  if (job.pagesA3BW > 0) {
-    rows.push({
-      ...job,
-      printType: "A3 Ασπρόμαυρο",
-      quantity: job.pagesA3BW,
-      cost: job.costA3BW, // Use the actual calculated cost from database
-      originalJobId: job.jobId,
-      rowId: `${job.jobId}-a3bw`
-    })
-  }
-  
-  if (job.pagesA3Color > 0) {
-    rows.push({
-      ...job,
-      printType: "A3 Έγχρωμο",
-      quantity: job.pagesA3Color,
-      cost: job.costA3Color, // Use the actual calculated cost from database
-      originalJobId: job.jobId,
-      rowId: `${job.jobId}-a3color`
-    })
-  }
-  
-  if (job.pagesRizochartoA3 > 0) {
-    rows.push({
-      ...job,
-      printType: "Ριζόχαρτο A3",
-      quantity: job.pagesRizochartoA3,
-      cost: job.costRizochartoA3, // Use the actual calculated cost from database
-      originalJobId: job.jobId,
-      rowId: `${job.jobId}-rizocharto-a3`
-    })
-  }
-  
-  if (job.pagesRizochartoA4 > 0) {
-    rows.push({
-      ...job,
-      printType: "Ριζόχαρτο A4",
-      quantity: job.pagesRizochartoA4,
-      cost: job.costRizochartoA4, // Use the actual calculated cost from database
-      originalJobId: job.jobId,
-      rowId: `${job.jobId}-rizocharto-a4`
-    })
-  }
-  
-  if (job.pagesChartoniA3 > 0) {
-    rows.push({
-      ...job,
-      printType: "Χαρτόνι A3",
-      quantity: job.pagesChartoniA3,
-      cost: job.costChartoniA3, // Use the actual calculated cost from database
-      originalJobId: job.jobId,
-      rowId: `${job.jobId}-chartoni-a3`
-    })
-  }
-  
-  if (job.pagesChartoniA4 > 0) {
-    rows.push({
-      ...job,
-      printType: "Χαρτόνι A4",
-      quantity: job.pagesChartoniA4,
-      cost: job.costChartoniA4, // Use the actual calculated cost from database
-      originalJobId: job.jobId,
-      rowId: `${job.jobId}-chartoni-a4`
-    })
-  }
-  
-  if (job.pagesAutokollito > 0) {
-    rows.push({
-      ...job,
-      printType: "Αυτοκόλλητο",
-      quantity: job.pagesAutokollito,
-      cost: job.costAutokollito, // Use the actual calculated cost from database
-      originalJobId: job.jobId,
-      rowId: `${job.jobId}-autokollito`
-    })
-  }
-  
-  return rows
 }
 
-// Helper function to filter expanded rows by print type
-const filterExpandedRowsByType = (rows: any[], printTypeFilter: string) => {
+// Helper function to convert print job to display format
+const convertPrintJobToDisplay = (job: PrintJob) => {
+  return {
+    ...job,
+    printType: getPrintTypeLabel(job.type),
+    quantity: job.quantity,
+    cost: job.totalCost,
+    originalJobId: job.jobId,
+    rowId: job.jobId
+  }
+}
+
+// Helper function to filter rows by print type
+const filterRowsByType = (rows: any[], printTypeFilter: string) => {
   if (!printTypeFilter || printTypeFilter === "all") {
     return rows
   }
   
   const filterMap: { [key: string]: string } = {
-    "a4BW": "A4 Ασπρόμαυρο",
-    "a4Color": "A4 Έγχρωμο",
-    "a3BW": "A3 Ασπρόμαυρο",
-    "a3Color": "A3 Έγχρωμο",
-    "rizochartoA3": "Ριζόχαρτο A3",
-    "rizochartoA4": "Ριζόχαρτο A4",
-    "chartoniA3": "Χαρτόνι A3",
-    "chartoniA4": "Χαρτόνι A4",
-    "autokollito": "Αυτοκόλλητο"
+    "a4BW": "A4BW",
+    "a4Color": "A4Color",
+    "a3BW": "A3BW",
+    "a3Color": "A3Color",
+    "rizochartoA3": "RizochartoA3",
+    "rizochartoA4": "RizochartoA4",
+    "chartoniA3": "ChartoniA3",
+    "chartoniA4": "ChartoniA4",
+    "autokollito": "Autokollito"
   }
   
-  const targetPrintType = filterMap[printTypeFilter]
-  if (!targetPrintType) {
+  const targetType = filterMap[printTypeFilter]
+  if (!targetType) {
     return rows
   }
   
-  return rows.filter(row => row.printType === targetPrintType)
+  return rows.filter(row => row.type === targetType)
 }
 
 export default function PrintJobsTable({ data, page, pageSize, onPageChange, userRole, onRowHover, printTypeFilter }: PrintJobsTableProps) {
@@ -170,13 +92,13 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
   const [sortedData, setSortedData] = useState<any[]>([])
 
   useEffect(() => {
-    // Expand each print job into individual rows
-    const expandedData = data.flatMap(expandPrintJob)
+    // Apply print type filter first
+    const filteredData = filterRowsByType(data, printTypeFilter || "all")
     
-    // Apply print type filter to expanded rows
-    const filteredExpandedData = filterExpandedRowsByType(expandedData, printTypeFilter || "all")
+    // Convert filtered print jobs to display format
+    const displayData = filteredData.map(convertPrintJobToDisplay)
     
-    setSortedData(sortData(filteredExpandedData, sortConfig))
+    setSortedData(sortData(displayData, sortConfig))
   }, [data, sortConfig, printTypeFilter])
 
   const handleSort = (key: string) => {

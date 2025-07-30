@@ -50,48 +50,59 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
     }
   };
 
-  // Function to get responsible users based on current user's role and members
+  // Function to get responsible users for Άτομο users based on their team membership
   const getResponsibleUsers = (userData: any) => {
     const allUsers = dummyDB.getUsers()
     const responsibleUsers: string[] = []
     
-    // For users with "user" access level, find their team's responsible person through memberOf field
-    if (userData.accessLevel === "user" && userData.memberOf && userData.memberOf.length > 0) {
-      // Find the first team in the memberOf list and get its responsible person
-      const firstTeam = userData.memberOf.find((member: string) => {
+    // For Άτομο users with "user" access level, find their team's responsible person
+    if (userData.userRole === "Άτομο" && userData.accessLevel === "user" && userData.memberOf && userData.memberOf.length > 0) {
+      // Find the team the user is a member of
+      const userTeam = userData.memberOf.find((member: string) => {
         const teamAccount = allUsers.find((user: any) => 
           user.userRole === "Ομάδα" && user.displayName === member
         )
-        return teamAccount && teamAccount.responsiblePerson
+        return teamAccount
       })
       
-      if (firstTeam) {
+      if (userTeam) {
+        // Find the team account
         const teamAccount = allUsers.find((user: any) => 
-          user.userRole === "Ομάδα" && user.displayName === firstTeam
+          user.userRole === "Ομάδα" && user.displayName === userTeam
         )
         
-        if (teamAccount && teamAccount.responsiblePerson) {
-          responsibleUsers.push(teamAccount.responsiblePerson)
-          return responsibleUsers
+        if (teamAccount) {
+          // Get the responsible persons for this team using the dynamic computation
+          const teamResponsiblePersons = getDynamicResponsiblePersons(teamAccount)
+          responsibleUsers.push(...teamResponsiblePersons)
         }
       }
     }
     
-    // For other cases (admin, Υπεύθυνος, or users without members), use the old logic
-    const ypefthynoiUsers = allUsers.filter((user: any) => user.accessLevel === "Υπεύθυνος")
+    return responsibleUsers
+  }
+
+  // Function to dynamically compute responsible persons for Ομάδα/Ναός/Τομέας
+  const getDynamicResponsiblePersons = (userData: any) => {
+    const allUsers = dummyDB.getUsers()
+    const responsibleUsers: string[] = []
     
-    ypefthynoiUsers.forEach((ypefthynos: any) => {
-      if (ypefthynos.responsibleFor && ypefthynos.responsibleFor.length > 0) {
-        const isResponsible = ypefthynos.responsibleFor.some((responsibleFor: string) => {
-          return responsibleFor === userData.displayName || 
-                 responsibleFor === userData.userRole
-        })
-        
-        if (isResponsible) {
-          responsibleUsers.push(ypefthynos.displayName)
+    // Only compute for Ομάδα, Ναός, and Τομέας
+    if (userData.userRole === "Ομάδα" || userData.userRole === "Ναός" || userData.userRole === "Τομέας") {
+      const ypefthynoiUsers = allUsers.filter((user: any) => user.accessLevel === "Υπεύθυνος")
+      
+      ypefthynoiUsers.forEach((ypefthynos: any) => {
+        if (ypefthynos.responsibleFor && ypefthynos.responsibleFor.length > 0) {
+          const isResponsible = ypefthynos.responsibleFor.some((responsibleFor: string) => {
+            return responsibleFor === userData.displayName
+          })
+          
+          if (isResponsible) {
+            responsibleUsers.push(ypefthynos.displayName)
+          }
         }
-      }
-    })
+      })
+    }
     
     return responsibleUsers
   }
@@ -117,28 +128,38 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
               />
             </div>
           </div>
-          {(roleFilter === "all" || roleFilter === "Άτομο") && (
-            <div className="w-full md:w-60 flex items-center">
-              <Select value={teamFilter} onValueChange={setTeamFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Όλες οι ομάδες" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Όλες οι ομάδες</SelectItem>
-                  {(() => {
-                    const { teams } = getDynamicFilterOptions(users);
-                    return teams.map((team) => (
-                      <SelectItem key={team} value={team}>
-                        {team}
-                      </SelectItem>
-                    ));
-                  })()}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
           <div className="w-full md:w-60 flex items-center">
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <Select value={teamFilter} onValueChange={(value) => {
+              // Reset role filter to "all" if current role is "Ναός" or "Τομέας" and a specific team is selected
+              if ((roleFilter === "Ναός" || roleFilter === "Τομέας") && value !== "all") {
+                setRoleFilter("all");
+              }
+              setTeamFilter(value);
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Όλες οι ομάδες" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Όλες οι ομάδες</SelectItem>
+                {(() => {
+                  const { teams } = getDynamicFilterOptions(users);
+                  return teams.map((team) => (
+                    <SelectItem key={team} value={team}>
+                      {team}
+                    </SelectItem>
+                  ));
+                })()}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full md:w-60 flex items-center">
+            <Select value={roleFilter} onValueChange={(value) => {
+              // Reset team filter to "all" if current team is specific and role is "Ναός" or "Τομέας"
+              if ((value === "Ναός" || value === "Τομέας") && teamFilter !== "all") {
+                setTeamFilter("all");
+              }
+              setRoleFilter(value);
+            }}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -214,49 +235,46 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   </div>
                 )}
 
-                {/* Direct responsiblePersons display for Τομείς and Ναοί */}
-                {(userData.userRole === "Τομέας" || userData.userRole === "Ναός") && userData.responsiblePersons && userData.responsiblePersons.length > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium text-gray-700">Υπεύθυνοι:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {userData.responsiblePersons.map((responsible: string, index: number) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {responsible}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Ομάδα responsiblePersons display */}
-                {userData.userRole === "Ομάδα" && userData.responsiblePersons && userData.responsiblePersons.length > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium text-gray-700">Υπεύθυνοι:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {userData.responsiblePersons.map((responsible: string, index: number) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {responsible}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Fallback for Άτομο users - use the complex logic */}
-                {userData.userRole === "Άτομο" && (() => {
-                  const responsibleUsers = getResponsibleUsers(userData)
-                  return responsibleUsers.length > 0 ? (
+                {/* Dynamic responsible persons display for Ομάδα/Ναός/Τομέας */}
+                {(userData.userRole === "Ομάδα" || userData.userRole === "Ναός" || userData.userRole === "Τομέας") && (() => {
+                  const dynamicResponsiblePersons = getDynamicResponsiblePersons(userData)
+                  return (
                     <div className="space-y-2">
                       <span className="text-sm font-medium text-gray-700">Υπεύθυνοι:</span>
                       <div className="flex flex-wrap gap-1">
-                        {responsibleUsers.map((responsible: string, index: number) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {responsible}
-                          </Badge>
-                        ))}
+                        {dynamicResponsiblePersons.length > 0 ? (
+                          dynamicResponsiblePersons.map((responsible: string, index: number) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {responsible}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-500 italic">Δεν έχει ανατεθεί Υπεύθυνος</span>
+                        )}
                       </div>
                     </div>
-                  ) : null
+                  )
+                })()}
+
+                {/* Responsible persons display for Άτομο users */}
+                {userData.userRole === "Άτομο" && userData.accessLevel === "user" && (() => {
+                  const responsibleUsers = getResponsibleUsers(userData)
+                  return (
+                    <div className="space-y-2">
+                      <span className="text-sm font-medium text-gray-700">Υπεύθυνοι:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {responsibleUsers.length > 0 ? (
+                          responsibleUsers.map((responsible: string, index: number) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {responsible}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-500 italic">Δεν έχει ανατεθεί Υπεύθυνος</span>
+                        )}
+                      </div>
+                    </div>
+                  )
                 })()}
 
                 {userData.accessLevel === "Υπεύθυνος" && userData.responsibleFor && userData.responsibleFor.length > 0 && (

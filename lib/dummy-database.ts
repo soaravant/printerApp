@@ -8,10 +8,8 @@ export interface User {
   displayName: string
   createdAt: Date
   userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" // New field for the role selection
-  responsiblePerson?: string // New field for responsible person
   team?: string // New field for team selection (now dynamic)
   memberOf?: string[] // New field for Άτομο users to show which Ομάδα/Ναός/Τομέας they belong to
-  responsiblePersons?: string[] // New field for Ομάδα/Ναός/Τομέας users to show who is responsible
   responsibleFor?: string[] // New field for Υπεύθυνος users to show which Ομάδα/Ναός/Τομέας they are responsible for
   printDebt?: number // Current print debt (can be negative for credit)
   laminationDebt?: number // Current lamination debt (can be negative for credit)
@@ -23,28 +21,13 @@ export interface PrintJob {
   uid: string
   username: string
   userDisplayName: string
-  pagesA4BW: number
-  pagesA4Color: number
-  pagesA3BW: number
-  pagesA3Color: number
-  pagesRizochartoA3: number
-  pagesRizochartoA4: number
-  pagesChartoniA3: number
-  pagesChartoniA4: number
-  pagesAutokollito: number
+  type: "A4BW" | "A4Color" | "A3BW" | "A3Color" | "RizochartoA3" | "RizochartoA4" | "ChartoniA3" | "ChartoniA4" | "Autokollito"
+  quantity: number
+  pricePerUnit: number
+  totalCost: number
   deviceIP: string
   deviceName: string
   timestamp: Date
-  costA4BW: number
-  costA4Color: number
-  costA3BW: number
-  costA3Color: number
-  costRizochartoA3: number
-  costRizochartoA4: number
-  costChartoniA3: number
-  costChartoniA4: number
-  costAutokollito: number
-  totalCost: number
   status: "completed" | "pending" | "failed"
 }
 
@@ -62,50 +45,7 @@ export interface LaminationJob {
   notes?: string
 }
 
-export interface PrintBilling {
-  billingId: string
-  uid: string
-  userDisplayName: string
-  period: string
-  totalA4BW: number
-  totalA4Color: number
-  totalA3BW: number
-  totalA3Color: number
-  totalRizochartoA3: number
-  totalRizochartoA4: number
-  totalChartoniA3: number
-  totalChartoniA4: number
-  totalAutokollito: number
-  totalCost: number
-  paid: boolean
-  paidDate?: Date
-  paidAmount: number
-  remainingBalance: number
-  dueDate: Date
-  generatedAt: Date
-  lastUpdated: Date
-  lastPayment?: Date // New field for last payment
-}
 
-export interface LaminationBilling {
-  billingId: string
-  uid: string
-  userDisplayName: string
-  period: string
-  totalA3: number
-  totalA4: number
-  totalCardSmall: number
-  totalCardLarge: number
-  totalCost: number
-  paid: boolean
-  paidDate?: Date
-  paidAmount: number
-  remainingBalance: number
-  dueDate: Date
-  generatedAt: Date
-  lastUpdated: Date
-  lastPayment?: Date // New field for last payment
-}
 
 export interface PriceTable {
   id: string
@@ -131,8 +71,6 @@ class DummyDatabase {
   private users: User[] = []
   private printJobs: PrintJob[] = []
   private laminationJobs: LaminationJob[] = []
-  private printBilling: PrintBilling[] = []
-  private laminationBilling: LaminationBilling[] = []
   private priceTables: PriceTable[] = []
   private income: Income[] = []
 
@@ -428,8 +366,6 @@ class DummyDatabase {
         displayName: "Ενωμένοι",
         createdAt: new Date("2024-01-05"),
         userRole: "Ομάδα",
-        responsiblePerson: "Υπεύθυνος 401",
-        responsiblePersons: ["Υπεύθυνος 401"],
       },
       {
         uid: "team-sporiades",
@@ -438,8 +374,6 @@ class DummyDatabase {
         displayName: "Σποριάδες",
         createdAt: new Date("2024-01-06"),
         userRole: "Ομάδα",
-        responsiblePerson: "Υπεύθυνος 402",
-        responsiblePersons: ["Υπεύθυνος 402"],
       },
       {
         uid: "team-karpoforoi",
@@ -448,8 +382,6 @@ class DummyDatabase {
         displayName: "Καρποφόροι",
         createdAt: new Date("2024-01-07"),
         userRole: "Ομάδα",
-        responsiblePerson: "Υπεύθυνος 403",
-        responsiblePersons: ["Υπεύθυνος 403"],
       },
       {
         uid: "team-olofwtoi",
@@ -458,8 +390,6 @@ class DummyDatabase {
         displayName: "Ολόφωτοι",
         createdAt: new Date("2024-01-08"),
         userRole: "Ομάδα",
-        responsiblePerson: "Υπεύθυνος 404",
-        responsiblePersons: ["Υπεύθυνος 404"],
       },
       {
         uid: "team-nikhtes",
@@ -468,8 +398,6 @@ class DummyDatabase {
         displayName: "Νικητές",
         createdAt: new Date("2024-01-09"),
         userRole: "Ομάδα",
-        responsiblePerson: "Υπεύθυνος 405",
-        responsiblePersons: ["Υπεύθυνος 405"],
       },
       {
         uid: "team-nikhforoi",
@@ -478,8 +406,6 @@ class DummyDatabase {
         displayName: "Νικηφόροι",
         createdAt: new Date("2024-01-10"),
         userRole: "Ομάδα",
-        responsiblePerson: "Υπεύθυνος 406",
-        responsiblePersons: ["Υπεύθυνος 406"],
       },
       {
         uid: "team-floga",
@@ -488,8 +414,6 @@ class DummyDatabase {
         displayName: "Φλόγα",
         createdAt: new Date("2024-01-11"),
         userRole: "Ομάδα",
-        responsiblePerson: "Υπεύθυνος 407",
-        responsiblePersons: ["Υπεύθυνος 407"],
       },
       {
         uid: "team-sympsyxoi",
@@ -498,8 +422,6 @@ class DummyDatabase {
         displayName: "Σύμψυχοι",
         createdAt: new Date("2024-01-12"),
         userRole: "Ομάδα",
-        responsiblePerson: "Υπεύθυνος 408",
-        responsiblePersons: ["Υπεύθυνος 408"],
       },
 
       // Ναός accounts (8 total) - using same user pairs as teams
@@ -510,8 +432,6 @@ class DummyDatabase {
         displayName: "Ναός 1",
         createdAt: new Date("2024-01-14"),
         userRole: "Ναός",
-        responsiblePerson: "Υπεύθυνος 401",
-        responsiblePersons: ["Υπεύθυνος 401"],
       },
       {
         uid: "naos-2",
@@ -520,8 +440,6 @@ class DummyDatabase {
         displayName: "Ναός 2",
         createdAt: new Date("2024-01-15"),
         userRole: "Ναός",
-        responsiblePerson: "Υπεύθυνος 402",
-        responsiblePersons: ["Υπεύθυνος 402"],
       },
       {
         uid: "naos-3",
@@ -530,8 +448,6 @@ class DummyDatabase {
         displayName: "Ναός 3",
         createdAt: new Date("2024-01-16"),
         userRole: "Ναός",
-        responsiblePerson: "Υπεύθυνος 403",
-        responsiblePersons: ["Υπεύθυνος 403"],
       },
       {
         uid: "naos-4",
@@ -540,8 +456,6 @@ class DummyDatabase {
         displayName: "Ναός 4",
         createdAt: new Date("2024-01-17"),
         userRole: "Ναός",
-        responsiblePerson: "Υπεύθυνος 404",
-        responsiblePersons: ["Υπεύθυνος 404"],
       },
       {
         uid: "naos-5",
@@ -550,8 +464,6 @@ class DummyDatabase {
         displayName: "Ναός 5",
         createdAt: new Date("2024-01-18"),
         userRole: "Ναός",
-        responsiblePerson: "Υπεύθυνος 405",
-        responsiblePersons: ["Υπεύθυνος 405"],
       },
       {
         uid: "naos-6",
@@ -560,8 +472,6 @@ class DummyDatabase {
         displayName: "Ναός 6",
         createdAt: new Date("2024-01-19"),
         userRole: "Ναός",
-        responsiblePerson: "Υπεύθυνος 406",
-        responsiblePersons: ["Υπεύθυνος 406"],
       },
       {
         uid: "naos-7",
@@ -570,8 +480,6 @@ class DummyDatabase {
         displayName: "Ναός 7",
         createdAt: new Date("2024-01-20"),
         userRole: "Ναός",
-        responsiblePerson: "Υπεύθυνος 407",
-        responsiblePersons: ["Υπεύθυνος 407"],
       },
       {
         uid: "naos-8",
@@ -580,8 +488,6 @@ class DummyDatabase {
         displayName: "Ναός 8",
         createdAt: new Date("2024-01-21"),
         userRole: "Ναός",
-        responsiblePerson: "Υπεύθυνος 408",
-        responsiblePersons: ["Υπεύθυνος 408"],
       },
 
       // Τομέας accounts (8 total) - using same user pairs as teams
@@ -592,8 +498,6 @@ class DummyDatabase {
         displayName: "Τομέας 1",
         createdAt: new Date("2024-01-22"),
         userRole: "Τομέας",
-        responsiblePerson: "Υπεύθυνος 401",
-        responsiblePersons: ["Υπεύθυνος 401"],
       },
       {
         uid: "tomeas-2",
@@ -602,8 +506,6 @@ class DummyDatabase {
         displayName: "Τομέας 2",
         createdAt: new Date("2024-01-23"),
         userRole: "Τομέας",
-        responsiblePerson: "Υπεύθυνος 402",
-        responsiblePersons: ["Υπεύθυνος 402"],
       },
       {
         uid: "tomeas-3",
@@ -612,8 +514,6 @@ class DummyDatabase {
         displayName: "Τομέας 3",
         createdAt: new Date("2024-01-24"),
         userRole: "Τομέας",
-        responsiblePerson: "Υπεύθυνος 403",
-        responsiblePersons: ["Υπεύθυνος 403"],
         printDebt: 14.22,
         laminationDebt: 1.33,
         totalDebt: 15.55,
@@ -625,8 +525,6 @@ class DummyDatabase {
         displayName: "Τομέας 4",
         createdAt: new Date("2024-01-25"),
         userRole: "Τομέας",
-        responsiblePerson: "Υπεύθυνος 404",
-        responsiblePersons: ["Υπεύθυνος 404"],
         printDebt: 14.86,
         laminationDebt: 3.41,
         totalDebt: 18.27,
@@ -638,8 +536,6 @@ class DummyDatabase {
         displayName: "Τομέας 5",
         createdAt: new Date("2024-01-26"),
         userRole: "Τομέας",
-        responsiblePerson: "Υπεύθυνος 405",
-        responsiblePersons: ["Υπεύθυνος 405"],
       },
       {
         uid: "tomeas-6",
@@ -648,8 +544,6 @@ class DummyDatabase {
         displayName: "Τομέας 6",
         createdAt: new Date("2024-01-27"),
         userRole: "Τομέας",
-        responsiblePerson: "Υπεύθυνος 406",
-        responsiblePersons: ["Υπεύθυνος 406"],
       },
       {
         uid: "tomeas-7",
@@ -658,8 +552,6 @@ class DummyDatabase {
         displayName: "Τομέας 7",
         createdAt: new Date("2024-01-28"),
         userRole: "Τομέας",
-        responsiblePerson: "Υπεύθυνος 407",
-        responsiblePersons: ["Υπεύθυνος 407"],
       },
       {
         uid: "tomeas-8",
@@ -668,8 +560,6 @@ class DummyDatabase {
         displayName: "Τομέας 8",
         createdAt: new Date("2024-01-29"),
         userRole: "Τομέας",
-        responsiblePerson: "Υπεύθυνος 408",
-        responsiblePersons: ["Υπεύθυνος 408"],
       },
     ];
 
@@ -735,82 +625,54 @@ class DummyDatabase {
           const jobDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, Math.floor(Math.random() * 28) + 1);
           const deviceName = this.getRandomPrinterName();
           
-          // Initialize print job with device name first
-          const printJob: PrintJob = {
-            jobId: `print-${userId}-${monthOffset}-${i}`,
-            uid: userId,
-            username: user.username,
-            userDisplayName: user.displayName,
-            pagesA4BW: 0,
-            pagesA4Color: 0,
-            pagesA3BW: 0,
-            pagesA3Color: 0,
-            pagesRizochartoA3: 0,
-            pagesRizochartoA4: 0,
-            pagesChartoniA3: 0,
-            pagesChartoniA4: 0,
-            pagesAutokollito: 0,
-            deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 3)}`,
-            deviceName: deviceName,
-            timestamp: jobDate,
-            costA4BW: 0,
-            costA4Color: 0,
-            costA3BW: 0,
-            costA3Color: 0,
-            costRizochartoA3: 0,
-            costRizochartoA4: 0,
-            costChartoniA3: 0,
-            costChartoniA4: 0,
-            costAutokollito: 0,
-            totalCost: 0,
-            status: "completed",
-          };
-
-          // Generate pages based on printer capabilities
+          // Generate print jobs based on printer capabilities
+          const printTypes: ("A4BW" | "A4Color" | "A3BW" | "A3Color" | "RizochartoA3" | "RizochartoA4" | "ChartoniA3" | "ChartoniA4" | "Autokollito")[] = [];
+          
           if (deviceName === "Canon Color") {
             // Canon Color can print everything
-            printJob.pagesA4BW = Math.floor(Math.random() * 8) + 1; // 1-8
-            printJob.pagesA4Color = Math.floor(Math.random() * 4);   // 0-3
-            printJob.pagesA3BW = Math.floor(Math.random() * 3);      // 0-2
-            printJob.pagesA3Color = Math.floor(Math.random() * 2);   // 0-1
-            printJob.pagesRizochartoA3 = Math.floor(Math.random() * 3); // 0-2
-            printJob.pagesRizochartoA4 = Math.floor(Math.random() * 4); // 0-3
-            printJob.pagesChartoniA3 = Math.floor(Math.random() * 3); // 0-2
-            printJob.pagesChartoniA4 = Math.floor(Math.random() * 4); // 0-3
-            printJob.pagesAutokollito = Math.floor(Math.random() * 5); // 0-4
-          } else if (deviceName === "Κυδωνιών") {
-            // Κυδωνιών can only print A4 B/W
-            printJob.pagesA4BW = Math.floor(Math.random() * 8) + 1; // 1-8
-            // All other page types remain 0
-          } else if (deviceName === "Canon B/W" || deviceName === "Brother") {
-            // Canon B/W and Brother can only print A4 B/W
-            printJob.pagesA4BW = Math.floor(Math.random() * 8) + 1; // 1-8
-            // All other page types remain 0
+            printTypes.push("A4BW", "A4Color", "A3BW", "A3Color", "RizochartoA3", "RizochartoA4", "ChartoniA3", "ChartoniA4", "Autokollito");
+          } else if (deviceName === "Κυδωνιών" || deviceName === "Canon B/W" || deviceName === "Brother") {
+            // These can only print A4 B/W
+            printTypes.push("A4BW");
           }
 
-          // Calculate costs with proper money rounding
-          const prices = this.priceTables.find((p) => p.id === "printing")?.prices || {};
-          printJob.costA4BW = calculatePrintCost(printJob.pagesA4BW, prices.a4BW || 0);
-          printJob.costA4Color = calculatePrintCost(printJob.pagesA4Color, prices.a4Color || 0);
-          printJob.costA3BW = calculatePrintCost(printJob.pagesA3BW, prices.a3BW || 0);
-          printJob.costA3Color = calculatePrintCost(printJob.pagesA3Color, prices.a3Color || 0);
-          printJob.costRizochartoA3 = calculatePrintCost(printJob.pagesRizochartoA3, prices.rizochartoA3 || 0);
-          printJob.costRizochartoA4 = calculatePrintCost(printJob.pagesRizochartoA4, prices.rizochartoA4 || 0);
-          printJob.costChartoniA3 = calculatePrintCost(printJob.pagesChartoniA3, prices.chartoniA3 || 0);
-          printJob.costChartoniA4 = calculatePrintCost(printJob.pagesChartoniA4, prices.chartoniA4 || 0);
-          printJob.costAutokollito = calculatePrintCost(printJob.pagesAutokollito, prices.autokollito || 0);
-          printJob.totalCost = calculatePrintJobTotal({
-            costA4BW: printJob.costA4BW,
-            costA4Color: printJob.costA4Color,
-            costA3BW: printJob.costA3BW,
-            costA3Color: printJob.costA3Color,
-            costRizochartoA3: printJob.costRizochartoA3,
-            costRizochartoA4: printJob.costRizochartoA4,
-            costChartoniA3: printJob.costChartoniA3,
-            costChartoniA4: printJob.costChartoniA4,
-            costAutokollito: printJob.costAutokollito
-          });
-          this.printJobs.push(printJob);
+          // Generate 1-3 print jobs per session
+          const numJobs = Math.floor(Math.random() * 3) + 1;
+          for (let j = 0; j < numJobs; j++) {
+            const type = printTypes[Math.floor(Math.random() * printTypes.length)];
+            const quantity = Math.floor(Math.random() * 8) + 1; // 1-8 pages
+            const prices = this.priceTables.find((p) => p.id === "printing")?.prices || {};
+            
+            let pricePerUnit = 0;
+            switch (type) {
+              case "A4BW": pricePerUnit = prices.a4BW || 0; break;
+              case "A4Color": pricePerUnit = prices.a4Color || 0; break;
+              case "A3BW": pricePerUnit = prices.a3BW || 0; break;
+              case "A3Color": pricePerUnit = prices.a3Color || 0; break;
+              case "RizochartoA3": pricePerUnit = prices.rizochartoA3 || 0; break;
+              case "RizochartoA4": pricePerUnit = prices.rizochartoA4 || 0; break;
+              case "ChartoniA3": pricePerUnit = prices.chartoniA3 || 0; break;
+              case "ChartoniA4": pricePerUnit = prices.chartoniA4 || 0; break;
+              case "Autokollito": pricePerUnit = prices.autokollito || 0; break;
+            }
+
+            const printJob: PrintJob = {
+              jobId: `print-${userId}-${monthOffset}-${i}-${j}`,
+              uid: userId,
+              username: user.username,
+              userDisplayName: user.displayName,
+              type,
+              quantity,
+              pricePerUnit,
+              totalCost: multiplyMoney(pricePerUnit, quantity),
+              deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 3)}`,
+              deviceName: deviceName,
+              timestamp: jobDate,
+              status: "completed",
+            };
+            
+            this.printJobs.push(printJob);
+          }
         }
         // 3-8 lamination jobs per user per month
         const laminationJobsCount = Math.floor(Math.random() * 6) + 3;
@@ -838,134 +700,8 @@ class DummyDatabase {
         }
       }
     }
-    // Generate billing records
-    this.generateBillingRecords();
-  }
-
-  private generateBillingRecords() {
-    const userIds = this.users.filter((u) => u.accessLevel === "user" || u.accessLevel === "Υπεύθυνος").map((u) => u.uid)
-    const now = new Date()
-
-    for (let monthOffset = 0; monthOffset < 3; monthOffset++) {
-      const periodDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
-      const period = periodDate.toISOString().slice(0, 7)
-
-      for (const userId of userIds) {
-        const user = this.users.find((u) => u.uid === userId)!
-
-        // Print billing
-        const monthPrintJobs = this.printJobs.filter(
-          (j) => j.uid === userId && j.timestamp.toISOString().slice(0, 7) === period,
-        )
-
-        if (monthPrintJobs.length > 0) {
-                  const totalA4BW = monthPrintJobs.reduce((sum, j) => sum + j.pagesA4BW, 0)
-        const totalA4Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA4Color, 0)
-        const totalA3BW = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3BW, 0)
-        const totalA3Color = monthPrintJobs.reduce((sum, j) => sum + j.pagesA3Color, 0)
-        const totalRizochartoA3 = monthPrintJobs.reduce((sum, j) => sum + j.pagesRizochartoA3, 0)
-        const totalRizochartoA4 = monthPrintJobs.reduce((sum, j) => sum + j.pagesRizochartoA4, 0)
-        const totalChartoniA3 = monthPrintJobs.reduce((sum, j) => sum + j.pagesChartoniA3, 0)
-        const totalChartoniA4 = monthPrintJobs.reduce((sum, j) => sum + j.pagesChartoniA4, 0)
-        const totalAutokollito = monthPrintJobs.reduce((sum, j) => sum + j.pagesAutokollito, 0)
-        const totalCost = roundMoney(monthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0))
-
-          const isPaid = Math.random() > 0.75
-          const paidAmount = isPaid ? totalCost : roundMoney(Math.random() * totalCost)
-
-          // Always generate a last payment date
-          // For paid bills: use the paid date
-          // For unpaid bills: use a date when partial payment was made (if any payment was made)
-          const hasPartialPayment = paidAmount > 0
-          const lastPaymentDate = isPaid 
-            ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) // Full payment date
-            : hasPartialPayment 
-              ? new Date(periodDate.getTime() + 10 * 24 * 60 * 60 * 1000) // Partial payment date
-              : new Date(periodDate.getTime() - 30 * 24 * 60 * 60 * 1000) // Previous payment date
-
-          const printBilling: PrintBilling = {
-            billingId: `print-billing-${userId}-${period}`,
-            uid: userId,
-            userDisplayName: user.displayName,
-            period,
-            totalA4BW,
-            totalA4Color,
-            totalA3BW,
-            totalA3Color,
-            totalRizochartoA3,
-            totalRizochartoA4,
-            totalChartoniA3,
-            totalChartoniA4,
-            totalAutokollito,
-            totalCost,
-            paid: isPaid,
-            paidDate: isPaid ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) : undefined,
-            paidAmount,
-            remainingBalance: roundMoney(totalCost - paidAmount),
-            dueDate: new Date(periodDate.getTime() + 30 * 24 * 60 * 60 * 1000),
-            generatedAt: new Date(periodDate.getTime() + 5 * 24 * 60 * 60 * 1000),
-            lastUpdated: new Date(),
-            lastPayment: lastPaymentDate,
-          }
-
-          this.printBilling.push(printBilling)
-        }
-
-        // Lamination billing
-        const monthLaminationJobs = this.laminationJobs.filter(
-          (j) => j.uid === userId && j.timestamp.toISOString().slice(0, 7) === period,
-        )
-
-        if (monthLaminationJobs.length > 0) {
-          const totalA3 = monthLaminationJobs.filter((j) => j.type === "A3").reduce((sum, j) => sum + j.quantity, 0)
-          const totalA4 = monthLaminationJobs.filter((j) => j.type === "A4").reduce((sum, j) => sum + j.quantity, 0)
-          const totalCardSmall = monthLaminationJobs
-            .filter((j) => j.type === "cards")
-            .reduce((sum, j) => sum + j.quantity, 0)
-          const totalCardLarge = monthLaminationJobs
-            .filter((j) => j.type === "cards")
-            .reduce((sum, j) => sum + j.quantity, 0)
-          const totalCost = roundMoney(monthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0))
-
-          const isPaid = Math.random() > 0.75
-          const paidAmount = isPaid ? totalCost : roundMoney(Math.random() * totalCost)
-
-          // Always generate a last payment date
-          // For paid bills: use the paid date
-          // For unpaid bills: use a date when partial payment was made (if any payment was made)
-          const hasPartialPayment = paidAmount > 0
-          const lastPaymentDate = isPaid 
-            ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) // Full payment date
-            : hasPartialPayment 
-              ? new Date(periodDate.getTime() + 10 * 24 * 60 * 60 * 1000) // Partial payment date
-              : new Date(periodDate.getTime() - 30 * 24 * 60 * 60 * 1000) // Previous payment date
-
-          const laminationBilling: LaminationBilling = {
-            billingId: `lamination-billing-${userId}-${period}`,
-            uid: userId,
-            userDisplayName: user.displayName,
-            period,
-            totalA3,
-            totalA4,
-            totalCardSmall,
-            totalCardLarge,
-            totalCost,
-            paid: isPaid,
-            paidDate: isPaid ? new Date(periodDate.getTime() + 15 * 24 * 60 * 60 * 1000) : undefined,
-            paidAmount,
-            remainingBalance: roundMoney(totalCost - paidAmount),
-            dueDate: new Date(periodDate.getTime() + 30 * 24 * 60 * 60 * 1000),
-            generatedAt: new Date(periodDate.getTime() + 5 * 24 * 60 * 60 * 1000),
-            lastUpdated: new Date(),
-            lastPayment: lastPaymentDate,
-          }
-
-          this.laminationBilling.push(laminationBilling)
-        }
-      }
-    }
     
-    // Generate income history based on billing records
+    // Generate income history based on jobs
     this.generateIncomeHistory()
     
     // Initialize debt fields for all users
@@ -987,24 +723,24 @@ class DummyDatabase {
       const monthDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
       const period = monthDate.toISOString().slice(0, 7)
       
-      // Get all billing records for this period
-      const monthPrintBilling = this.printBilling.filter(b => b.period === period)
-      const monthLaminationBilling = this.laminationBilling.filter(b => b.period === period)
+      // Get all jobs for this period
+      const monthPrintJobs = this.printJobs.filter(j => j.timestamp.toISOString().slice(0, 7) === period)
+      const monthLaminationJobs = this.laminationJobs.filter(j => j.timestamp.toISOString().slice(0, 7) === period)
       
-      // Generate income for each user with billing in this period
-      const usersWithBilling = new Set([
-        ...monthPrintBilling.map(b => b.uid),
-        ...monthLaminationBilling.map(b => b.uid)
+      // Generate income for each user with jobs in this period
+      const usersWithJobs = new Set([
+        ...monthPrintJobs.map(j => j.uid),
+        ...monthLaminationJobs.map(j => j.uid)
       ])
       
-      for (const userId of usersWithBilling) {
+      for (const userId of usersWithJobs) {
         const user = this.users.find(u => u.uid === userId)!
-        const userPrintBilling = monthPrintBilling.filter(b => b.uid === userId)
-        const userLaminationBilling = monthLaminationBilling.filter(b => b.uid === userId)
+        const userPrintJobs = monthPrintJobs.filter(j => j.uid === userId)
+        const userLaminationJobs = monthLaminationJobs.filter(j => j.uid === userId)
         
         // Calculate total debt for this user in this period
-        const totalPrintDebt = userPrintBilling.reduce((sum, b) => sum + b.totalCost, 0)
-        const totalLaminationDebt = userLaminationBilling.reduce((sum, b) => sum + b.totalCost, 0)
+        const totalPrintDebt = userPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
+        const totalLaminationDebt = userLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
         const totalDebt = totalPrintDebt + totalLaminationDebt
         
         if (totalDebt === 0) continue
@@ -1180,42 +916,7 @@ class DummyDatabase {
     this.updateUserDebtFields(job.uid)
   }
 
-  // Billing methods
-  getPrintBilling(uid?: string): PrintBilling[] {
-    if (uid) {
-      return this.printBilling.filter((billing) => billing.uid === uid)
-    }
-    return [...this.printBilling]
-  }
 
-  getAllPrintBilling(): PrintBilling[] {
-    return [...this.printBilling]
-  }
-
-  getLaminationBilling(uid?: string): LaminationBilling[] {
-    if (uid) {
-      return this.laminationBilling.filter((billing) => billing.uid === uid)
-    }
-    return [...this.laminationBilling]
-  }
-
-  getAllLaminationBilling(): LaminationBilling[] {
-    return [...this.laminationBilling]
-  }
-
-  updatePrintBilling(billingId: string, updates: Partial<PrintBilling>): void {
-    const index = this.printBilling.findIndex((b) => b.billingId === billingId)
-    if (index !== -1) {
-      this.printBilling[index] = { ...this.printBilling[index], ...updates, lastUpdated: new Date() }
-    }
-  }
-
-  updateLaminationBilling(billingId: string, updates: Partial<LaminationBilling>): void {
-    const index = this.laminationBilling.findIndex((b) => b.billingId === billingId)
-    if (index !== -1) {
-      this.laminationBilling[index] = { ...this.laminationBilling[index], ...updates, lastUpdated: new Date() }
-    }
-  }
 
   // Price table methods
   getPriceTables(): PriceTable[] {
@@ -1235,12 +936,12 @@ class DummyDatabase {
 
   // Statistics methods
   getTotalUnpaidForUser(uid: string): { print: number; lamination: number; total: number } {
-    const printUnpaid = this.printBilling
-      .filter((b) => b.uid === uid)
-      .reduce((sum, b) => sum + b.remainingBalance, 0)
-    const laminationUnpaid = this.laminationBilling
-      .filter((b) => b.uid === uid)
-      .reduce((sum, b) => sum + b.remainingBalance, 0)
+    const printUnpaid = this.printJobs
+      .filter((j) => j.uid === uid)
+      .reduce((sum, j) => sum + j.totalCost, 0)
+    const laminationUnpaid = this.laminationJobs
+      .filter((j) => j.uid === uid)
+      .reduce((sum, j) => sum + j.totalCost, 0)
 
     return {
       print: printUnpaid,
@@ -1267,62 +968,7 @@ class DummyDatabase {
   addIncome(incomeRecord: Income): void {
     this.income.push(incomeRecord)
     
-    // Update billing records to reflect the income
-    const userPrintBilling = this.printBilling.filter(b => b.uid === incomeRecord.uid)
-    const userLaminationBilling = this.laminationBilling.filter(b => b.uid === incomeRecord.uid)
-    
-    let remainingAmount = incomeRecord.amount
-    
-    if (remainingAmount > 0) {
-      // Positive income - reduce debt
-      // First, apply income to lamination billing
-      for (const billing of userLaminationBilling) {
-        if (remainingAmount <= 0) break
-        
-        const incomeAmount = Math.min(remainingAmount, billing.remainingBalance)
-        billing.paidAmount += incomeAmount
-        billing.remainingBalance -= incomeAmount
-        billing.lastPayment = incomeRecord.timestamp
-        
-        if (billing.remainingBalance <= 0) {
-          billing.paid = true
-          billing.paidDate = incomeRecord.timestamp
-        }
-        
-        remainingAmount -= incomeAmount
-      }
-      
-      // Then, apply remaining income to print billing
-      for (const billing of userPrintBilling) {
-        if (remainingAmount <= 0) break
-        
-        const incomeAmount = Math.min(remainingAmount, billing.remainingBalance)
-        billing.paidAmount += incomeAmount
-        billing.remainingBalance -= incomeAmount
-        billing.lastPayment = incomeRecord.timestamp
-        
-        if (billing.remainingBalance <= 0) {
-          billing.paid = true
-          billing.paidDate = incomeRecord.timestamp
-        }
-        
-        remainingAmount -= incomeAmount
-      }
-      
-      // If there's still remaining amount, create credit by reducing remaining balance further
-      if (remainingAmount > 0) {
-        // Apply remaining amount as credit to lamination billing first
-        if (userLaminationBilling.length > 0) {
-          userLaminationBilling[0].remainingBalance -= remainingAmount
-          userLaminationBilling[0].lastPayment = incomeRecord.timestamp
-        } else if (userPrintBilling.length > 0) {
-          userPrintBilling[0].remainingBalance -= remainingAmount
-          userPrintBilling[0].lastPayment = incomeRecord.timestamp
-        }
-      }
-    }
-    
-    // Update user's debt fields
+    // Update user's debt fields (income reduces debt)
     this.updateUserDebtFields(incomeRecord.uid)
   }
   
@@ -1343,8 +989,6 @@ class DummyDatabase {
   reset(): void {
     this.printJobs = []
     this.laminationJobs = []
-    this.printBilling = []
-    this.laminationBilling = []
     this.income = []
     this.initializeData()
   }

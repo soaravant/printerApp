@@ -89,7 +89,7 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
           <div>
             <GreekDatePicker
               id="dateFrom"
-              label="Από Ημερομηνία"
+              label="Από"
               value={dateFrom}
               onChange={setDateFrom}
             />
@@ -99,7 +99,7 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
           <div>
             <GreekDatePicker
               id="dateTo"
-              label="Έως Ημερομηνία"
+              label="Έως"
               value={dateTo}
               onChange={setDateTo}
             />

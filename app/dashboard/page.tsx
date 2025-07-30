@@ -5,7 +5,7 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
 import { dummyDB } from "@/lib/dummy-database"
-import type { PrintJob, LaminationJob, PrintBilling, LaminationBilling, User, Income } from "@/lib/dummy-database"
+import type { PrintJob, LaminationJob, User, Income } from "@/lib/dummy-database"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -20,11 +20,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import dynamic from "next/dynamic"
 import { useState, useEffect } from "react"
 import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download, RotateCcw, Filter, FileText, BarChart3 } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
 import * as XLSX from "xlsx-js-style"
 import React from "react"
-import { BillingFilters } from "@/components/billing-filters"
+
 import { PrintFilters } from "@/components/print-filters"
 import { LaminationFilters } from "@/components/lamination-filters"
+import { DebtFilters } from "@/components/debt-filters"
+import { IncomeFilters } from "@/components/income-filters"
 
 // Error boundary component for dynamic imports
 function ErrorBoundary({ children, fallback }: { children: React.ReactNode; fallback: React.ReactNode }) {
@@ -44,16 +47,8 @@ const LaminationJobsTable = dynamic(() => import("@/components/lamination-jobs-t
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση πλαστικοποιήσεων...</div>,
   ssr: false,
 })
-const PrintBillingTable = dynamic(() => import("@/components/print-billing-table"), {
-  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση χρεώσεων εκτυπώσεων...</div>,
-  ssr: false,
-})
-const CombinedDebtTable = dynamic(() => import("@/components/combined-debt-table"), {
+const DebtTable = dynamic(() => import("@/components/debt-table"), {
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση συγκεντρωτικού πίνακα...</div>,
-  ssr: false,
-})
-const LaminationBillingTable = dynamic(() => import("@/components/lamination-billing-table"), {
-  loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση χρεώσεων πλαστικοποιήσεων...</div>,
   ssr: false,
 })
 const IncomeTable = dynamic(() => import("@/components/income-table"), {
@@ -79,8 +74,6 @@ export default function DashboardPage() {
   const { refreshTrigger } = useRefresh()
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([])
   const [laminationJobs, setLaminationJobs] = useState<LaminationJob[]>([])
-  const [printBilling, setPrintBilling] = useState<PrintBilling[]>([])
-  const [laminationBilling, setLaminationBilling] = useState<LaminationBilling[]>([])
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [income, setIncome] = useState<Income[]>([])
 
@@ -99,28 +92,35 @@ export default function DashboardPage() {
   const [machineFilter, setMachineFilter] = useState("all") // For lamination machine (Πλαστικοποίηση, Βιβλιοδεσία)
   const [laminationTypeFilter, setLaminationTypeFilter] = useState("all") // For lamination type based on machine
 
-  // Billing table specific filters (copied from admin page)
-  const [billingSearchTerm, setBillingSearchTerm] = useState("")
-  const [billingDebtFilter, setBillingDebtFilter] = useState("all") // all, print, lamination, both
-  const [billingAmountFilter, setBillingAmountFilter] = useState("all") // all, under10, 10to50, over50
-  const [billingPriceRange, setBillingPriceRange] = useState<[number, number]>([0, 100])
-  const [billingPriceRangeInputs, setBillingPriceRangeInputs] = useState<[string, string]>(["0", "100"])
-  const [billingRoleFilter, setBillingRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Ναός, Τομέας
-  const [billingResponsibleForFilter, setBillingResponsibleForFilter] = useState("all") // all, or specific responsibleFor item
+  // Debt filtering states
+  const [debtSearchTerm, setDebtSearchTerm] = useState("")
+  const [debtFilter, setDebtFilter] = useState("all")
+  const [amountFilter, setAmountFilter] = useState("all")
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100])
+  const [priceRangeInputs, setPriceRangeInputs] = useState<[string, string]>(["0", "100"])
+  const [roleFilter, setRoleFilter] = useState("all")
+  const [teamFilter, setTeamFilter] = useState("all")
+  const [responsibleForFilter, setResponsibleForFilter] = useState("all")
+
+  // Income filtering states
+  const [incomeSearchTerm, setIncomeSearchTerm] = useState("")
+  const [incomeRoleFilter, setIncomeRoleFilter] = useState("all")
+  const [incomeDateFrom, setIncomeDateFrom] = useState("")
+  const [incomeDateTo, setIncomeDateTo] = useState("")
+  const [incomeAmountRange, setIncomeAmountRange] = useState<[number, number]>([0, 100])
+  const [incomeAmountInputs, setIncomeAmountInputs] = useState<[string, string]>(["0", "100"])
+  const [incomeResponsibleForFilter, setIncomeResponsibleForFilter] = useState("all")
 
   // Filtered data states
-  const [filteredPrintBilling, setFilteredPrintBilling] = useState<PrintBilling[]>([])
   const [filteredPrintJobs, setFilteredPrintJobs] = useState<PrintJob[]>([])
-  const [filteredLaminationBilling, setFilteredLaminationBilling] = useState<LaminationBilling[]>([])
   const [filteredLaminationJobs, setFilteredLaminationJobs] = useState<LaminationJob[]>([])
   const [filteredIncome, setFilteredIncome] = useState<Income[]>([])
 
   // Pagination state
   const [printJobsPage, setPrintJobsPage] = useState(1)
   const [laminationJobsPage, setLaminationJobsPage] = useState(1)
-  const [printBillingPage, setPrintBillingPage] = useState(1)
-  const [laminationBillingPage, setLaminationBillingPage] = useState(1)
   const [incomePage, setIncomePage] = useState(1)
+  const [debtPage, setDebtPage] = useState(1)
   const PAGE_SIZE = 10
 
   // Hover state for highlighting statistics
@@ -134,41 +134,29 @@ export default function DashboardPage() {
       // Admin sees all data
       const allPrintJobs = dummyDB.getAllPrintJobs()
       const allLaminationJobs = dummyDB.getAllLaminationJobs()
-      const allPrintBilling = dummyDB.getAllPrintBilling()
-      const allLaminationBilling = dummyDB.getAllLaminationBilling()
       const users = dummyDB.getUsers()
 
       setPrintJobs(allPrintJobs)
       setLaminationJobs(allLaminationJobs)
-      setPrintBilling(allPrintBilling)
-      setLaminationBilling(allLaminationBilling)
       setAllUsers(users)
       setIncome(dummyDB.getFreshIncome())
     } else if (user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
       // Υπεύθυνος users see data for all teams/groups they are responsible for
       const allPrintJobs = dummyDB.getAllPrintJobs()
       const allLaminationJobs = dummyDB.getAllLaminationJobs()
-      const allPrintBilling = dummyDB.getAllPrintBilling()
-      const allLaminationBilling = dummyDB.getAllLaminationBilling()
       const users = dummyDB.getUsers()
 
       setPrintJobs(allPrintJobs)
       setLaminationJobs(allLaminationJobs)
-      setPrintBilling(allPrintBilling)
-      setLaminationBilling(allLaminationBilling)
       setAllUsers(users)
       setIncome(dummyDB.getFreshIncome())
     } else {
       // Regular user sees only their data
       const pJobs = dummyDB.getPrintJobs(user.uid)
       const lJobs = dummyDB.getLaminationJobs(user.uid)
-      const pBilling = dummyDB.getPrintBilling(user.uid)
-      const lBilling = dummyDB.getLaminationBilling(user.uid)
 
       setPrintJobs(pJobs)
       setLaminationJobs(lJobs)
-      setPrintBilling(pBilling)
-      setLaminationBilling(lBilling)
       setIncome(dummyDB.getFreshIncome(user.uid))
     }
   }, [user, refreshTrigger]) // Add refreshTrigger to dependencies
@@ -186,29 +174,25 @@ export default function DashboardPage() {
     userFilter,
     printJobs,
     laminationJobs,
-    printBilling,
-    laminationBilling,
     income,
     // New tab-specific filters
     activeTab,
     printTypeFilter,
     machineFilter,
     laminationTypeFilter,
-    // Billing table filters
-    billingSearchTerm,
-    billingDebtFilter,
-    billingPriceRange,
-    billingAmountFilter,
-    billingRoleFilter,
-    billingResponsibleForFilter,
+    // Income filters
+    incomeSearchTerm,
+    incomeRoleFilter,
+    incomeDateFrom,
+    incomeDateTo,
+    incomeAmountRange,
+    incomeResponsibleForFilter,
   ])
 
   // Reset page on filter change
   useEffect(() => {
     setPrintJobsPage(1)
     setLaminationJobsPage(1)
-    setPrintBillingPage(1)
-    setLaminationBillingPage(1)
   }, [searchTerm, dateFrom, dateTo, statusFilter, typeFilter, deviceFilter, userFilter])
 
   // Auto-set print type filter when Canon B/W, Brother, or Κυδωνιών is selected
@@ -218,157 +202,82 @@ export default function DashboardPage() {
     }
   }, [deviceFilter])
 
-  // Calculate price distribution for billing table filtering
-  const calculateBillingPriceDistribution = () => {
-    const allAmounts: number[] = []
-    
-    printBilling.forEach((billing) => {
-      if (billing.remainingBalance > 0) {
-        allAmounts.push(billing.remainingBalance)
-      }
-    })
-
-    if (allAmounts.length === 0) {
-      return {
-        min: 0,
-        max: 100,
-        distribution: {
-          "0-20": 0,
-          "20-35": 0,
-          "35-90": 0,
-          "90+": 0
-        }
-      }
-    }
-
-    const min = Math.min(...allAmounts)
-    const max = Math.max(...allAmounts)
-    
-    // Create distribution buckets
-    const distribution = {
-      "0-20": allAmounts.filter(amount => amount <= 20).length,
-      "20-35": allAmounts.filter(amount => amount > 20 && amount <= 35).length,
-      "35-90": allAmounts.filter(amount => amount > 35 && amount <= 90).length,
-      "90+": allAmounts.filter(amount => amount > 90).length
-    }
-
-    return { min, max, distribution }
-  }
-
-  const billingPriceDistribution = calculateBillingPriceDistribution()
-
-  // Update billing price range when distribution changes
+  // Reset debt page when debt filters change
   useEffect(() => {
-    setBillingPriceRange([0, billingPriceDistribution.max])
-    setBillingPriceRangeInputs(["0", billingPriceDistribution.max.toString()])
-  }, [billingPriceDistribution.max])
+    setDebtPage(1)
+  }, [debtSearchTerm, debtFilter, amountFilter, priceRange, roleFilter, responsibleForFilter])
+
+  // Reset debt range when role filter changes
+  useEffect(() => {
+    if (allUsers.length > 0) {
+      // Calculate the actual debt range from filtered users based on current role filter
+      const filteredUsers = allUsers.filter(userData => {
+        if (userData.accessLevel === "admin") return false;
+        
+        // Apply role filter
+        if (roleFilter !== "all" && userData.userRole !== roleFilter) {
+          return false;
+        }
+        
+        return true;
+      });
+      
+      const userDebtAmounts = filteredUsers.map(user => user.totalDebt || 0);
+      
+      if (userDebtAmounts.length > 0) {
+        const actualMinDebt = Math.floor(Math.min(...userDebtAmounts));
+        const actualMaxDebt = Math.ceil(Math.max(...userDebtAmounts));
+        
+        // Update the price range inputs with actual values for the selected role
+        setPriceRangeInputs([
+          actualMinDebt.toString(),
+          actualMaxDebt.toString()
+        ]);
+        
+        // Also update the price range state
+        setPriceRange([actualMinDebt, actualMaxDebt]);
+      } else {
+        // Fallback to default values if no users found for the role
+        setPriceRange([0, 100]);
+        setPriceRangeInputs(["0", "100"]);
+      }
+    }
+  }, [roleFilter, allUsers])
+
+  // Reset team filter when role filter changes to Τομέας or Ναός
+  useEffect(() => {
+    if (roleFilter === "Τομέας" || roleFilter === "Ναός") {
+      setTeamFilter("all")
+    }
+  }, [roleFilter])
+
+  // Initialize price range inputs with actual debt range
+  useEffect(() => {
+    if (allUsers.length > 0) {
+      // Calculate the actual debt range from all users
+      const userDebtAmounts = allUsers
+        .filter(userData => userData.accessLevel !== "admin")
+        .map(user => user.totalDebt || 0);
+      
+      if (userDebtAmounts.length > 0) {
+        const actualMinDebt = Math.floor(Math.min(...userDebtAmounts));
+        const actualMaxDebt = Math.ceil(Math.max(...userDebtAmounts));
+        
+        // Update the price range inputs with actual values
+        setPriceRangeInputs([
+          actualMinDebt.toString(),
+          actualMaxDebt.toString()
+        ]);
+        
+        // Also update the price range state
+        setPriceRange([actualMinDebt, actualMaxDebt]);
+      }
+    }
+  }, [allUsers])
+
+
 
   const applyFilters = () => {
-    // Filter Print Billing with billing-specific filters
-    let filteredPB = [...printBilling]
-    
-    // Apply billing search filter
-    if (billingSearchTerm) {
-      filteredPB = filteredPB.filter(
-        (item) =>
-          item.period.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
-          item.userDisplayName.toLowerCase().includes(billingSearchTerm.toLowerCase()),
-      )
-    }
-
-    // Apply billing debt filter
-    if (billingDebtFilter !== "all") {
-      filteredPB = filteredPB.filter((item) => {
-        if (billingDebtFilter === "paid") return item.paid
-        if (billingDebtFilter === "unpaid") return !item.paid
-        return true
-      })
-    }
-
-    // Apply billing price range filter
-    if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
-      filteredPB = filteredPB.filter((item) => {
-        return item.remainingBalance >= billingPriceRange[0] && item.remainingBalance <= billingPriceRange[1]
-      })
-    }
-
-    // Apply billing amount filter
-    if (billingAmountFilter !== "all") {
-      filteredPB = filteredPB.filter((item) => {
-        switch (billingAmountFilter) {
-          case "under10":
-            return item.remainingBalance < 10
-          case "10to50":
-            return item.remainingBalance >= 10 && item.remainingBalance <= 50
-          case "over50":
-            return item.remainingBalance > 50
-          default:
-            return true
-        }
-      })
-    }
-
-    // Apply billing role filter
-    if (billingRoleFilter !== "all") {
-      filteredPB = filteredPB.filter((item) => {
-        const userData = dummyDB.getUserById(item.uid)
-        return userData?.userRole === billingRoleFilter
-      })
-    }
-
-    // Apply base responsibleFor filter for Υπεύθυνος users (always active)
-    if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
-      filteredPB = filteredPB.filter((item) => {
-        const userData = dummyDB.getUserById(item.uid)
-        if (!userData) return false
-        
-        // For individual users, check if they belong to any of the responsibleFor groups
-        if (userData.userRole === "Άτομο") {
-          return userData.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
-        }
-        
-        // For groups, check if the group is in the responsibleFor list
-        return user.responsibleFor?.includes(userData.displayName) || false
-      })
-    }
-
-    // Apply specific responsibleFor filter (when a specific tag is selected)
-    if (billingResponsibleForFilter !== "all" && user?.accessLevel === "Υπεύθυνος") {
-      filteredPB = filteredPB.filter((item) => {
-        const userData = dummyDB.getUserById(item.uid)
-        if (!userData) return false
-        
-        // Check if the user is responsible for this item
-        // For individual users, check if they belong to any of the responsibleFor groups
-        if (userData.userRole === "Άτομο") {
-          return userData.memberOf?.includes(billingResponsibleForFilter) || false
-        }
-        
-        // For groups, check if the group name matches
-        return userData.displayName === billingResponsibleForFilter
-      })
-    }
-
-    // Apply legacy filters for backward compatibility
-    if (searchTerm) {
-      filteredPB = filteredPB.filter(
-        (item) =>
-          item.period.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.userDisplayName.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    }
-    if (statusFilter !== "all") {
-      filteredPB = filteredPB.filter((item) => {
-        if (statusFilter === "paid") return item.paid
-        if (statusFilter === "unpaid") return !item.paid
-        return true
-      })
-    }
-    if (userFilter !== "all") {
-      filteredPB = filteredPB.filter((item) => item.uid === userFilter)
-    }
-    setFilteredPrintBilling(filteredPB)
-
     // Filter Print Jobs with tab-specific filters
     let filteredPJ = [...printJobs]
     if (searchTerm) {
@@ -404,134 +313,29 @@ export default function DashboardPage() {
       filteredPJ = filteredPJ.filter((item) => {
         switch (printTypeFilter) {
           case "a4BW":
-            return item.pagesA4BW > 0
+            return item.type === "A4BW"
           case "a4Color":
-            return item.pagesA4Color > 0
+            return item.type === "A4Color"
           case "a3BW":
-            return item.pagesA3BW > 0
+            return item.type === "A3BW"
           case "a3Color":
-            return item.pagesA3Color > 0
+            return item.type === "A3Color"
           case "rizochartoA3":
-            return item.pagesRizochartoA3 > 0
+            return item.type === "RizochartoA3"
           case "rizochartoA4":
-            return item.pagesRizochartoA4 > 0
+            return item.type === "RizochartoA4"
           case "chartoniA3":
-            return item.pagesChartoniA3 > 0
+            return item.type === "ChartoniA3"
           case "chartoniA4":
-            return item.pagesChartoniA4 > 0
+            return item.type === "ChartoniA4"
           case "autokollito":
-            return item.pagesAutokollito > 0
+            return item.type === "Autokollito"
           default:
             return true
         }
       })
     }
     setFilteredPrintJobs(filteredPJ)
-
-    // Filter Lamination Billing with billing-specific filters
-    let filteredLB = [...laminationBilling]
-    
-    // Apply billing search filter
-    if (billingSearchTerm) {
-      filteredLB = filteredLB.filter(
-        (item) =>
-          item.period.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
-          item.userDisplayName.toLowerCase().includes(billingSearchTerm.toLowerCase()),
-      )
-    }
-
-    // Apply billing debt filter
-    if (billingDebtFilter !== "all") {
-      filteredLB = filteredLB.filter((item) => {
-        if (billingDebtFilter === "paid") return item.paid
-        if (billingDebtFilter === "unpaid") return !item.paid
-        return true
-      })
-    }
-
-    // Apply billing price range filter
-    if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
-      filteredLB = filteredLB.filter((item) => {
-        return item.remainingBalance >= billingPriceRange[0] && item.remainingBalance <= billingPriceRange[1]
-      })
-    }
-
-    // Apply billing amount filter
-    if (billingAmountFilter !== "all") {
-      filteredLB = filteredLB.filter((item) => {
-        switch (billingAmountFilter) {
-          case "under10":
-            return item.remainingBalance < 10
-          case "10to50":
-            return item.remainingBalance >= 10 && item.remainingBalance <= 50
-          case "over50":
-            return item.remainingBalance > 50
-          default:
-            return true
-        }
-      })
-    }
-
-    // Apply billing role filter
-    if (billingRoleFilter !== "all") {
-      filteredLB = filteredLB.filter((item) => {
-        const userData = dummyDB.getUserById(item.uid)
-        return userData?.userRole === billingRoleFilter
-      })
-    }
-
-    // Apply base responsibleFor filter for Υπεύθυνος users (always active)
-    if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
-      filteredLB = filteredLB.filter((item) => {
-        const userData = dummyDB.getUserById(item.uid)
-        if (!userData) return false
-        
-        // For individual users, check if they belong to any of the responsibleFor groups
-        if (userData.userRole === "Άτομο") {
-          return userData.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
-        }
-        
-        // For groups, check if the group is in the responsibleFor list
-        return user.responsibleFor?.includes(userData.displayName) || false
-      })
-    }
-
-    // Apply specific responsibleFor filter (when a specific tag is selected)
-    if (billingResponsibleForFilter !== "all" && user?.accessLevel === "Υπεύθυνος") {
-      filteredLB = filteredLB.filter((item) => {
-        const userData = dummyDB.getUserById(item.uid)
-        if (!userData) return false
-        
-        // Check if the user is responsible for this item
-        // For individual users, check if they belong to any of the responsibleFor groups
-        if (userData.userRole === "Άτομο") {
-          return userData.memberOf?.includes(billingResponsibleForFilter) || false
-        }
-        
-        // For groups, check if the group name matches
-        return userData.displayName === billingResponsibleForFilter
-      })
-    }
-
-    // Apply legacy filters for backward compatibility
-    if (searchTerm) {
-      filteredLB = filteredLB.filter(
-        (item) =>
-          item.period.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.userDisplayName.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    }
-    if (statusFilter !== "all") {
-      filteredLB = filteredLB.filter((item) => {
-        if (statusFilter === "paid") return item.paid
-        if (statusFilter === "unpaid") return !item.paid
-        return true
-      })
-    }
-    if (userFilter !== "all") {
-      filteredLB = filteredLB.filter((item) => item.uid === userFilter)
-    }
-    setFilteredLaminationBilling(filteredLB)
 
     // Filter Lamination Jobs with tab-specific filters
     let filteredLJ = [...laminationJobs]
@@ -585,81 +389,65 @@ export default function DashboardPage() {
     }
     setFilteredLaminationJobs(filteredLJ)
 
-    // Filter Income with billing-specific filters
+    // Filter Income with new income filters
     let filteredInc = [...income]
     
-    // Apply billing search filter
-    if (billingSearchTerm) {
+    // Apply income search filter
+    if (incomeSearchTerm) {
       filteredInc = filteredInc.filter(
         (item) =>
-          item.userDisplayName.toLowerCase().includes(billingSearchTerm.toLowerCase())
+          item.userDisplayName.toLowerCase().includes(incomeSearchTerm.toLowerCase()) ||
+          item.username.toLowerCase().includes(incomeSearchTerm.toLowerCase())
       )
     }
-
-    // Apply billing role filter
-    if (billingRoleFilter !== "all") {
+    
+    // Apply income role filter
+    if (incomeRoleFilter !== "all") {
       filteredInc = filteredInc.filter((item) => {
-        const userData = dummyDB.getUserById(item.uid)
-        return userData?.userRole === billingRoleFilter
+        const userData = allUsers.find(u => u.uid === item.uid);
+        return userData && userData.userRole === incomeRoleFilter;
       })
     }
-
-    // Apply base responsibleFor filter for Υπεύθυνος users (always active)
-    if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
+    
+    // Apply income date filters
+    if (incomeDateFrom) {
       filteredInc = filteredInc.filter((item) => {
-        const userData = dummyDB.getUserById(item.uid)
-        if (!userData) return false
+        const itemDate = new Date(item.timestamp);
+        const fromDate = new Date(incomeDateFrom);
+        return itemDate >= fromDate;
+      })
+    }
+    
+    if (incomeDateTo) {
+      filteredInc = filteredInc.filter((item) => {
+        const itemDate = new Date(item.timestamp);
+        const toDate = new Date(incomeDateTo);
+        return itemDate <= toDate;
+      })
+    }
+    
+    // Apply income amount range filter
+    filteredInc = filteredInc.filter((item) => {
+      const amount = item.amount || 0;
+      return amount >= incomeAmountRange[0] && amount <= incomeAmountRange[1];
+    })
+    
+    // Apply income responsibleFor filter for Υπεύθυνος users
+    if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0 && incomeResponsibleForFilter !== "all") {
+      filteredInc = filteredInc.filter((item) => {
+        const userData = allUsers.find(u => u.uid === item.uid);
+        if (!userData) return false;
         
         // For individual users, check if they belong to any of the responsibleFor groups
         if (userData.userRole === "Άτομο") {
-          return userData.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
-        }
-        
-        // For groups, check if the group is in the responsibleFor list
-        return user.responsibleFor?.includes(userData.displayName) || false
-      })
-    }
-
-    // Apply specific responsibleFor filter (when a specific tag is selected)
-    if (billingResponsibleForFilter !== "all" && user?.accessLevel === "Υπεύθυνος") {
-      filteredInc = filteredInc.filter((item) => {
-        const userData = dummyDB.getUserById(item.uid)
-        if (!userData) return false
-        
-        // Check if the user is responsible for this item
-        // For individual users, check if they belong to any of the responsibleFor groups
-        if (userData.userRole === "Άτομο") {
-          return userData.memberOf?.includes(billingResponsibleForFilter) || false
-        }
-        
-        // For groups, check if the group name matches
-        return userData.displayName === billingResponsibleForFilter
-      })
-    }
-
-    // Apply billing amount filter
-    if (billingAmountFilter !== "all") {
-      filteredInc = filteredInc.filter((item) => {
-        switch (billingAmountFilter) {
-          case "under10":
-            return item.amount < 10
-          case "10to50":
-            return item.amount >= 10 && item.amount <= 50
-          case "over50":
-            return item.amount > 50
-          default:
-            return true
+          return userData.memberOf?.some((group: string) => user.responsibleFor?.includes(group));
+        } else {
+          // For groups, check if the group is in the responsibleFor list
+          return user.responsibleFor?.includes(userData.displayName);
         }
       })
     }
-
-    // Apply billing price range filter
-    if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
-      filteredInc = filteredInc.filter((item) => {
-        return item.amount >= billingPriceRange[0] && item.amount <= billingPriceRange[1]
-      })
-    }
-
+    
     setFilteredIncome(filteredInc)
   }
 
@@ -675,14 +463,73 @@ export default function DashboardPage() {
     setPrintTypeFilter("all")
     setMachineFilter("all")
     setLaminationTypeFilter("all")
-    // Clear billing table filters
-    setBillingSearchTerm("")
-    setBillingDebtFilter("all")
-    setBillingAmountFilter("all")
-    setBillingPriceRange([0, billingPriceDistribution.max])
-    setBillingPriceRangeInputs(["0", billingPriceDistribution.max.toString()])
-    setBillingRoleFilter("all")
-    setBillingResponsibleForFilter("all")
+    // Clear debt filters
+    setDebtSearchTerm("")
+    setDebtFilter("all")
+    setAmountFilter("all")
+    
+    // Reset price range to actual debt range from data
+    if (allUsers.length > 0) {
+      const userDebtAmounts = allUsers
+        .filter(userData => userData.accessLevel !== "admin")
+        .map(user => user.totalDebt || 0);
+      
+      if (userDebtAmounts.length > 0) {
+        const actualMinDebt = Math.floor(Math.min(...userDebtAmounts));
+        const actualMaxDebt = Math.ceil(Math.max(...userDebtAmounts));
+        
+        setPriceRange([actualMinDebt, actualMaxDebt]);
+        setPriceRangeInputs([
+          actualMinDebt.toString(),
+          actualMaxDebt.toString()
+        ]);
+      } else {
+        // Fallback to default values if no debt data
+        setPriceRange([0, 100]);
+        setPriceRangeInputs(["0", "100"]);
+      }
+    } else {
+      // Fallback to default values if no users loaded
+      setPriceRange([0, 100]);
+      setPriceRangeInputs(["0", "100"]);
+    }
+    
+    setRoleFilter("all")
+    setTeamFilter("all")
+    setResponsibleForFilter("all")
+  }
+
+  const clearIncomeFilters = () => {
+    setIncomeSearchTerm("")
+    setIncomeRoleFilter("all")
+    setIncomeDateFrom("")
+    setIncomeDateTo("")
+    
+    // Reset income amount range to actual range from data
+    if (income.length > 0) {
+      const incomeAmounts = income.map(inc => inc.amount || 0);
+      
+      if (incomeAmounts.length > 0) {
+        const actualMinIncome = Math.floor(Math.min(...incomeAmounts));
+        const actualMaxIncome = Math.ceil(Math.max(...incomeAmounts));
+        
+        setIncomeAmountRange([actualMinIncome, actualMaxIncome]);
+        setIncomeAmountInputs([
+          actualMinIncome.toString(),
+          actualMaxIncome.toString()
+        ]);
+      } else {
+        // Fallback to default values if no income data
+        setIncomeAmountRange([0, 100]);
+        setIncomeAmountInputs(["0", "100"]);
+      }
+    } else {
+      // Fallback to default values if no income loaded
+      setIncomeAmountRange([0, 100]);
+      setIncomeAmountInputs(["0", "100"]);
+    }
+    
+    setIncomeResponsibleForFilter("all")
   }
 
   type RGB = string // e.g. "4472C4"
@@ -803,13 +650,7 @@ export default function DashboardPage() {
   const totalLaminationUnpaid = allUsersData.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
 
   // Check if any filters are applied
-  const hasFilters = billingSearchTerm || 
-                    billingDebtFilter !== "all" || 
-                    billingPriceRange[0] !== billingPriceDistribution.min || 
-                    billingPriceRange[1] !== billingPriceDistribution.max ||
-                    billingAmountFilter !== "all" || 
-                    billingRoleFilter !== "all" ||
-                    searchTerm || 
+  const hasFilters = searchTerm || 
                     statusFilter !== "all" || 
                     userFilter !== "all"
 
@@ -827,6 +668,11 @@ export default function DashboardPage() {
   const currentMonthLaminationJobs = laminationJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
   const currentMonthPrintCost = currentMonthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
   const currentMonthLaminationCost = currentMonthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
+  
+  // Calculate current month income
+  const currentMonthIncome = income.filter((inc) => inc.timestamp.toISOString().slice(0, 7) === currentMonth)
+  const currentMonthPrintIncome = currentMonthIncome.reduce((sum, inc) => sum + (inc.amount || 0), 0)
+  const currentMonthLaminationIncome = currentMonthIncome.reduce((sum, inc) => sum + (inc.amount || 0), 0)
 
   const getLaminationTypeLabel = (type: string) => {
     switch (type) {
@@ -872,19 +718,30 @@ export default function DashboardPage() {
 
     filteredPrintJobs.forEach(job => {
       if (job.deviceName === "Canon B/W") {
-        stats.canonBW.a4BW += job.pagesA4BW
-        stats.total += job.pagesA4BW
+        if (job.type === "A4BW") {
+          stats.canonBW.a4BW += job.quantity
+          stats.total += job.quantity
+        }
       } else if (job.deviceName === "Canon Color") {
-        stats.canonColour.a4BW += job.pagesA4BW
-        stats.canonColour.a4Colour += job.pagesA4Color
-        stats.canonColour.a3BW += job.pagesA3BW
-        stats.canonColour.a3Colour += job.pagesA3Color
+        if (job.type === "A4BW") {
+          stats.canonColour.a4BW += job.quantity
+        } else if (job.type === "A4Color") {
+          stats.canonColour.a4Colour += job.quantity
+        } else if (job.type === "A3BW") {
+          stats.canonColour.a3BW += job.quantity
+        } else if (job.type === "A3Color") {
+          stats.canonColour.a3Colour += job.quantity
+        }
       } else if (job.deviceName === "Brother") {
-        stats.brother.a4BW += job.pagesA4BW
-        stats.total += job.pagesA4BW
+        if (job.type === "A4BW") {
+          stats.brother.a4BW += job.quantity
+          stats.total += job.quantity
+        }
       } else if (job.deviceName === "Κυδωνιών") {
-        stats.kydonion.a4BW += job.pagesA4BW
-        stats.total += job.pagesA4BW
+        if (job.type === "A4BW") {
+          stats.kydonion.a4BW += job.quantity
+          stats.total += job.quantity
+        }
       }
     })
 
@@ -966,7 +823,7 @@ export default function DashboardPage() {
       lastPayment: Date | null
     }>()
 
-    // For Υπεύθυνος users, first add all teams they are responsible for (even with zero debt)
+    // For Υπεύθυνος users, first add all teams they are responsible for
     if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
       user.responsibleFor.forEach(teamName => {
         // Find the team entity itself (not its members)
@@ -974,14 +831,22 @@ export default function DashboardPage() {
         
         if (teamEntity) {
           // Apply role filter to team entries
-          if (billingRoleFilter !== "all" && teamEntity.userRole !== billingRoleFilter) {
+          if (roleFilter !== "all" && teamEntity.userRole !== roleFilter) {
             return // Skip this team if it doesn't match the role filter
           }
           
+          // Apply team filter for admin users to team entries
+          if (user?.accessLevel === "admin" && teamFilter !== "all") {
+            // For teams, check if the team name matches the selected team filter
+            if (teamEntity.displayName !== teamFilter) {
+              return // Skip this team if it doesn't match the team filter
+            }
+          }
+          
           // Apply responsibleFor filter to team entries
-          if (billingResponsibleForFilter !== "all") {
+          if (responsibleForFilter !== "all") {
             // For teams, check if the team name matches the selected responsibleFor filter
-            if (teamEntity.displayName !== billingResponsibleForFilter) {
+            if (teamEntity.displayName !== responsibleForFilter) {
               return // Skip this team if it doesn't match the responsibleFor filter
             }
           }
@@ -992,19 +857,19 @@ export default function DashboardPage() {
           const teamTotalDebt = teamEntity.totalDebt || 0
           
           // Apply debt status filter to team entries
-          if (billingDebtFilter !== "all") {
+          if (debtFilter !== "all") {
             const hasUnpaidDebt = (teamPrintDebt > 0) || (teamLaminationDebt > 0)
-            if (billingDebtFilter === "paid" && hasUnpaidDebt) {
+            if (debtFilter === "paid" && hasUnpaidDebt) {
               return // Skip this team if it doesn't match the debt status filter
             }
-            if (billingDebtFilter === "unpaid" && !hasUnpaidDebt) {
+            if (debtFilter === "unpaid" && !hasUnpaidDebt) {
               return // Skip this team if it doesn't match the debt status filter
             }
           }
           
           // Apply amount filter to team entries
-          if (billingAmountFilter !== "all") {
-            switch (billingAmountFilter) {
+          if (amountFilter !== "all") {
+            switch (amountFilter) {
               case "under10":
                 if (teamTotalDebt >= 10) return // Skip this team
                 break
@@ -1018,165 +883,215 @@ export default function DashboardPage() {
           }
           
           // Apply price range filter to team entries
-          if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
-            if (teamTotalDebt < billingPriceRange[0] || teamTotalDebt > billingPriceRange[1]) {
+          if (priceRange[0] !== 0 || priceRange[1] !== 100) {
+            if (teamTotalDebt < priceRange[0] || teamTotalDebt > priceRange[1]) {
               return // Skip this team if it doesn't match the price range filter
             }
           }
           
-          // Find the most recent payment date for this team from its own billing records
-          let lastPayment: Date | null = null
-          const teamPrintBilling = filteredPrintBilling.filter(b => b.uid === teamEntity.uid)
-          const teamLaminationBilling = filteredLaminationBilling.filter(b => b.uid === teamEntity.uid)
-          
-          teamPrintBilling.forEach(billing => {
-            if (billing.lastPayment && (!lastPayment || billing.lastPayment > lastPayment)) {
-              lastPayment = billing.lastPayment
-            }
-          })
-          
-          teamLaminationBilling.forEach(billing => {
-            if (billing.lastPayment && (!lastPayment || billing.lastPayment > lastPayment)) {
-              lastPayment = billing.lastPayment
-            }
-          })
-          
-          // Add team to the map
-          userDebtMap.set(`team-${teamName}`, {
-            uid: `team-${teamName}`,
-            userDisplayName: teamName,
-            userRole: "Ομάδα",
-            responsiblePerson: user.displayName,
-            printDebt: teamPrintDebt,
-            laminationDebt: teamLaminationDebt,
-            totalDebt: teamTotalDebt,
-            lastPayment: lastPayment
-          })
+                // Find the latest income date for this team
+      const teamIncome = income.filter(inc => inc.uid === teamEntity.uid)
+      const latestTeamIncome = teamIncome.length > 0 
+        ? teamIncome.reduce((latest, current) => 
+            current.timestamp > latest.timestamp ? current : latest
+          ).timestamp
+        : null
+
+      // Add team to the map
+      userDebtMap.set(`team-${teamName}`, {
+        uid: `team-${teamName}`,
+        userDisplayName: teamName,
+        userRole: "Ομάδα",
+        responsiblePerson: user.displayName,
+        printDebt: teamPrintDebt,
+        laminationDebt: teamLaminationDebt,
+        totalDebt: teamTotalDebt,
+        lastPayment: latestTeamIncome
+      })
         }
       })
     }
 
-    // Get all users and their debt information (skip team entries that were already added)
-    // Use relevantUsers instead of allUsersData to respect the base filtering for Υπεύθυνος users
+    // Get all users and their debt information
     relevantUsers.forEach(userData => {
       // Skip admin users from the debt table
       if (userData.accessLevel === "admin") return
       
       // Skip if this is a team entry that was already added for Υπεύθυνος users
-      // Note: Since we're now using relevantUsers, this check is less necessary but kept for safety
       if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.includes(userData.displayName) && userData.userRole === "Ομάδα") {
         return
       }
       
-      const responsiblePerson = userData.userRole === "Άτομο" 
-        ? userData.displayName 
-        : userData.responsiblePerson || "-"
+      // Apply search filter
+      if (debtSearchTerm) {
+        const responsiblePerson = userData.userRole === "Άτομο" 
+          ? userData.displayName 
+          : "-";
+        const matchesSearch = userData.displayName.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
+                             userData.userRole.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
+                             responsiblePerson.toLowerCase().includes(debtSearchTerm.toLowerCase());
+        if (!matchesSearch) return
+      }
       
-      // Get user's current debt from their debt fields
+      // Apply role filter
+      if (roleFilter !== "all" && userData.userRole !== roleFilter) {
+        return
+      }
+      
+      // Apply team filter for admin users
+      if (user?.accessLevel === "admin" && teamFilter !== "all") {
+        // For individual users, check if they belong to the selected team
+        if (userData.userRole === "Άτομο") {
+          if (!userData.memberOf?.includes(teamFilter)) {
+            return
+          }
+        } else {
+          // For groups, check if the group name matches the selected team
+          if (userData.displayName !== teamFilter) {
+            return
+          }
+        }
+      }
+      
+      // Apply responsibleFor filter
+      if (responsibleForFilter !== "all") {
+        // For individual users, check if they belong to the selected responsibleFor group
+        if (userData.userRole === "Άτομο") {
+          if (!userData.memberOf?.includes(responsibleForFilter)) {
+            return
+          }
+        } else {
+          // For groups, check if the group matches the selected responsibleFor filter
+          if (userData.displayName !== responsibleForFilter) {
+            return
+          }
+        }
+      }
+      
+      // Function to get dynamic responsible persons for Ομάδα/Ναός/Τομέας
+      const getDynamicResponsiblePersons = (userData: any) => {
+        const responsibleUsers: string[] = []
+        
+        if (userData.userRole === "Ομάδα" || userData.userRole === "Ναός" || userData.userRole === "Τομέας") {
+          const ypefthynoiUsers = allUsersData.filter((user: any) => user.accessLevel === "Υπεύθυνος")
+          
+          ypefthynoiUsers.forEach((ypefthynos: any) => {
+            if (ypefthynos.responsibleFor && ypefthynos.responsibleFor.length > 0) {
+              const isResponsible = ypefthynos.responsibleFor.some((responsibleFor: string) => {
+                return responsibleFor === userData.displayName
+              })
+              
+              if (isResponsible) {
+                responsibleUsers.push(ypefthynos.displayName)
+              }
+            }
+          })
+        }
+        
+        return responsibleUsers
+      }
+
+      // Function to get responsible users for Άτομο users based on their team membership
+      const getResponsibleUsers = (userData: any) => {
+        const responsibleUsers: string[] = []
+        
+        if (userData.userRole === "Άτομο" && userData.memberOf && userData.memberOf.length > 0) {
+          const userTeam = userData.memberOf.find((member: string) => {
+            const teamAccount = allUsersData.find((user: any) => 
+              user.userRole === "Ομάδα" && user.displayName === member
+            )
+            return teamAccount
+          })
+          
+          if (userTeam) {
+            const teamAccount = allUsersData.find((user: any) => 
+              user.userRole === "Ομάδα" && user.displayName === userTeam
+            )
+            
+            if (teamAccount) {
+              const teamResponsiblePersons = getDynamicResponsiblePersons(teamAccount)
+              responsibleUsers.push(...teamResponsiblePersons)
+            }
+          }
+        }
+        
+        return responsibleUsers
+      }
+
+      // Get responsible person based on user role
+      let responsiblePerson = "Δεν έχει ανατεθεί Υπεύθυνος"
+      
+      if ((userData.accessLevel as string) === "Υπεύθυνος") {
+        responsiblePerson = "-"
+      } else if ((userData.accessLevel as string) === "admin") {
+        responsiblePerson = "Διαχειριστής"
+      } else if (userData.userRole === "Άτομο") {
+        const responsibleUsers = getResponsibleUsers(userData)
+        responsiblePerson = responsibleUsers.length > 0 ? responsibleUsers.join(", ") : "Δεν έχει ανατεθεί Υπεύθυνος"
+      } else if (userData.userRole === "Ομάδα" || userData.userRole === "Ναός" || userData.userRole === "Τομέας") {
+        const responsibleUsers = getDynamicResponsiblePersons(userData)
+        responsiblePerson = responsibleUsers.length > 0 ? responsibleUsers.join(", ") : "Δεν έχει ανατεθεί Υπεύθυνος"
+      } else {
+        // For any other cases, show the default message
+        responsiblePerson = "Δεν έχει ανατεθεί Υπεύθυνος"
+      }
+      
       const printDebt = userData.printDebt || 0
       const laminationDebt = userData.laminationDebt || 0
       const totalDebt = userData.totalDebt || 0
       
-      // Find the most recent payment date from billing records
-      let lastPayment: Date | null = null
-      
-      const userPrintBilling = filteredPrintBilling.filter(b => b.uid === userData.uid)
-      const userLaminationBilling = filteredLaminationBilling.filter(b => b.uid === userData.uid)
-      
-      // Check print billing for last payment
-      userPrintBilling.forEach(billing => {
-        if (billing.lastPayment && (!lastPayment || billing.lastPayment > lastPayment)) {
-          lastPayment = billing.lastPayment
-        }
-      })
-      
-      // Check lamination billing for last payment
-      userLaminationBilling.forEach(billing => {
-        if (billing.lastPayment && (!lastPayment || billing.lastPayment > lastPayment)) {
-          lastPayment = billing.lastPayment
-        }
-      })
-      
-      // Apply billing filters to determine if this user should be included
-      let shouldInclude = true
-      
-      // Apply search filter
-      if (billingSearchTerm) {
-        const matchesSearch = userData.displayName.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
-                             userData.userRole.toLowerCase().includes(billingSearchTerm.toLowerCase()) ||
-                             responsiblePerson.toLowerCase().includes(billingSearchTerm.toLowerCase())
-        if (!matchesSearch) shouldInclude = false
-      }
-      
-      // Apply role filter
-      if (billingRoleFilter !== "all" && userData.userRole !== billingRoleFilter) {
-        shouldInclude = false
-      }
-      
-      // Note: Base responsibleFor filtering is already handled by relevantUsers
-      // This section is kept for the specific responsibleFor filter (when a specific tag is selected)
-      
-      // Apply debt status filter (check if user has any unpaid debt)
-      if (billingDebtFilter !== "all") {
+      // Apply debt status filter
+      if (debtFilter !== "all") {
         const hasUnpaidDebt = (printDebt > 0) || (laminationDebt > 0)
-        if (billingDebtFilter === "paid" && hasUnpaidDebt) {
-          shouldInclude = false
+        if (debtFilter === "paid" && hasUnpaidDebt) {
+          return // Skip this user if it doesn't match the debt status filter
         }
-        if (billingDebtFilter === "unpaid" && !hasUnpaidDebt) {
-          shouldInclude = false
+        if (debtFilter === "unpaid" && !hasUnpaidDebt) {
+          return // Skip this user if it doesn't match the debt status filter
         }
       }
       
       // Apply amount filter
-      if (billingAmountFilter !== "all") {
-        switch (billingAmountFilter) {
+      if (amountFilter !== "all") {
+        switch (amountFilter) {
           case "under10":
-            if (totalDebt >= 10) shouldInclude = false
+            if (totalDebt >= 10) return // Skip this user
             break
           case "10to50":
-            if (totalDebt < 10 || totalDebt > 50) shouldInclude = false
+            if (totalDebt < 10 || totalDebt > 50) return // Skip this user
             break
           case "over50":
-            if (totalDebt <= 50) shouldInclude = false
+            if (totalDebt <= 50) return // Skip this user
             break
         }
       }
       
       // Apply price range filter
-      if (billingPriceRange[0] !== billingPriceDistribution.min || billingPriceRange[1] !== billingPriceDistribution.max) {
-        if (totalDebt < billingPriceRange[0] || totalDebt > billingPriceRange[1]) {
-          shouldInclude = false
+      if (priceRange[0] !== 0 || priceRange[1] !== 100) {
+        if (totalDebt < priceRange[0] || totalDebt > priceRange[1]) {
+          return // Skip this user if it doesn't match the price range filter
         }
       }
       
-      // Apply responsibleFor filter (only for Υπεύθυνος users)
-      if (billingResponsibleForFilter !== "all" && user?.accessLevel === "Υπεύθυνος") {
-        // Check if the user is responsible for this item
-        // For individual users, check if they belong to any of the responsibleFor groups
-        if (userData.userRole === "Άτομο") {
-          if (!userData.memberOf?.includes(billingResponsibleForFilter)) {
-            shouldInclude = false
-          }
-        } else {
-          // For groups, check if the group name matches
-          if (userData.displayName !== billingResponsibleForFilter) {
-            shouldInclude = false
-          }
-        }
-      }
-      
-      if (shouldInclude) {
-        userDebtMap.set(userData.uid, {
-          uid: userData.uid,
-          userDisplayName: userData.displayName,
-          userRole: userData.userRole,
-          responsiblePerson: responsiblePerson,
-          printDebt: printDebt,
-          laminationDebt: laminationDebt,
-          totalDebt: totalDebt,
-          lastPayment: lastPayment
-        })
-      }
+      // Find the latest income date for this user
+      const userIncome = income.filter(inc => inc.uid === userData.uid)
+      const latestUserIncome = userIncome.length > 0 
+        ? userIncome.reduce((latest, current) => 
+            current.timestamp > latest.timestamp ? current : latest
+          ).timestamp
+        : null
+
+      // Add user to the map
+      userDebtMap.set(userData.uid, {
+        uid: userData.uid,
+        userDisplayName: userData.displayName,
+        userRole: userData.userRole,
+        responsiblePerson: responsiblePerson,
+        printDebt: printDebt,
+        laminationDebt: laminationDebt,
+        totalDebt: totalDebt,
+        lastPayment: latestUserIncome
+      })
     })
 
     return Array.from(userDebtMap.values())
@@ -1208,7 +1123,7 @@ export default function DashboardPage() {
                 <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
                   <div className="flex items-center gap-3">
                     <Receipt className="h-8 w-8 text-yellow-700" />
-                    <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Χρέους/Πίστωσης</h3>
+                    <h3 className="text-lg font-semibold text-yellow-900">Σύνολο Χρέους</h3>
                   </div>
                 </div>
                 <div className={`p-6 flex-1 flex ${hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "admin" ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
@@ -1224,17 +1139,26 @@ export default function DashboardPage() {
               {/* Print Debts Card - Blue Theme */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
                 <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
-                  <div className="flex items-center gap-3">
-                    <Printer className="h-6 w-6 text-blue-700" />
-                    <h3 className="text-lg font-semibold text-blue-900">Χρέος/Πίστωση ΤΟ. ΦΩ.</h3>
+                  <div className="flex items-center">
+                    <Printer className="h-6 w-6 text-blue-700 mr-3" />
+                    <div className="text-center flex-1">
+                      <div className="text-lg font-semibold text-blue-900">ΤΟ. ΦΩ.</div>
+                      <div className="text-sm font-medium text-blue-800">Χρέος|Έσοδα</div>
+                    </div>
                   </div>
                 </div>
-                <div className={`p-6 flex-1 flex ${hasFilters && printUnpaidPercentage < 100 && user.accessLevel === "admin" ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
-                  <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-blue-600' : printUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                    {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
+                <div className="p-6">
+                  <div className="flex justify-between items-center">
+                    <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-blue-600' : printUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                      {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
+                    </div>
+                    <Separator orientation="vertical" className="mx-4 h-12" />
+                    <div className="text-2xl font-bold text-green-600">
+                      {formatPrice(currentMonthPrintIncome)}
+                    </div>
                   </div>
                   {hasFilters && printUnpaidPercentage < 100 && user.accessLevel === "admin" && (
-                    <div className="text-sm text-gray-500 pb-0.5">({printUnpaidPercentage.toFixed(1)}% του {formatPrice(totalPrintUnpaid)})</div>
+                    <div className="text-sm text-gray-500 mt-3">({printUnpaidPercentage.toFixed(1)}% του {formatPrice(totalPrintUnpaid)})</div>
                   )}
                 </div>
               </div>
@@ -1242,45 +1166,54 @@ export default function DashboardPage() {
               {/* Lamination Debts Card - Green Theme */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
                 <div className="bg-green-100 px-6 py-4 border-b border-green-200">
-                  <div className="flex items-center gap-3">
-                    <CreditCard className="h-6 w-6 text-green-700" />
-                    <h3 className="text-lg font-semibold text-green-900">Χρέος/Πίστωση ΠΛΑ. ΤΟ.</h3>
+                  <div className="flex items-center">
+                    <CreditCard className="h-6 w-6 text-green-700 mr-3" />
+                    <div className="text-center flex-1">
+                      <div className="text-lg font-semibold text-green-900">ΠΛΑ. ΤΟ.</div>
+                      <div className="text-sm font-medium text-green-800">Χρέος|Έσοδα</div>
+                    </div>
                   </div>
                 </div>
-                <div className={`p-6 flex-1 flex ${hasFilters && laminationUnpaidPercentage < 100 && user.accessLevel === "admin" ? 'justify-start gap-4 items-end' : 'justify-start items-center'}`}>
-                  <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-green-600' : laminationUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                    {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
+                <div className="p-6">
+                  <div className="flex justify-between items-center">
+                    <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-green-600' : laminationUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                      {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
+                    </div>
+                    <Separator orientation="vertical" className="mx-4 h-12" />
+                    <div className="text-2xl font-bold text-green-600">
+                      {formatPrice(currentMonthLaminationIncome)}
+                    </div>
                   </div>
                   {hasFilters && laminationUnpaidPercentage < 100 && user.accessLevel === "admin" && (
-                    <div className="text-sm text-gray-500 pb-0.5">({laminationUnpaidPercentage.toFixed(1)}% του {formatPrice(totalLaminationUnpaid)})</div>
+                    <div className="text-sm text-gray-500 mt-3">({laminationUnpaidPercentage.toFixed(1)}% του {formatPrice(totalLaminationUnpaid)})</div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Two Column Layout: Filters on Left, Tables on Right */}
+            {/* Debt Section */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-              {/* Left Column: Filters */}
+              {/* Left Column: Debt Filters */}
               <div className="lg:col-span-1">
-                <div className="sticky top-6 space-y-6">
-                  {/* Billing Filters */}
-                  <BillingFilters
-                    billingSearchTerm={billingSearchTerm}
-                    setBillingSearchTerm={setBillingSearchTerm}
-                    billingDebtFilter={billingDebtFilter}
-                    setBillingDebtFilter={setBillingDebtFilter}
-                    billingAmountFilter={billingAmountFilter}
-                    setBillingAmountFilter={setBillingAmountFilter}
-                    billingPriceRange={billingPriceRange}
-                    setBillingPriceRange={setBillingPriceRange}
-                    billingPriceRangeInputs={billingPriceRangeInputs}
-                    setBillingPriceRangeInputs={setBillingPriceRangeInputs}
-                    billingRoleFilter={billingRoleFilter}
-                    setBillingRoleFilter={setBillingRoleFilter}
-                    billingResponsibleForFilter={billingResponsibleForFilter}
-                    setBillingResponsibleForFilter={setBillingResponsibleForFilter}
-                    billingPriceDistribution={billingPriceDistribution}
-                    printBilling={printBilling}
+                <div className="h-full">
+                  <DebtFilters
+                    debtSearchTerm={debtSearchTerm}
+                    setDebtSearchTerm={setDebtSearchTerm}
+                    debtFilter={debtFilter}
+                    setDebtFilter={setDebtFilter}
+                    amountFilter={amountFilter}
+                    setAmountFilter={setAmountFilter}
+                    priceRange={priceRange}
+                    setPriceRange={setPriceRange}
+                    priceRangeInputs={priceRangeInputs}
+                    setPriceRangeInputs={setPriceRangeInputs}
+                    roleFilter={roleFilter}
+                    setRoleFilter={setRoleFilter}
+                    teamFilter={teamFilter}
+                    setTeamFilter={setTeamFilter}
+                    responsibleForFilter={responsibleForFilter}
+                    setResponsibleForFilter={setResponsibleForFilter}
+                    priceDistribution={{ min: 0, max: 100 }}
                     users={dummyDB.getUsers()}
                     clearFilters={clearFilters}
                     combinedDebtData={combinedDebtData}
@@ -1288,8 +1221,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Right Column: Tables */}
-              <div className="lg:col-span-3 space-y-6">
+              {/* Right Column: Debt Table */}
+              <div className="lg:col-span-3">
                 {/* Consolidated Table Card */}
                 <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden">
                   <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
@@ -1297,11 +1230,11 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-3">
                         <BarChart3 className="h-6 w-6 text-yellow-700" />
                         <div>
-                          <h3 className="text-lg font-semibold text-yellow-900">Συγκεντρωτικός Πίνακας Χρέους/Πίστωσης</h3>
+                          <h3 className="text-lg font-semibold text-yellow-900">Συγκεντρωτικός Πίνακας Χρέους</h3>
                           <p className="text-sm text-yellow-700">Συγκεντρωμένα δεδομένα χρεώσεων, πληρωμών και πιστώσεων</p>
                         </div>
                       </div>
-                      {user.accessLevel === "admin" && (
+                      {(user.accessLevel === "admin" || user.accessLevel === "Υπεύθυνος") && (
                         <Button
                           onClick={() =>
                             exportTableXLSX(
@@ -1318,10 +1251,10 @@ export default function DashboardPage() {
                                 { key: "userDisplayName", label: "Όνομα" },
                                 { key: "responsiblePerson", label: "Υπεύθυνος" },
                                 { key: "currentDebt", label: "Τρέχον Χρέος/Πίστωση (ΤΟ. ΦΩ. | ΠΛΑ. ΤΟ. | Σύνολο)" },
-                                { key: "lastPayment", label: "Τελευταία Εξόφληση" }
+                                { key: "lastPayment", label: "Τελευταία Πληρωμή" }
                               ],
                               "EAB308",
-                              "Συγκεντρωτικός Πίνακας Χρέους/Πίστωσης"
+                              "Συγκεντρωτικός Πίνακας Χρέους"
                             )
                           }
                           variant="outline"
@@ -1336,18 +1269,51 @@ export default function DashboardPage() {
                   </div>
                   
                   <div className="p-6">
-                    <CombinedDebtTable
+                    <DebtTable
                       data={combinedDebtData}
-                      page={printBillingPage}
+                      page={debtPage}
                       pageSize={PAGE_SIZE}
-                      onPageChange={setPrintBillingPage}
+                      onPageChange={setDebtPage}
                       userRole={user.accessLevel}
                       onRowHover={setHoveredPrintJob}
                     />
                   </div>
                 </div>
 
-                {/* Income Table */}
+
+              </div>
+            </div>
+
+            {/* Income Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+              {/* Left Column: Income Filters */}
+              <div className="lg:col-span-1">
+                <div className="h-full">
+                  <IncomeFilters
+                    incomeSearchTerm={incomeSearchTerm}
+                    setIncomeSearchTerm={setIncomeSearchTerm}
+                    incomeRoleFilter={incomeRoleFilter}
+                    setIncomeRoleFilter={setIncomeRoleFilter}
+                    incomeDateFrom={incomeDateFrom}
+                    setIncomeDateFrom={setIncomeDateFrom}
+                    incomeDateTo={incomeDateTo}
+                    setIncomeDateTo={setIncomeDateTo}
+                    incomeAmountRange={incomeAmountRange}
+                    setIncomeAmountRange={setIncomeAmountRange}
+                    incomeAmountInputs={incomeAmountInputs}
+                    setIncomeAmountInputs={setIncomeAmountInputs}
+                    incomeResponsibleForFilter={incomeResponsibleForFilter}
+                    setIncomeResponsibleForFilter={setIncomeResponsibleForFilter}
+                    incomeData={income}
+                    users={dummyDB.getUsers()}
+                    clearIncomeFilters={clearIncomeFilters}
+                  />
+                </div>
+              </div>
+
+              {/* Right Column: Income Table */}
+              <div className="lg:col-span-3">
+                {/* Income Table Card */}
                 <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden">
                   <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
                     <div className="flex justify-between items-center">
@@ -1358,33 +1324,33 @@ export default function DashboardPage() {
                           <p className="text-sm text-yellow-700">Ιστορικό εσόδων από πληρωμές</p>
                         </div>
                       </div>
-                                        {user.accessLevel === "admin" && (
-                    <Button
-                      onClick={() =>
-                        exportTableXLSX(
-                          filteredIncome.map((incomeRecord) => ({
-                            timestamp: incomeRecord.timestamp.toLocaleDateString("el-GR"),
-                            userDisplayName: incomeRecord.userDisplayName,
-                            amount: formatPrice(incomeRecord.amount),
-                          })),
-                          "income_history",
-                          [
-                            { key: "timestamp", label: "Ημερομηνία" },
-                            { key: "userDisplayName", label: "Χρήστης" },
-                            { key: "amount", label: "Ποσό" }
-                          ],
-                          "EAB308",
-                          "Έσοδα"
-                        )
-                      }
-                      variant="outline"
-                      size="sm"
-                      className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Εξαγωγή XLSX
-                    </Button>
-                  )}
+                      {(user.accessLevel === "admin" || user.accessLevel === "Υπεύθυνος") && (
+                        <Button
+                          onClick={() =>
+                            exportTableXLSX(
+                              filteredIncome.map((incomeRecord) => ({
+                                timestamp: incomeRecord.timestamp.toLocaleDateString("el-GR"),
+                                userDisplayName: incomeRecord.userDisplayName,
+                                amount: formatPrice(incomeRecord.amount),
+                              })),
+                              "income_history",
+                              [
+                                { key: "timestamp", label: "Ημερομηνία" },
+                                { key: "userDisplayName", label: "Χρήστης" },
+                                { key: "amount", label: "Ποσό" }
+                              ],
+                              "EAB308",
+                              "Έσοδα"
+                            )
+                          }
+                          variant="outline"
+                          size="sm"
+                          className="bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Εξαγωγή XLSX
+                        </Button>
+                      )}
                     </div>
                   </div>
                   
@@ -1461,125 +1427,34 @@ export default function DashboardPage() {
                                 <p className="text-sm text-blue-700">Λεπτομερές ιστορικό όλων των εκτυπώσεων</p>
                               </div>
                             </div>
-                            {user.accessLevel === "admin" && (
+                            {(user.accessLevel === "admin" || user.accessLevel === "Υπεύθυνος") && (
                               <Button
                                 onClick={() => {
-                                  // Helper function to expand a print job into individual rows
-                                  const expandPrintJob = (job: any) => {
-                                    const rows = []
-                                    
-                                    if (job.pagesA4BW > 0) {
-                                      rows.push({
-                                        timestamp: job.timestamp.toLocaleString("el-GR"),
-                                        uid: job.uid,
-                                        userDisplayName: job.userDisplayName,
-                                        deviceName: job.deviceName,
-                                        printType: "A4 Ασπρόμαυρο",
-                                        quantity: job.pagesA4BW,
-                                        cost: formatPrice(job.pagesA4BW * 0.05)
-                                      })
+                                  // Helper function to get print type label
+                                  const getPrintTypeLabel = (type: string) => {
+                                    switch (type) {
+                                      case "A4BW": return "A4 Ασπρόμαυρο"
+                                      case "A4Color": return "A4 Έγχρωμο"
+                                      case "A3BW": return "A3 Ασπρόμαυρο"
+                                      case "A3Color": return "A3 Έγχρωμο"
+                                      case "RizochartoA3": return "Ριζόχαρτο A3"
+                                      case "RizochartoA4": return "Ριζόχαρτο A4"
+                                      case "ChartoniA3": return "Χαρτόνι A3"
+                                      case "ChartoniA4": return "Χαρτόνι A4"
+                                      case "Autokollito": return "Αυτοκόλλητο"
+                                      default: return type
                                     }
-                                    
-                                    if (job.pagesA4Color > 0) {
-                                      rows.push({
-                                        timestamp: job.timestamp.toLocaleString("el-GR"),
-                                        uid: job.uid,
-                                        userDisplayName: job.userDisplayName,
-                                        deviceName: job.deviceName,
-                                        printType: "A4 Έγχρωμο",
-                                        quantity: job.pagesA4Color,
-                                        cost: formatPrice(job.pagesA4Color * 0.20)
-                                      })
-                                    }
-                                    
-                                    if (job.pagesA3BW > 0) {
-                                      rows.push({
-                                        timestamp: job.timestamp.toLocaleString("el-GR"),
-                                        uid: job.uid,
-                                        userDisplayName: job.userDisplayName,
-                                        deviceName: job.deviceName,
-                                        printType: "A3 Ασπρόμαυρο",
-                                        quantity: job.pagesA3BW,
-                                        cost: formatPrice(job.pagesA3BW * 0.10)
-                                      })
-                                    }
-                                    
-                                    if (job.pagesA3Color > 0) {
-                                      rows.push({
-                                        timestamp: job.timestamp.toLocaleString("el-GR"),
-                                        uid: job.uid,
-                                        userDisplayName: job.userDisplayName,
-                                        deviceName: job.deviceName,
-                                        printType: "A3 Έγχρωμο",
-                                        quantity: job.pagesA3Color,
-                                        cost: formatPrice(job.pagesA3Color * 0.40)
-                                      })
-                                    }
-                                    
-                                    if (job.pagesRizochartoA3 > 0) {
-                                      rows.push({
-                                        timestamp: job.timestamp.toLocaleString("el-GR"),
-                                        uid: job.uid,
-                                        userDisplayName: job.userDisplayName,
-                                        deviceName: job.deviceName,
-                                        printType: "Ριζόχαρτο A3",
-                                        quantity: job.pagesRizochartoA3,
-                                        cost: formatPrice(job.pagesRizochartoA3 * 0.10)
-                                      })
-                                    }
-                                    
-                                    if (job.pagesRizochartoA4 > 0) {
-                                      rows.push({
-                                        timestamp: job.timestamp.toLocaleString("el-GR"),
-                                        uid: job.uid,
-                                        userDisplayName: job.userDisplayName,
-                                        deviceName: job.deviceName,
-                                        printType: "Ριζόχαρτο A4",
-                                        quantity: job.pagesRizochartoA4,
-                                        cost: formatPrice(job.pagesRizochartoA4 * 0.10)
-                                      })
-                                    }
-                                    
-                                    if (job.pagesChartoniA3 > 0) {
-                                      rows.push({
-                                        timestamp: job.timestamp.toLocaleString("el-GR"),
-                                        uid: job.uid,
-                                        userDisplayName: job.userDisplayName,
-                                        deviceName: job.deviceName,
-                                        printType: "Χαρτόνι A3",
-                                        quantity: job.pagesChartoniA3,
-                                        cost: formatPrice(job.pagesChartoniA3 * 0.10)
-                                      })
-                                    }
-                                    
-                                    if (job.pagesChartoniA4 > 0) {
-                                      rows.push({
-                                        timestamp: job.timestamp.toLocaleString("el-GR"),
-                                        uid: job.uid,
-                                        userDisplayName: job.userDisplayName,
-                                        deviceName: job.deviceName,
-                                        printType: "Χαρτόνι A4",
-                                        quantity: job.pagesChartoniA4,
-                                        cost: formatPrice(job.pagesChartoniA4 * 0.10)
-                                      })
-                                    }
-                                    
-                                    if (job.pagesAutokollito > 0) {
-                                      rows.push({
-                                        timestamp: job.timestamp.toLocaleString("el-GR"),
-                                        uid: job.uid,
-                                        userDisplayName: job.userDisplayName,
-                                        deviceName: job.deviceName,
-                                        printType: "Αυτοκόλλητο",
-                                        quantity: job.pagesAutokollito,
-                                        cost: formatPrice(job.pagesAutokollito * 0.10)
-                                      })
-                                    }
-                                    
-                                    return rows
                                   }
-
-                                  const expandedData = filteredPrintJobs.flatMap(expandPrintJob)
+                                  
+                                  const expandedData = filteredPrintJobs.map(job => ({
+                                    timestamp: job.timestamp.toLocaleString("el-GR"),
+                                    uid: job.uid,
+                                    userDisplayName: job.userDisplayName,
+                                    deviceName: job.deviceName,
+                                    printType: getPrintTypeLabel(job.type),
+                                    quantity: job.quantity,
+                                    cost: formatPrice(job.totalCost)
+                                  }))
                                   
                                   exportTableXLSX(
                                     expandedData,
@@ -1817,7 +1692,7 @@ export default function DashboardPage() {
                                 <p className="text-sm text-green-700">Ιστορικό καταχωρημένων πλαστικοποιήσεων</p>
                               </div>
                             </div>
-                            {user.accessLevel === "admin" && (
+                            {(user.accessLevel === "admin" || user.accessLevel === "Υπεύθυνος") && (
                               <Button
                                 onClick={() =>
                                   exportTableXLSX(

@@ -176,8 +176,38 @@ export const getDynamicFilterOptions = (users: any[]) => {
     }
   })
 
+  // Define the specific order for teams
+  const teamOrder = [
+    "Ενωμένοι",
+    "Σποριάδες", 
+    "Καρποφόροι",
+    "Ολόφωτοι",
+    "Νικητές",
+    "Νικηφόροι",
+    "Φλόγα",
+    "Σύμψυχοι"
+  ]
+
+  // Sort teams according to the predefined order, with any additional teams at the end
+  const sortedTeams = Array.from(teams).sort((a, b) => {
+    const aIndex = teamOrder.indexOf(a)
+    const bIndex = teamOrder.indexOf(b)
+    
+    // If both teams are in the predefined order, sort by their position
+    if (aIndex !== -1 && bIndex !== -1) {
+      return aIndex - bIndex
+    }
+    
+    // If only one team is in the predefined order, prioritize it
+    if (aIndex !== -1) return -1
+    if (bIndex !== -1) return 1
+    
+    // If neither team is in the predefined order, sort alphabetically
+    return a.localeCompare(b)
+  })
+
   return {
-    teams: Array.from(teams).sort(),
+    teams: sortedTeams,
     naoi: Array.from(naoi).sort(),
     tomeis: Array.from(tomeis).sort()
   }

@@ -13,7 +13,7 @@ const CombinedDebtColGroup = () => (
     <col style={{ minWidth: "120px" }} />
     <col style={{ minWidth: "150px" }} />
     <col style={{ minWidth: "150px" }} />
-    <col style={{ minWidth: "200px" }} />
+    <col style={{ minWidth: "140px" }} />
     <col style={{ minWidth: "180px" }} />
   </colgroup>
 )
@@ -29,7 +29,7 @@ interface CombinedDebtData {
   lastPayment: Date | null
 }
 
-interface CombinedDebtTableProps {
+interface DebtTableProps {
   data: CombinedDebtData[]
   page: number
   pageSize: number
@@ -38,7 +38,7 @@ interface CombinedDebtTableProps {
   onRowHover?: (hoveredJob: { deviceName: string; printType: string } | null) => void
 }
 
-export default function CombinedDebtTable({ data, page, pageSize, onPageChange, userRole, onRowHover }: CombinedDebtTableProps) {
+export default function DebtTable({ data, page, pageSize, onPageChange, userRole, onRowHover }: DebtTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
   const [sortedData, setSortedData] = useState(data)
 
@@ -141,7 +141,6 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
             >
               <div className="text-center">
                 <div>Τρέχον Χρέος</div>
-                <div className="text-xs font-normal text-gray-600">ΤΟ. ΦΩ. | ΠΛΑ. ΤΟ. | Σύνολο</div>
               </div>
             </SortableTableHeader>
             <SortableTableHeader
@@ -150,7 +149,7 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
               onSort={handleSort}
               className="whitespace-nowrap text-center"
             >
-              Τελευταία Εξόφληση
+              Τελευταία Πληρωμή
             </SortableTableHeader>
           </TableRow>
         </TableHeader>
@@ -181,17 +180,7 @@ export default function CombinedDebtTable({ data, page, pageSize, onPageChange, 
                   <TableCell className={`text-center ${item.totalDebt > 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"}`}>
                     <div className="text-center">
                       <div className="text-sm">
-                        <span className={`${item.printDebt > 0 ? "text-red-600" : "text-green-600"} font-normal`}>
-                          {item.printDebt > 0 ? formatPrice(item.printDebt) : item.printDebt < 0 ? `-${formatPrice(Math.abs(item.printDebt))}` : formatPrice(item.printDebt)}
-                        </span>
-                        {" | "}
-                        <span className={`${item.laminationDebt > 0 ? "text-red-600" : "text-green-600"} font-normal`}>
-                          {item.laminationDebt > 0 ? formatPrice(item.laminationDebt) : item.laminationDebt < 0 ? `-${formatPrice(Math.abs(item.laminationDebt))}` : formatPrice(item.laminationDebt)}
-                        </span>
-                        {" | "}
-                        <span className={`${item.totalDebt > 0 ? "text-red-600" : "text-green-600"} font-bold`}>
-                          {item.totalDebt > 0 ? formatPrice(item.totalDebt) : item.totalDebt < 0 ? `-${formatPrice(Math.abs(item.totalDebt))}` : formatPrice(item.totalDebt)}
-                        </span>
+                        {item.totalDebt > 0 ? formatPrice(item.totalDebt) : item.totalDebt < 0 ? `-${formatPrice(Math.abs(item.totalDebt))}` : formatPrice(item.totalDebt)}
                       </div>
                     </div>
                   </TableCell>

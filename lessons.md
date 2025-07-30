@@ -1,5 +1,300 @@
 # Development Lessons & Solutions
 
+## Dashboard UI Fixes (December 2024)
+
+### Duplicate Income Table Removal and Yellow Color Theme
+
+**Problem**: The dashboard had two identical income tables - one in the "Debt Section" and another in the "Income Section". Additionally, the income filters and table were using green colors instead of the requested yellow theme.
+
+**Requirements**:
+- Remove the duplicate income table from the "Debt Section"
+- Change income filters and table colors from green to yellow
+- Maintain all existing functionality
+- Keep the income table in the "Income Section" only
+
+**Solution**: Removed duplicate table and updated color scheme to yellow theme.
+
+**Changes Made**:
+
+**1. Removed Duplicate Income Table (`app/dashboard/page.tsx`)**:
+- Removed the income table from the "Debt Section" (around line 1000-1100)
+- Kept only the income table in the "Income Section" (around line 1200-1300)
+- Maintained all export functionality and data display
+
+**2. Updated Income Filters Colors (`components/income-filters.tsx`)**:
+- Changed border colors from green to yellow (`border-green-200` → `border-yellow-200`)
+- Updated background colors (`bg-green-100` → `bg-yellow-100`)
+- Changed icon colors (`text-green-700` → `text-yellow-700`)
+- Updated button colors (`bg-green-400` → `bg-yellow-400`, `border-green-500` → `border-yellow-500`)
+- Changed focus states (`focus:border-green-500` → `focus:border-yellow-500`)
+- Updated slider colors (`bg-green-400` → `bg-yellow-400`, `border-green-500` → `border-yellow-500`)
+- **Enhanced**: Replaced regular date inputs with GreekDatePicker component for better UX and Greek date formatting
+
+**3. Updated Income Table Colors (`components/income-table.tsx`)**:
+- Changed amount text color from green to yellow (`text-green-600` → `text-yellow-600`)
+- Maintained hover state with yellow theme (`hover:bg-yellow-50`)
+- **Updated**: Changed amount text color back to green (`text-yellow-600` → `text-green-600`) for better visibility
+
+**4. Updated Dashboard Income Section Colors (`app/dashboard/page.tsx`)**:
+- Changed income table card border and background colors to yellow
+- Updated button colors to match yellow theme
+- Maintained consistent styling throughout
+
+**Key Benefits**:
+- **Cleaner UI**: Removed duplicate table for better user experience
+- **Consistent Theme**: Income section now uses yellow colors as requested
+- **Better Organization**: Income table is now only in the dedicated "Income Section"
+- **Better Visibility**: Amount values use green color for better readability
+- **Improved Layout**: Filters are now full height and not sticky for better UX
+- **Enhanced Date Selection**: GreekDatePicker provides better UX with Greek date formatting and calendar interface
+- **Maintained Functionality**: All features work exactly the same
+
+**Technical Implementation**:
+- Removed duplicate JSX code for income table
+- Updated all color classes from green to yellow variants
+- Maintained all existing functionality and data flow
+- Preserved export functionality and filtering
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Removed duplicate income table, updated colors, and removed sticky positioning from filters
+- `components/income-filters.tsx` - Updated all green colors to yellow
+- `components/income-table.tsx` - Updated amount text color to green for better visibility
+
+**Testing Considerations**:
+- Verify only one income table is displayed
+- Verify income table is in the correct "Income Section"
+- Verify all yellow colors are applied correctly
+- Verify all filtering functionality still works
+- Verify export functionality still works
+- Verify responsive design is maintained
+- Test with different user access levels
+
+**Result**: Dashboard now has a single income table in the "Income Section" with a consistent yellow color theme, providing a cleaner and more organized user interface.
+
+## Filter System Fixes (December 2024)
+
+### Comprehensive Filter Implementation for All Tables
+
+**Problem**: The filters for debt/income tables, print jobs table, and lamination jobs table were not working properly. Specifically:
+- Debt and income filters were defined but not applied to the `combinedDebtData`
+- Missing debt status and amount filters in the UI
+- Debt filter states were not being cleared properly
+- Print jobs table filtering was working but could be improved
+- Lamination jobs table filtering was working but could be improved
+
+**Requirements**:
+- Implement comprehensive filtering for debt and income tables
+- Add missing debt status and amount filters to the UI
+- Ensure all filter states are properly cleared
+- Verify print jobs table filters work correctly
+- Verify lamination jobs table filters work correctly
+- Add proper useEffect dependencies for filter recalculation
+
+**Solution**: Implemented comprehensive filtering system with proper state management and UI components.
+
+**Changes Made**:
+
+**1. Updated calculateCombinedDebtData Function (`app/dashboard/page.tsx`)**:
+- Added comprehensive filtering logic for all debt filter states
+- Applied search filter to user display name, role, and responsible person
+- Applied role filter to both individual users and team entries
+- Applied responsibleFor filter for Υπεύθυνος users
+- Applied debt status filter (paid/unpaid) based on debt amounts
+- Applied amount filter (under10, 10to50, over50) based on total debt
+- Applied price range filter using the slider values
+- Added proper filtering for team entries in Υπεύθυνος user view
+
+**2. Added Missing UI Filters (`components/debt-income-filters.tsx`)**:
+- Added debt status filter dropdown (paid/unpaid)
+- Added amount filter dropdown (under10, 10to50, over50)
+- Maintained consistent styling with yellow theme
+- Added proper labels and Greek translations
+
+**3. Updated clearFilters Function (`app/dashboard/page.tsx`)**:
+- Added clearing of all debt filter states
+- Ensured all filter states are reset to default values
+- Maintained existing functionality for other filters
+
+**4. Added Filter Dependencies (`app/dashboard/page.tsx`)**:
+- Added useEffect to reset debt page when debt filters change
+- Ensured proper recalculation of filtered data
+- Maintained existing pagination behavior
+
+**5. Fixed TypeScript Issues**:
+- Removed reference to non-existent `responsiblePerson` property
+- Used proper fallback values for missing properties
+- Maintained type safety throughout the filtering logic
+
+**Key Benefits**:
+- **Complete Filtering**: All debt and income filters now work properly
+- **Better UX**: Users can filter by debt status, amount ranges, and other criteria
+- **Consistent Behavior**: All tables now have proper filtering functionality
+- **Proper State Management**: All filter states are properly managed and cleared
+- **Type Safety**: Fixed TypeScript errors and maintained type safety
+
+**Technical Implementation**:
+- Comprehensive filtering logic in `calculateCombinedDebtData` function
+- Proper UI components for all filter types
+- Consistent state management across all filter types
+- Proper useEffect dependencies for filter recalculation
+- Type-safe implementation with proper error handling
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Updated calculateCombinedDebtData function and clearFilters
+- `components/debt-income-filters.tsx` - Added missing debt status and amount filters
+
+**Testing Considerations**:
+- Verify debt status filter works correctly (paid/unpaid)
+- Verify amount filter works correctly (under10, 10to50, over50)
+- Verify search filter works for all fields
+- Verify role filter works for all user types
+- Verify responsibleFor filter works for Υπεύθυνος users
+- Verify price range filter works with slider and radio buttons
+- Verify all filters can be cleared properly
+- Verify print jobs table filters work correctly
+- Verify lamination jobs table filters work correctly
+- Test with different user access levels (admin, Υπεύθυνος, user)
+
+**Result**: All filters for debt/income tables, print jobs table, and lamination jobs table now work properly, providing users with comprehensive filtering capabilities and a better user experience.
+
+## Latest Major Refactoring (December 2024)
+
+### PrintJob Structure Refactoring and Billing System Removal
+
+**Problem**: The PrintJob interface was using individual page fields (pagesA4BW, pagesA4Color, etc.) which made the data model complex and inconsistent with LaminationJob. Additionally, the separate billing system (PrintBilling, LaminationBilling) was redundant since debt tracking could be done directly on User objects.
+
+**Requirements**:
+- Simplify PrintJob structure to match LaminationJob pattern
+- Remove redundant billing system
+- Use direct debt tracking on User objects
+- Maintain all existing functionality
+- Update all components to work with new structure
+
+**Solution**: Complete refactoring of PrintJob interface and removal of billing system.
+
+**Changes Made**:
+
+**1. Updated PrintJob Interface (`lib/dummy-database.ts`)**:
+```typescript
+// OLD STRUCTURE
+export interface PrintJob {
+  jobId: string
+  uid: string
+  username: string
+  userDisplayName: string
+  pagesA4BW: number
+  pagesA4Color: number
+  pagesA3BW: number
+  pagesA3Color: number
+  pagesRizochartoA3: number
+  pagesRizochartoA4: number
+  pagesChartoniA3: number
+  pagesChartoniA4: number
+  pagesAutokollito: number
+  deviceIP: string
+  deviceName: string
+  timestamp: Date
+  costA4BW: number
+  costA4Color: number
+  costA3BW: number
+  costA3Color: number
+  costRizochartoA3: number
+  costRizochartoA4: number
+  costChartoniA3: number
+  costChartoniA4: number
+  costAutokollito: number
+  totalCost: number
+  status: "completed" | "pending" | "failed"
+}
+
+// NEW STRUCTURE
+export interface PrintJob {
+  jobId: string
+  uid: string
+  username: string
+  userDisplayName: string
+  type: "A4BW" | "A4Color" | "A3BW" | "A3Color" | "RizochartoA3" | "RizochartoA4" | "ChartoniA3" | "ChartoniA4" | "Autokollito"
+  quantity: number
+  pricePerUnit: number
+  totalCost: number
+  deviceIP: string
+  deviceName: string
+  timestamp: Date
+  status: "completed" | "pending" | "failed"
+}
+```
+
+**2. Removed Billing Interfaces**:
+- Completely removed `PrintBilling` interface
+- Completely removed `LaminationBilling` interface
+- Removed all billing-related methods from DummyDatabase class
+
+**3. Updated Components**:
+- **PrintJobsTable**: Updated to work with new structure
+  - Removed `expandPrintJob` function that used individual page properties
+  - Added `getPrintTypeLabel` function to convert type codes to Greek labels
+  - Added `convertPrintJobToDisplay` function for new structure
+  - Updated filtering logic to work with `type` field
+  - Changed from `flatMap` to `map` since each job now represents one row
+- **DebtIncomeFilters**: Renamed from BillingFilters
+  - Updated all prop names (billingSearchTerm → debtSearchTerm, etc.)
+  - Updated internal logic to work with new structure
+- **Dashboard**: Removed all billing-related state and logic
+  - Simplified `calculateCombinedDebtData` function
+  - Updated export functionality
+  - Removed billing-related state variables
+
+**4. Type Code Mapping**:
+```typescript
+const getPrintTypeLabel = (type: string) => {
+  switch (type) {
+    case "A4BW": return "A4 Ασπρόμαυρο"
+    case "A4Color": return "A4 Έγχρωμο"
+    case "A3BW": return "A3 Ασπρόμαυρο"
+    case "A3Color": return "A3 Έγχρωμο"
+    case "RizochartoA3": return "Ριζόχαρτο A3"
+    case "RizochartoA4": return "Ριζόχαρτο A4"
+    case "ChartoniA3": return "Χαρτόνι A3"
+    case "ChartoniA4": return "Χαρτόνι A4"
+    case "Autokollito": return "Αυτοκόλλητο"
+    default: return type
+  }
+}
+```
+
+**5. Removed Files**:
+- `components/print-billing-table.tsx` (deleted)
+- `components/lamination-billing-table.tsx` (deleted)
+- `app/printing/page.tsx` (deleted)
+- `app/lamination/page.tsx` (deleted)
+
+**6. Renamed Files**:
+- `components/billing-filters.tsx` → `components/debt-income-filters.tsx`
+
+**Key Benefits**:
+- **Simplified Data Model**: PrintJob now matches LaminationJob structure
+- **Reduced Complexity**: Removed redundant billing system
+- **Direct Debt Tracking**: Using User object fields for debt management
+- **Consistent Interface**: All job types now use the same pattern
+- **Better Maintainability**: Fewer interfaces and less complex logic
+
+**Files Modified**:
+- `lib/dummy-database.ts` - Updated PrintJob interface and removed billing system
+- `components/print-jobs-table.tsx` - Updated for new structure
+- `components/debt-income-filters.tsx` - Renamed and updated
+- `app/dashboard/page.tsx` - Removed billing logic and updated components
+- `filestructure.md` - Updated documentation
+- `lessons.md` - Added this documentation
+
+**Testing Considerations**:
+- Verify print jobs display correctly with new structure
+- Verify filtering works with new type-based system
+- Verify export functionality works with new structure
+- Verify debt calculations work correctly
+- Verify all user roles can access appropriate data
+
+**Result**: Successfully refactored PrintJob structure and removed billing system while maintaining all functionality. The application now has a cleaner, more consistent data model.
+
 ## Recent Lessons & Improvements (December 2024)
 
 ### Missing Users in Consolidated Debt Table (December 2024)
@@ -5817,9 +6112,7 @@ const generateChartData = () => {
 - `components/searchable-select.tsx` - Used in admin page
 - `components/history-filter.tsx` - Used in printing and lamination pages
 - `components/print-jobs-table.tsx` - Dynamically imported in dashboard
-- `components/print-billing-table.tsx` - Dynamically imported in dashboard
 - `components/lamination-jobs-table.tsx` - Dynamically imported in dashboard
-- `components/lamination-billing-table.tsx` - Dynamically imported in dashboard
 - `components/usage-chart.tsx` - Dynamically imported in dashboard
 - `components/admin-users-tab.tsx` - Used in admin page
 
@@ -6839,9 +7132,7 @@ interface PrintJobsTableProps {
 
 **Tables Updated**:
 - Print Jobs Table (`components/print-jobs-table.tsx`)
-- Print Billing Table (`components/print-billing-table.tsx`)
 - Lamination Jobs Table (`components/lamination-jobs-table.tsx`)
-- Lamination Billing Table (`components/lamination-billing-table.tsx`)
 
 **UI/UX Features**:
 - **Hover Effects**: Headers show hover state with background color change
@@ -7396,3 +7687,55 @@ function PrintJobsColGroup({ userRole }: { userRole: string }) {
 - Verify clicking clear button removes search text
 - Verify clear button works on mobile devices
 - Verify clear button maintains proper styling across different themes
+
+### XLSX Export Access Extension for Υπεύθυνος Users (December 2024)
+
+**Problem**: The XLSX export functionality was restricted to only admin users, but users with "Υπεύθυνος" (responsible) access level also needed the ability to export data for their teams and areas of responsibility.
+
+**Solution**: Extended the XLSX export functionality to allow both admin and Υπεύθυνος users to export data, while maintaining the restriction for regular users.
+
+**Changes Made**:
+
+**Dashboard Page (`app/dashboard/page.tsx`)**:
+- **Before**: All export buttons were restricted with `user.accessLevel === "admin"`
+- **After**: Export buttons now allow both admin and Υπεύθυνος users with `(user.accessLevel === "admin" || user.accessLevel === "Υπεύθυνος")`
+
+**Specific Export Functions Updated**:
+1. **Combined Debt Table Export**: Allows Υπεύθυνος users to export debt/credit data for their responsible teams
+2. **Income History Export**: Allows Υπεύθυνος users to export income data for their areas of responsibility
+3. **Print Jobs Export**: Allows Υπεύθυνος users to export print job history for their teams
+4. **Lamination Jobs Export**: Allows Υπεύθυνος users to export lamination job history for their teams
+
+**Technical Implementation**:
+- **Conditional Logic**: Updated all export button visibility conditions from single admin check to admin OR Υπεύθυνος check
+- **Consistent Pattern**: Applied the same pattern across all export buttons: `{(user.accessLevel === "admin" || user.accessLevel === "Υπεύθυνος") && (...)}`
+- **No Functionality Changes**: Export logic itself remains unchanged, only access control was modified
+- **Data Scope**: Υπεύθυνος users can only export data for teams/areas they are responsible for (existing data filtering logic handles this)
+
+**Key Benefits**:
+- **Enhanced Role Functionality**: Υπεύθυνος users can now perform data exports for their teams
+- **Improved Workflow**: Team leaders can generate reports without needing admin assistance
+- **Maintained Security**: Regular users still cannot access export functionality
+- **Consistent Access Control**: Aligns with existing role-based data access patterns
+
+**Files Modified**:
+- `app/dashboard/page.tsx` - Updated export button access conditions for all four export functions
+
+**Access Control Summary**:
+- **Admin Users**: Full access to all export functionality (unchanged)
+- **Υπεύθυνος Users**: Access to export functionality for their responsible teams/areas (new)
+- **Regular Users**: No access to export functionality (unchanged)
+
+**Testing Considerations**:
+- Verify admin users can still access all export functionality
+- Verify Υπεύθυνος users can see and use export buttons
+- Verify Υπεύθυνος users can only export data for their responsible teams
+- Verify regular users cannot see export buttons
+- Verify all export formats and data remain correct
+- Verify export functionality works with existing filters and data scope
+
+**Future Considerations**:
+- Consider adding audit logging for export actions by Υπεύθυνος users
+- Implement export permission granularity if needed for specific data types
+- Add user feedback when export is not available
+- Consider role-based export format restrictions if needed
