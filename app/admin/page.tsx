@@ -34,10 +34,11 @@ export default function AdminPage() {
   const [roleFilter, setRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Ναός, Τομέας
   const [teamFilter, setTeamFilter] = useState("all") // all, Ενωμένοι, Σποριάδες, etc.
   const [selectedUser, setSelectedUser] = useState("")
+  const [selectedPrinter, setSelectedPrinter] = useState("Canon Color")
   const [laminationType, setLaminationType] = useState<"A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover">("A4")
   const [printingType, setPrintingType] = useState<"A4BW" | "A4Color" | "A3BW" | "A3Color" | "RizochartoA3" | "RizochartoA4" | "ChartoniA3" | "ChartoniA4" | "Autokollito">("A4BW")
   const [quantity, setQuantity] = useState("1")
-  const [selectedDate, setSelectedDate] = useState("")
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(false)
   const [newUser, setNewUser] = useState({
     username: "",
@@ -49,6 +50,41 @@ export default function AdminPage() {
     responsibleFor: [] as string[],
   })
   const [showPassword, setShowPassword] = useState(false)
+
+  // Printer configuration
+  const printerOptions = [
+    { value: "Canon Color", label: "Canon Color", ip: "192.168.1.100" },
+    { value: "Canon B/W", label: "Canon B/W", ip: "192.168.1.101" },
+    { value: "Brother", label: "Brother", ip: "192.168.1.102" },
+    { value: "Κυδωνιών", label: "Κυδωνιών", ip: "192.168.1.103" }
+  ]
+
+  // Printers that only support A4BW
+  const a4BWOnlyPrinters = ["Canon B/W", "Brother", "Κυδωνιών"]
+
+  // Get available print types based on selected printer
+  const getAvailablePrintTypes = () => {
+    if (a4BWOnlyPrinters.includes(selectedPrinter)) {
+      return ["A4BW"]
+    }
+    return ["A4BW", "A4Color", "A3BW", "A3Color", "RizochartoA3", "RizochartoA4", "ChartoniA3", "ChartoniA4", "Autokollito"]
+  }
+
+  // Helper function to map print type to price table property name
+  const getPricePropertyName = (printType: string): string => {
+    const priceMap: { [key: string]: string } = {
+      "A4BW": "a4BW",
+      "A4Color": "a4Color", 
+      "A3BW": "a3BW",
+      "A3Color": "a3Color",
+      "RizochartoA3": "rizochartoA3",
+      "RizochartoA4": "rizochartoA4",
+      "ChartoniA3": "chartoniA3",
+      "ChartoniA4": "chartoniA4",
+      "Autokollito": "autokollito"
+    }
+    return priceMap[printType] || printType
+  }
 
   // Debt reduction state
   const [debtReductionUser, setDebtReductionUser] = useState("")
@@ -138,6 +174,18 @@ export default function AdminPage() {
     setFilteredUsers(filtered)
   }, [usersTabSearchTerm, roleFilter, teamFilter, users])
 
+  // Auto-set printing type to A4BW when selecting a restricted printer
+  useEffect(() => {
+    if (a4BWOnlyPrinters.includes(selectedPrinter) && printingType !== "A4BW") {
+      setPrintingType("A4BW")
+    }
+  }, [selectedPrinter, printingType])
+
+  // Set initial date to today when component mounts
+  useEffect(() => {
+    setSelectedDate(new Date().toISOString().split('T')[0])
+  }, [])
+
   const laminationPrices = dummyDB.getPriceTable("lamination")?.prices || {}
   const printingPrices = dummyDB.getPriceTable("printing")?.prices || {}
 
@@ -156,9 +204,10 @@ export default function AdminPage() {
       const selectedUserData = users.find((u) => u.uid === selectedUser)
       if (!selectedUserData) return
 
-      const pricePerUnit = printingPrices[printingType] || 0
+      const pricePerUnit = printingPrices[getPricePropertyName(printingType)] || 0
       const totalCost = multiplyMoney(pricePerUnit, Number.parseInt(quantity))
 
+      const selectedPrinterData = printerOptions.find(p => p.value === selectedPrinter)
       const newJob: PrintJob = {
         jobId: `print-job-${Date.now()}`,
         uid: selectedUser,
@@ -168,8 +217,8 @@ export default function AdminPage() {
         quantity: Number.parseInt(quantity),
         pricePerUnit,
         totalCost,
-        deviceIP: "192.168.1.100",
-        deviceName: "Admin Printer",
+        deviceIP: selectedPrinterData?.ip || "192.168.1.100",
+        deviceName: selectedPrinter,
         timestamp: new Date(selectedDate),
         status: "completed",
       }
@@ -590,7 +639,7 @@ export default function AdminPage() {
     setSelectedUser("")
     setLaminationType("A4")
     setQuantity("1")
-    setSelectedDate("")
+    setSelectedDate(new Date().toISOString().split('T')[0])
   }
 
   const handleTestToasts = () => {
@@ -701,9 +750,10 @@ export default function AdminPage() {
                           onClick={() => {
                             // Reset printing form
                             setSelectedUser("")
+                            setSelectedPrinter("Canon Color")
                             setPrintingType("A4BW")
                             setQuantity("1")
-                            setSelectedDate("")
+                            setSelectedDate(new Date().toISOString().split('T')[0])
                           }}
                         >
                           <RotateCcw className="h-4 w-4 text-blue-600" />
@@ -741,26 +791,63 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* Row 2: Type, Quantity */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Row 2: Printer, Type, Quantity */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
-                        <Label htmlFor="type" className="text-gray-700">Τύπος Εκτύπωσης</Label>
-                        <Select value={printingType} onValueChange={(value: any) => setPrintingType(value)}>
+                        <Label htmlFor="printer" className="text-gray-700">Εκτυπωτής</Label>
+                        <Select value={selectedPrinter} onValueChange={setSelectedPrinter}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="A4BW">A4 Ασπρόμαυρο ({formatPrice(printingPrices.A4BW)})</SelectItem>
-                            <SelectItem value="A4Color">A4 Έγχρωμο ({formatPrice(printingPrices.A4Color)})</SelectItem>
-                            <SelectItem value="A3BW">A3 Ασπρόμαυρο ({formatPrice(printingPrices.A3BW)})</SelectItem>
-                            <SelectItem value="A3Color">A3 Έγχρωμο ({formatPrice(printingPrices.A3Color)})</SelectItem>
-                            <SelectItem value="RizochartoA3">Ριζόχαρτο A3 ({formatPrice(printingPrices.RizochartoA3)})</SelectItem>
-                            <SelectItem value="RizochartoA4">Ριζόχαρτο A4 ({formatPrice(printingPrices.RizochartoA4)})</SelectItem>
-                            <SelectItem value="ChartoniA3">Χαρτόνι A3 ({formatPrice(printingPrices.ChartoniA3)})</SelectItem>
-                            <SelectItem value="ChartoniA4">Χαρτόνι A4 ({formatPrice(printingPrices.ChartoniA4)})</SelectItem>
-                            <SelectItem value="Autokollito">Αυτοκόλλητο ({formatPrice(printingPrices.Autokollito)})</SelectItem>
+                            {printerOptions.map((printer) => (
+                              <SelectItem key={printer.value} value={printer.value}>
+                                {printer.label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="type" className="text-gray-700">Τύπος Εκτύπωσης</Label>
+                        <Select 
+                          value={printingType} 
+                          onValueChange={(value: any) => setPrintingType(value)}
+                          disabled={a4BWOnlyPrinters.includes(selectedPrinter)}
+                        >
+                          <SelectTrigger className={a4BWOnlyPrinters.includes(selectedPrinter) ? "bg-gray-100 text-gray-500" : ""}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                                             {getAvailablePrintTypes().map((type) => {
+                   const isDisabled = a4BWOnlyPrinters.includes(selectedPrinter) && type !== "A4BW"
+                   return (
+                     <SelectItem
+                       key={type}
+                       value={type}
+                       disabled={isDisabled}
+                       className={isDisabled ? "text-gray-400" : ""}
+                     >
+                       {type === "A4BW" && `A4 Ασπρόμαυρο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                       {type === "A4Color" && `A4 Έγχρωμο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                       {type === "A3BW" && `A3 Ασπρόμαυρο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                       {type === "A3Color" && `A3 Έγχρωμο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                       {type === "RizochartoA3" && `Ριζόχαρτο A3 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                       {type === "RizochartoA4" && `Ριζόχαρτο A4 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                       {type === "ChartoniA3" && `Χαρτόνι A3 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                       {type === "ChartoniA4" && `Χαρτόνι A4 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                       {type === "Autokollito" && `Αυτοκόλλητο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                     </SelectItem>
+                   )
+                 })}
+                          </SelectContent>
+                        </Select>
+                        {a4BWOnlyPrinters.includes(selectedPrinter) && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Αυτός ο εκτυπωτής υποστηρίζει μόνο A4 Ασπρόμαυρο
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -779,7 +866,7 @@ export default function AdminPage() {
                     <div className="text-center">
                       <Label className="text-gray-700">Συνολικό Κόστος</Label>
                       <div className="text-2xl font-bold text-blue-600">
-                        {formatPrice((printingPrices[printingType] || 0) * Number.parseInt(quantity || "0"))}
+                        {formatPrice((printingPrices[getPricePropertyName(printingType)] || 0) * Number.parseInt(quantity || "0"))}
                       </div>
                     </div>
 
@@ -921,7 +1008,7 @@ export default function AdminPage() {
                           onClick={() => {
                             setDebtReductionUser("")
                             setDebtReductionAmount("")
-                            setDebtReductionDate("")
+                            setDebtReductionDate(new Date().toISOString().split('T')[0])
                           }}
                         >
                           <RotateCcw className="h-4 w-4 text-yellow-600" />

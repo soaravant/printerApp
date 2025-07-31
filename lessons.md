@@ -1,5 +1,210 @@
 # Development Lessons & Solutions
 
+## Date Initialization Fix for Printing Tab (December 2024)
+
+### Set Default Date to Today in Admin Printing Form
+
+**Problem**: The date field in the "Χρέωση ΤΟ. ΦΩ." (Printing Charge) tab was initially empty, requiring users to manually select today's date every time they wanted to add a printing job.
+
+**Requirements**:
+- Set the initial and default date to today's date when the form loads
+- Make the reset button reset the date back to today's date
+- Ensure the date is always set to today when the component mounts
+
+**Solution**: Updated the date state initialization and reset logic to use today's date.
+
+**Changes Made**:
+
+**1. Updated Date State Initialization (`app/admin/page.tsx`)**:
+```typescript
+// Before
+const [selectedDate, setSelectedDate] = useState("")
+
+// After  
+const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+```
+
+**2. Updated Reset Button Logic**:
+```typescript
+// Before
+setSelectedDate("")
+
+// After
+setSelectedDate(new Date().toISOString().split('T')[0])
+```
+
+**3. Added useEffect for Component Mount**:
+```typescript
+// Set initial date to today when component mounts
+useEffect(() => {
+  setSelectedDate(new Date().toISOString().split('T')[0])
+}, [])
+```
+
+**Key Benefits**:
+- **Better UX**: Users don't need to manually select today's date every time
+- **Consistent Default**: Date is always set to today when the form loads
+- **Proper Reset**: Reset button returns the form to a sensible default state
+- **Automatic Initialization**: Date is set automatically when component mounts
+
+**Technical Implementation**:
+- Uses `new Date().toISOString().split('T')[0]` to get today's date in YYYY-MM-DD format
+- Applied to both initial state and reset logic
+- Added useEffect with empty dependency array to ensure it runs only on mount
+- Follows the same pattern used in debt reduction date field
+
+**Files Modified**:
+- `app/admin/page.tsx` - Updated date state initialization, reset logic, and added useEffect
+
+**Testing Considerations**:
+- Verify date field shows today's date when form loads
+- Verify reset button sets date back to today
+- Verify date format is correct (YYYY-MM-DD)
+- Test across different timezones if needed
+- Verify date persists correctly when switching between tabs
+
+**Result**: The printing form now automatically defaults to today's date, improving user experience and reducing manual input requirements.
+
+## Date Initialization Fix for Lamination and Debt Reduction Tabs (December 2024)
+
+### Consistent Date Reset Logic Across All Admin Tabs
+
+**Problem**: The "Χρέωση ΠΛΑ. ΤΟ." (Lamination) and "Ξεχρέωση" (Debt Reduction) tabs had inconsistent date reset behavior compared to the "Χρέωση ΤΟ. ΦΩ." (Printing) tab. Their reset buttons were clearing the date field instead of resetting to today's date.
+
+**Requirements**:
+- Make all three tabs (Printing, Lamination, Debt Reduction) use the same date reset logic
+- Ensure reset buttons set the date back to today's date instead of clearing it
+- Maintain consistency across the admin interface
+
+**Solution**: Updated the reset logic for both lamination and debt reduction tabs to match the printing tab's behavior.
+
+**Changes Made**:
+
+**1. Updated Lamination Form Reset Function (`app/admin/page.tsx`)**:
+```typescript
+// Before
+const handleResetLaminationForm = () => {
+  setSelectedUser("")
+  setLaminationType("A4")
+  setQuantity("1")
+  setSelectedDate("")  // Was clearing the date
+}
+
+// After
+const handleResetLaminationForm = () => {
+  setSelectedUser("")
+  setLaminationType("A4")
+  setQuantity("1")
+  setSelectedDate(new Date().toISOString().split('T')[0])  // Now resets to today
+}
+```
+
+**2. Updated Debt Reduction Reset Button Logic**:
+```typescript
+// Before
+onClick={() => {
+  setDebtReductionUser("")
+  setDebtReductionAmount("")
+  setDebtReductionDate("")  // Was clearing the date
+}}
+
+// After
+onClick={() => {
+  setDebtReductionUser("")
+  setDebtReductionAmount("")
+  setDebtReductionDate(new Date().toISOString().split('T')[0])  // Now resets to today
+}}
+```
+
+**Key Benefits**:
+- **Consistent UX**: All three tabs now behave the same way when reset
+- **Better Default State**: Reset returns forms to a sensible default instead of empty state
+- **Reduced User Friction**: Users don't need to manually set the date after reset
+- **Unified Interface**: All admin tabs follow the same design patterns
+
+**Technical Implementation**:
+- Uses the same `new Date().toISOString().split('T')[0]` pattern as the printing tab
+- Applied to both lamination form reset function and debt reduction inline reset
+- Maintains existing state initialization (both tabs already initialized to today's date)
+- No changes needed to useEffect hooks since they were already properly configured
+
+**Files Modified**:
+- `app/admin/page.tsx` - Updated `handleResetLaminationForm` function and debt reduction reset button
+
+**Testing Considerations**:
+- Verify lamination tab reset sets date to today
+- Verify debt reduction tab reset sets date to today
+- Verify all three tabs have consistent reset behavior
+- Test that date format remains correct (YYYY-MM-DD)
+- Verify reset doesn't affect other form fields incorrectly
+
+**Result**: All admin tabs now have consistent date reset behavior, with reset buttons setting the date back to today's date instead of clearing it.
+
+## Price Display Fix for Printing Tab (December 2024)
+
+### Critical Fix for Incorrect Price Display in Admin Printing Tab
+
+**Problem**: The prices shown in the "Χρέωση ΤΟ. ΦΩ." (Printing Charge) tab were displaying as 0 or incorrect values. This was caused by a mismatch between the property names used in the admin page and the actual price table structure.
+
+**Root Cause**: The admin page was using uppercase property names (e.g., `A4BW`, `A4Color`) to access the price table, but the actual price table uses lowercase property names (e.g., `a4BW`, `a4Color`).
+
+**Solution**: Created a mapping function to convert between the uppercase type names used in the UI and the lowercase property names used in the price table.
+
+**Changes Made**:
+
+**1. Added Price Mapping Helper Function (`app/admin/page.tsx`)**:
+```typescript
+const getPricePropertyName = (printType: string): string => {
+  const priceMap: { [key: string]: string } = {
+    "A4BW": "a4BW",
+    "A4Color": "a4Color", 
+    "A3BW": "a3BW",
+    "A3Color": "a3Color",
+    "RizochartoA3": "rizochartoA3",
+    "RizochartoA4": "rizochartoA4",
+    "ChartoniA3": "chartoniA3",
+    "ChartoniA4": "chartoniA4",
+    "Autokollito": "autokollito"
+  }
+  return priceMap[printType] || printType
+}
+```
+
+**2. Updated SelectItem Price Display**:
+- Changed from direct property access to using the mapping function
+- Example: `printingPrices.A4BW` → `printingPrices[getPricePropertyName(type)]`
+
+**3. Updated Total Cost Calculation**:
+- Fixed the total cost display to use the correct price mapping
+- Updated both the UI display and the `handleAddPrinting` function
+
+**4. Updated Price Per Unit Calculation**:
+- Fixed the `pricePerUnit` calculation in `handleAddPrinting` to use the mapping function
+
+**Key Benefits**:
+- **Correct Price Display**: All prices now show the correct values from the price table
+- **Consistent Mapping**: Single source of truth for type-to-price mapping
+- **Maintainable Code**: Easy to update if price table structure changes
+- **Type Safety**: Maintains TypeScript type safety while handling the mapping
+
+**Technical Implementation**:
+- Mapping function converts uppercase UI type names to lowercase price table property names
+- Applied to all price-related calculations and displays
+- Maintains backward compatibility with existing type definitions
+- Handles edge cases with fallback to original type name
+
+**Files Modified**:
+- `app/admin/page.tsx` - Added mapping function and updated all price references
+
+**Testing Considerations**:
+- Verify all print types show correct prices in the dropdown
+- Verify total cost calculation is accurate
+- Verify job creation uses correct price per unit
+- Test with all printer types and print type combinations
+- Verify prices match those shown in the prices page
+
+**Result**: The printing tab now displays correct prices for all print types, and the total cost calculation is accurate.
+
 ## Debt Reduction Logic and Bank System Implementation (December 2024)
 
 ### New Debt Reduction Logic and Bank Tracking System
