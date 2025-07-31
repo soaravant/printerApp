@@ -1204,12 +1204,9 @@ export default function DashboardPage() {
                       {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
                     </div>
                     {user.accessLevel === "admin" && (
-                      <>
-                        <Separator orientation="vertical" className="mx-4 h-12" />
-                        <div className="text-2xl font-bold text-green-600">
-                          {formatPrice(totalBank)}
-                        </div>
-                      </>
+                      <div className="text-2xl font-bold text-green-600">
+                        {formatPrice(totalBank)}
+                      </div>
                     )}
                   </div>
                   {hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "admin" && (
@@ -1272,12 +1269,9 @@ export default function DashboardPage() {
                       {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
                     </div>
                     {user.accessLevel === "admin" && (
-                      <>
-                        <Separator orientation="vertical" className="mx-4 h-12" />
-                        <div className="text-2xl font-bold text-green-600">
-                          {formatPrice(printBank)}
-                        </div>
-                      </>
+                      <div className="text-2xl font-bold text-green-600">
+                        {formatPrice(printBank)}
+                      </div>
                     )}
                   </div>
                   {hasFilters && printUnpaidPercentage < 100 && user.accessLevel === "admin" && (
@@ -1340,12 +1334,9 @@ export default function DashboardPage() {
                       {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
                     </div>
                     {user.accessLevel === "admin" && (
-                      <>
-                        <Separator orientation="vertical" className="mx-4 h-12" />
-                        <div className="text-2xl font-bold text-green-600">
-                          {formatPrice(laminationBank)}
-                        </div>
-                      </>
+                      <div className="text-2xl font-bold text-green-600">
+                        {formatPrice(laminationBank)}
+                      </div>
                     )}
                   </div>
                   {hasFilters && laminationUnpaidPercentage < 100 && user.accessLevel === "admin" && (

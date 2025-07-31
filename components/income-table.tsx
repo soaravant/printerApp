@@ -52,7 +52,7 @@ export default function IncomeTable({
               sortKey="username"
               currentSort={sortConfig}
               onSort={handleSort}
-              className="text-center"
+              className="text-center w-1/4"
             >
               Χρήστης
             </SortableTableHeader>
@@ -60,7 +60,7 @@ export default function IncomeTable({
               sortKey="userDisplayName"
               currentSort={sortConfig}
               onSort={handleSort}
-              className="text-center"
+              className="text-center w-1/4"
             >
               Όνομα
             </SortableTableHeader>
@@ -68,7 +68,7 @@ export default function IncomeTable({
               sortKey="amount"
               currentSort={sortConfig}
               onSort={handleSort}
-              className="text-center"
+              className="text-center w-1/4"
             >
               Ποσό
             </SortableTableHeader>
@@ -76,7 +76,7 @@ export default function IncomeTable({
               sortKey="timestamp"
               currentSort={sortConfig}
               onSort={handleSort}
-              className="text-center"
+              className="text-center w-1/4"
             >
               Ημερομηνία
             </SortableTableHeader>
@@ -85,7 +85,7 @@ export default function IncomeTable({
       </Table>
 
       {/* Scrollable body only */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className={`${userRole === "Υπεύθυνος" ? "max-h-[500px]" : "max-h-[400px]"} overflow-y-auto`}>
         <Table className="min-w-full">
           <TableBody>
             {paginatedData.length === 0 ? (
@@ -97,12 +97,12 @@ export default function IncomeTable({
             ) : (
               paginatedData.map((income) => (
                 <TableRow key={income.incomeId} className="hover:bg-yellow-50 cursor-pointer transition-colors duration-200">
-                  <TableCell className="text-center">{income.username}</TableCell>
-                  <TableCell className="text-center">{income.userDisplayName}</TableCell>
-                  <TableCell className="text-center font-bold text-green-600">
+                  <TableCell className="text-center align-middle w-1/4">{income.username}</TableCell>
+                  <TableCell className="text-center align-middle w-1/4">{income.userDisplayName}</TableCell>
+                  <TableCell className="text-center font-bold text-green-600 align-middle w-1/4">
                     {formatPrice(income.amount)}
                   </TableCell>
-                  <TableCell className="text-center font-medium">
+                  <TableCell className="text-center font-medium align-middle w-1/4">
                     {formatDate(income.timestamp)}
                   </TableCell>
                 </TableRow>
