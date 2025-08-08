@@ -8159,3 +8159,17 @@ function PrintJobsColGroup({ userRole }: { userRole: string }) {
 - Implement export permission granularity if needed for specific data types
 - Add user feedback when export is not available
 - Consider role-based export format restrictions if needed
+
+## Global Unhandled Promise Rejection Handler (January 2025)
+
+**Problem**: A global `unhandledrejection` listener was added directly inside `app/layout.tsx` (a Server Component). Server Components don't run in the browser, so the listener never attached on the client, and side effects don't belong in Server Components.
+
+**Fix**:
+- Created a small Client Component `components/global-error-handler.tsx` that attaches the listener in a `useEffect` and cleans it up on unmount.
+- Imported and rendered `GlobalErrorHandler` inside `app/layout.tsx` within the providers so it runs on every page.
+
+**Files Modified/Added**:
+- Added: `components/global-error-handler.tsx`
+- Edited: `app/layout.tsx` to include `<GlobalErrorHandler />`
+
+**Result**: The global error handler reliably runs in the browser, avoids SSR side-effects, and prevents unhandled promise rejections from breaking UX.
