@@ -239,7 +239,9 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                   });
                   
                   const userDebtAmountsForRange = filteredUsersForRange.map(user => user.totalDebt || 0);
-                  const actualMinDebt = userDebtAmountsForRange.length > 0 ? Math.floor(Math.min(...userDebtAmountsForRange)) : 0;
+                  const actualMinDebt = userDebtAmountsForRange.length > 0 
+                    ? Math.floor(Math.min(...userDebtAmountsForRange)) 
+                    : 0;
                   const actualMaxDebt = userDebtAmountsForRange.length > 0 ? Math.ceil(Math.max(...userDebtAmountsForRange)) : 100;
                   
                   return (
@@ -247,13 +249,20 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                       <Input
                         type="text"
                         aria-label="Ελάχιστο ποσό"
-                        value={Math.round(Number(priceRangeInputs[0].replace(',', '.'))).toLocaleString('el-GR')}
-                        onChange={(e) => {
-                          let val = e.target.value.replace(/[^0-9,.]/g, '').replace('.', ',')
+                        value={priceRangeInputs[0]}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          // allow optional leading minus and a single comma
+                          let val = e.target.value
+                            .replace(/[^0-9,.-]/g, '')
+                            .replace('.', ',')
+                          // keep only one leading '-'
+                          val = val.replace(/(?!^)-/g, '')
+                          // keep only first comma
                           val = val.replace(/(,.*),/, '$1')
                           setPriceRangeInputs([val, priceRangeInputs[1]])
-                          const parsed = parseFloat(val.replace(',', '.')) || 0
-                          setPriceRange([parsed, priceRange[1]])
+                          const parsed = parseFloat(val.replace(',', '.'))
+                          const nextMin = Number.isFinite(parsed) ? parsed : 0
+                          setPriceRange([nextMin, priceRange[1]])
                         }}
                         onFocus={e => e.target.select()}
                         className="w-16 h-7 text-sm border-gray-300 rounded-md text-center focus:border-yellow-500"
@@ -266,13 +275,17 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                       <Input
                         type="text"
                         aria-label="Μέγιστο ποσό"
-                        value={Math.round(Number(priceRangeInputs[1].replace(',', '.'))).toLocaleString('el-GR')}
-                        onChange={(e) => {
-                          let val = e.target.value.replace(/[^0-9,.]/g, '').replace('.', ',')
+                        value={priceRangeInputs[1]}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          let val = e.target.value
+                            .replace(/[^0-9,.-]/g, '')
+                            .replace('.', ',')
+                          val = val.replace(/(?!^)-/g, '')
                           val = val.replace(/(,.*),/, '$1')
                           setPriceRangeInputs([priceRangeInputs[0], val])
-                          const parsed = parseFloat(val.replace(',', '.')) || 0
-                          setPriceRange([priceRange[0], parsed])
+                          const parsed = parseFloat(val.replace(',', '.'))
+                          const nextMax = Number.isFinite(parsed) ? parsed : 0
+                          setPriceRange([priceRange[0], nextMax])
                         }}
                         onFocus={e => e.target.select()}
                         className="w-16 h-7 text-sm border-gray-300 rounded-md text-center focus:border-yellow-500"
@@ -441,7 +454,9 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                   });
                   
                   const userDebtAmountsForSlider = filteredUsersForSlider.map(user => user.totalDebt || 0);
-                  const sliderMin = userDebtAmountsForSlider.length > 0 ? Math.floor(Math.min(...userDebtAmountsForSlider)) : 0;
+                  const sliderMin = userDebtAmountsForSlider.length > 0 
+                    ? Math.floor(Math.min(...userDebtAmountsForSlider)) 
+                    : 0;
                   const sliderMax = userDebtAmountsForSlider.length > 0 ? Math.ceil(Math.max(...userDebtAmountsForSlider)) : 100;
                   
                   return (
@@ -523,7 +538,9 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                     
                     // Calculate actual min and max debt amounts from filtered data
                     const userDebtAmounts = filteredUsersForCounts.map(user => user.totalDebt || 0);
-                    const actualMinDebt = userDebtAmounts.length > 0 ? Math.floor(Math.min(...userDebtAmounts)) : 0;
+                    const actualMinDebt = userDebtAmounts.length > 0 
+                      ? Math.floor(Math.min(...userDebtAmounts)) 
+                      : 0;
                     const actualMaxDebt = userDebtAmounts.length > 0 ? Math.ceil(Math.max(...userDebtAmounts)) : 100;
                     
                     // Create 4 equally spaced intervals from actual min to actual max
@@ -565,7 +582,9 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                         if (isSelected) {
                           // If already selected, clear the selection (reset to full range)
                           // Use the actual debt range with floor/ceil math
-                          const actualMinDebt = userDebtAmounts.length > 0 ? Math.floor(Math.min(...userDebtAmounts)) : 0;
+                          const actualMinDebt = userDebtAmounts.length > 0 
+                            ? Math.floor(Math.min(...userDebtAmounts)) 
+                            : 0;
                           const actualMaxDebt = userDebtAmounts.length > 0 ? Math.ceil(Math.max(...userDebtAmounts)) : 100;
                           
                           setPriceRange([actualMinDebt, actualMaxDebt]);

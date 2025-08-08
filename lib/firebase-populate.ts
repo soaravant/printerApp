@@ -1,14 +1,13 @@
 // Firebase Populate Script for Printer Management System
 // This file contains functions to populate Firebase collections with sample data
 
-import { 
-  FirebaseUser, 
-  FirebaseProduct, 
-  FirebaseTransaction, 
-  FirebasePrint, 
-  FirebaseLamination,
-  FIREBASE_COLLECTIONS 
-} from './firebase-schema'
+import {
+  FIREBASE_COLLECTIONS,
+  FirebaseUser,
+  FirebasePriceTable,
+  FirebasePrintJob,
+  FirebaseLaminationJob,
+} from "./firebase-schema"
 
 // ============================================================================
 // POPULATE FUNCTIONS
@@ -18,40 +17,35 @@ import {
  * Populate users collection
  */
 export async function populateUsers() {
-  // TODO: Implement user population
-  console.log('Populating users...')
+  console.log("Populating users... (use scripts/seed-firestore.ts via Node)")
 }
 
 /**
  * Populate products collection
  */
 export async function populateProducts() {
-  // TODO: Implement product population
-  console.log('Populating products...')
+  console.log("Populating products... (deprecated in favor of price tables)")
 }
 
 /**
  * Populate transactions collection
  */
 export async function populateTransactions() {
-  // TODO: Implement transaction population
-  console.log('Populating transactions...')
+  console.log("Populating transactions... (not implemented in client)")
 }
 
 /**
  * Populate prints collection
  */
 export async function populatePrints() {
-  // TODO: Implement print jobs population
-  console.log('Populating prints...')
+  console.log("Populating prints... (use scripts/seed-firestore.ts via Node)")
 }
 
 /**
  * Populate laminations collection
  */
 export async function populateLaminations() {
-  // TODO: Implement lamination jobs population
-  console.log('Populating laminations...')
+  console.log("Populating laminations... (use scripts/seed-firestore.ts via Node)")
 }
 
 /**
@@ -78,8 +72,7 @@ export async function populateAllCollections() {
  * Clear all collections (for testing)
  */
 export async function clearAllCollections() {
-  // TODO: Implement collection clearing
-  console.log('Clearing all collections...')
+  console.log("Clearing collections... (use scripts/clear-firestore.ts via Node)")
 }
 
 // ============================================================================
@@ -90,14 +83,13 @@ export async function clearAllCollections() {
  * Generate sample data based on existing dummy database patterns
  */
 export function generateSampleData() {
-  // TODO: Implement sample data generation
-  console.log('Generating sample data...')
+  console.log("Generating sample data... (handled in seed script)")
 }
 
 /**
  * Validate data before inserting into Firebase
  */
-export function validateData<T>(data: T, schema: any): boolean {
-  // TODO: Implement data validation
-  return true
-} 
+export function validateData<T>(data: T, _schema: unknown): boolean {
+  // Placeholder: validation is done during seeding in Node context
+  return !!data
+}

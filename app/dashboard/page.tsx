@@ -646,7 +646,13 @@ export default function DashboardPage() {
     XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split("T")[0]}.xlsx`)
   }
 
-  if (!user) return null
+  if (!user) {
+    return (
+      <ProtectedRoute>
+        {null}
+      </ProtectedRoute>
+    )
+  }
 
   // Calculate totals based on user debt fields
   const allUsersData = dummyDB.getUsers()
@@ -672,7 +678,11 @@ export default function DashboardPage() {
   
   const printUnpaid = personalDebtUsers.reduce((sum, u) => sum + (u.printDebt || 0), 0)
   const laminationUnpaid = personalDebtUsers.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
-  const totalUnpaid = printUnpaid + laminationUnpaid
+  // Use users' totalDebt directly so negative credit is reflected in the summary
+  const totalUnpaid = personalDebtUsers.reduce(
+    (sum, u) => sum + (typeof u.totalDebt === "number" ? u.totalDebt : (u.printDebt || 0) + (u.laminationDebt || 0)),
+    0
+  )
 
   // Calculate totals without filters for percentage calculations
   const totalPrintUnpaid = allUsersData.reduce((sum, u) => sum + (u.printDebt || 0), 0)
@@ -1200,7 +1210,7 @@ export default function DashboardPage() {
                   </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className={`text-3xl font-bold ${totalUnpaid > 0 ? 'text-red-600' : totalUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                    <div className={`text-3xl font-bold ${totalUnpaid <= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
                     </div>
                     {user.accessLevel === "admin" && (
@@ -1265,7 +1275,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-blue-600' : printUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                    <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-red-600' : 'text-green-600'}`}>
                       {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
                     </div>
                     {user.accessLevel === "admin" && (
@@ -1330,7 +1340,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-green-600' : laminationUnpaid < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                    <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-red-600' : 'text-green-600'}`}>
                       {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
                     </div>
                     {user.accessLevel === "admin" && (
@@ -1671,12 +1681,13 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="p-4">
-                        <div className="grid grid-cols-4 gap-2 text-center">
+                        <div className="grid grid-cols-4 grid-rows-2 gap-2 text-center">
+                          {/* Row 1 */}
                           <div>
                             <div className="text-xs text-gray-600">A4 B/W</div>
                             <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Color", "A4 Ασπρόμαυρο") 
-                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                              isPrintStatHighlighted("Canon Color", "A4 Ασπρόμαυρο")
+                                ? "text-blue-600 bg-blue-100 rounded px-1"
                                 : "text-black"
                             }`}>
                               {printStats.canonColour.a4BW}
@@ -1685,18 +1696,28 @@ export default function DashboardPage() {
                           <div>
                             <div className="text-xs text-gray-600">A4 Colour</div>
                             <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Color", "A4 Έγχρωμο") 
-                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                              isPrintStatHighlighted("Canon Color", "A4 Έγχρωμο")
+                                ? "text-blue-600 bg-blue-100 rounded px-1"
                                 : "text-black"
                             }`}>
                               {printStats.canonColour.a4Colour}
                             </div>
                           </div>
                           <div>
+                            <div className="text-xs text-gray-600">A4 Total</div>
+                            <div className="text-lg font-bold text-black">{printStats.canonColour.a4Total}</div>
+                          </div>
+                          <div className="row-span-2 flex flex-col items-center justify-center">
+                            <div className="text-xs text-gray-600">Total</div>
+                            <div className="text-xl font-bold text-black">{printStats.canonColour.total}</div>
+                          </div>
+
+                          {/* Row 2 */}
+                          <div>
                             <div className="text-xs text-gray-600">A3 B/W</div>
                             <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Color", "A3 Ασπρόμαυρο") 
-                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                              isPrintStatHighlighted("Canon Color", "A3 Ασπρόμαυρο")
+                                ? "text-blue-600 bg-blue-100 rounded px-1"
                                 : "text-black"
                             }`}>
                               {printStats.canonColour.a3BW}
@@ -1705,26 +1726,16 @@ export default function DashboardPage() {
                           <div>
                             <div className="text-xs text-gray-600">A3 Colour</div>
                             <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Color", "A3 Έγχρωμο") 
-                                ? "text-blue-600 bg-blue-100 rounded px-1" 
+                              isPrintStatHighlighted("Canon Color", "A3 Έγχρωμο")
+                                ? "text-blue-600 bg-blue-100 rounded px-1"
                                 : "text-black"
                             }`}>
                               {printStats.canonColour.a3Colour}
                             </div>
                           </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 mt-3 text-center">
-                          <div>
-                            <div className="text-xs text-gray-600">A4 Total</div>
-                            <div className="text-sm font-bold text-black">{printStats.canonColour.a4Total}</div>
-                          </div>
                           <div>
                             <div className="text-xs text-gray-600">A3 Total</div>
-                            <div className="text-sm font-bold text-black">{printStats.canonColour.a3Total}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-600">Total</div>
-                            <div className="text-sm font-bold text-black">{printStats.canonColour.total}</div>
+                            <div className="text-lg font-bold text-black">{printStats.canonColour.a3Total}</div>
                           </div>
                         </div>
                       </div>

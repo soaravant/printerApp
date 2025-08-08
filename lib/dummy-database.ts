@@ -973,40 +973,82 @@ class DummyDatabase {
     }
   }
 
-  // New method to get net debt (after income payments)
+  // New method to get net debt (sequential, credit first on total)
+  // Rule:
+  // - Keep category debts (print/lamination) never negative. Any overpayment becomes credit on total only (negative total).
+  // - When new job is added and there is credit, consume credit first (reduce negative total toward 0),
+  //   then add any remainder to the respective category.
   getNetDebtForUser(uid: string): { print: number; lamination: number; total: number } {
-    const userDebt = this.getTotalUnpaidForUser(uid)
-    
-    // Calculate total income payments for this user
-    const userIncome = this.income
-      .filter(i => i.uid === uid)
-      .reduce((sum, i) => sum + i.amount, 0)
-    
-    // Calculate net debt (jobs - income)
-    const totalJobCost = userDebt.print + userDebt.lamination
-    
-    if (totalJobCost > 0) {
-      // Apply income proportionally to print and lamination debt
-      const printRatio = userDebt.print / totalJobCost
-      const laminationRatio = userDebt.lamination / totalJobCost
-      
-      const netPrintDebt = userDebt.print - (userIncome * printRatio)
-      const netLaminationDebt = userDebt.lamination - (userIncome * laminationRatio)
-      
-      return {
-        print: netPrintDebt,
-        lamination: netLaminationDebt,
-        total: netPrintDebt + netLaminationDebt,
-      }
-    } else {
-      // If no job costs, income creates credit (negative debt)
-      const credit = userIncome / 2 // Split credit between print and lamination
-      return {
-        print: -credit,
-        lamination: -credit,
-        total: -userIncome,
+    // Collect user events (print jobs, lamination jobs, incomes) and process chronologically
+    const printJobs = this.printJobs.filter(j => j.uid === uid)
+    const laminationJobs = this.laminationJobs.filter(j => j.uid === uid)
+    const incomes = this.income.filter(i => i.uid === uid)
+
+    type Event = { kind: "print" | "lamination" | "income"; amount: number; timestamp: Date }
+    const events: Event[] = []
+    for (const j of printJobs) {
+      events.push({ kind: "print", amount: j.totalCost, timestamp: j.timestamp })
+    }
+    for (const j of laminationJobs) {
+      events.push({ kind: "lamination", amount: j.totalCost, timestamp: j.timestamp })
+    }
+    for (const inc of incomes) {
+      events.push({ kind: "income", amount: inc.amount, timestamp: inc.timestamp })
+    }
+
+    // Sort by time ascending
+    events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+
+    let printDebt = 0
+    let laminationDebt = 0
+    let totalCredit = 0 // positive number representing credit; total debt = print + lamination - credit
+
+    for (const e of events) {
+      if (e.kind === "print") {
+        if (totalCredit > 0) {
+          if (e.amount <= totalCredit) {
+            totalCredit -= e.amount
+          } else {
+            const remainder = e.amount - totalCredit
+            totalCredit = 0
+            printDebt += remainder
+          }
+        } else {
+          printDebt += e.amount
+        }
+      } else if (e.kind === "lamination") {
+        if (totalCredit > 0) {
+          if (e.amount <= totalCredit) {
+            totalCredit -= e.amount
+          } else {
+            const remainder = e.amount - totalCredit
+            totalCredit = 0
+            laminationDebt += remainder
+          }
+        } else {
+          laminationDebt += e.amount
+        }
+      } else {
+        // income: pay lamination first, then print; leftover increases credit
+        let remaining = e.amount
+        if (laminationDebt > 0) {
+          const payL = Math.min(remaining, laminationDebt)
+          laminationDebt -= payL
+          remaining -= payL
+        }
+        if (remaining > 0 && printDebt > 0) {
+          const payP = Math.min(remaining, printDebt)
+          printDebt -= payP
+          remaining -= payP
+        }
+        if (remaining > 0) {
+          totalCredit += remaining
+        }
       }
     }
+
+    const total = printDebt + laminationDebt - totalCredit
+    return { print: printDebt, lamination: laminationDebt, total }
   }
 
   getJobCountsForUser(uid: string): { print: number; lamination: number } {
@@ -1025,58 +1067,42 @@ class DummyDatabase {
   }
 
   addIncome(incomeRecord: Income): void {
+    // Add income record first
     this.income.push(incomeRecord)
     
-    // Apply the new debt reduction logic and update bank
+    // Update banks based on current debts at the time of payment (lamination first then print)
     this.applyDebtReduction(incomeRecord.uid, incomeRecord.amount)
+
+    // Recalculate user debt fields sequentially with the new income
+    this.updateUserDebtFields(incomeRecord.uid)
   }
 
   // New method to apply debt reduction with the specified logic
   private applyDebtReduction(uid: string, amount: number): void {
+    // Only update banks here based on current state; actual debt fields are recalculated elsewhere
     const user = this.users.find(u => u.uid === uid)
     if (!user) return
 
-    // Get current debt amounts
-    const currentPrintDebt = user.printDebt || 0
-    const currentLaminationDebt = user.laminationDebt || 0
-    
     let remainingAmount = amount
     let printBankIncrease = 0
     let laminationBankIncrease = 0
 
-    // Step 1: First subtract from lamination debt
-    if (currentLaminationDebt > 0 && remainingAmount > 0) {
-      const laminationPayment = Math.min(remainingAmount, currentLaminationDebt)
-      user.laminationDebt = currentLaminationDebt - laminationPayment
-      remainingAmount -= laminationPayment
-      laminationBankIncrease += laminationPayment
-    }
+    const currentLaminationDebt = Math.max(0, user.laminationDebt || 0)
+    const laminationPayment = Math.min(remainingAmount, currentLaminationDebt)
+    laminationBankIncrease += laminationPayment
+    remainingAmount -= laminationPayment
 
-    // Step 2: If lamination debt is 0 and there's still money, subtract from print debt
-    if ((user.laminationDebt || 0) <= 0 && remainingAmount > 0 && currentPrintDebt > 0) {
-      const printPayment = Math.min(remainingAmount, currentPrintDebt)
-      user.printDebt = currentPrintDebt - printPayment
-      remainingAmount -= printPayment
-      printBankIncrease += printPayment
-    }
+    const currentPrintDebt = Math.max(0, user.printDebt || 0)
+    const printPayment = Math.min(remainingAmount, currentPrintDebt)
+    printBankIncrease += printPayment
+    remainingAmount -= printPayment
 
-    // Step 3: If there's still money, create negative debt (credit)
+    // Allocate any remaining (excess) income to lamination bank as per business rule
     if (remainingAmount > 0) {
-      // Apply remaining amount as credit to print first, then lamination
-      if ((user.printDebt || 0) <= 0) {
-        user.printDebt = (user.printDebt || 0) - remainingAmount
-        printBankIncrease += remainingAmount
-      } else {
-        user.laminationDebt = (user.laminationDebt || 0) - remainingAmount
-        laminationBankIncrease += remainingAmount
-      }
+      laminationBankIncrease += remainingAmount
       remainingAmount = 0
     }
 
-    // Update total debt
-    user.totalDebt = (user.printDebt || 0) + (user.laminationDebt || 0)
-
-    // Update bank amounts
     this.bank.printBank += printBankIncrease
     this.bank.laminationBank += laminationBankIncrease
     this.bank.lastUpdated = new Date()
@@ -1114,12 +1140,11 @@ class DummyDatabase {
     const user = this.users.find(u => u.uid === uid)
     if (!user) return
     
-    // Get net debt (after income payments)
+    // Recalculate debts using sequential rule
     const netDebt = this.getNetDebtForUser(uid)
-    
-    user.printDebt = netDebt.print
-    user.laminationDebt = netDebt.lamination
-    user.totalDebt = netDebt.total
+    user.printDebt = roundMoney(netDebt.print)
+    user.laminationDebt = roundMoney(netDebt.lamination)
+    user.totalDebt = roundMoney(netDebt.total)
   }
 
 

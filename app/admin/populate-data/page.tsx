@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { ProtectedRoute } from "@/components/protected-route"
+import { Navigation } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
@@ -138,34 +140,39 @@ export default function PopulateDataPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle>Δημιουργία Δεδομένων</CardTitle>
-            <CardDescription>
-              Δημιουργήστε demo δεδομένα για δοκιμές και ανάπτυξη
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button
-              onClick={handlePopulateData}
-              disabled={isLoading}
-              className="w-full"
-            >
-              {isLoading ? "Δημιουργία..." : "Δημιουργία Demo Δεδομένων"}
-            </Button>
-            <Button
-              onClick={handleClearData}
-              disabled={isLoading}
-              variant="destructive"
-              className="w-full"
-            >
-              {isLoading ? "Διαγραφή..." : "Διαγραφή Όλων των Δεδομένων"}
-            </Button>
-          </CardContent>
-        </Card>
+    <ProtectedRoute requireAdmin>
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <main className="p-8">
+          <div className="max-w-2xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle>Δημιουργία Δεδομένων</CardTitle>
+                <CardDescription>
+                  Δημιουργήστε demo δεδομένα για δοκιμές και ανάπτυξη
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button
+                  onClick={handlePopulateData}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  {isLoading ? "Δημιουργία..." : "Δημιουργία Demo Δεδομένων"}
+                </Button>
+                <Button
+                  onClick={handleClearData}
+                  disabled={isLoading}
+                  variant="destructive"
+                  className="w-full"
+                >
+                  {isLoading ? "Διαγραφή..." : "Διαγραφή Όλων των Δεδομένων"}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
       </div>
-    </div>
+    </ProtectedRoute>
   )
 }

@@ -194,9 +194,10 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredUsers.map((userData) => {
           // Use the actual debt fields from user data
-          const printDebt = userData.printDebt || 0;
-          const laminationDebt = userData.laminationDebt || 0;
           const totalDebt = userData.totalDebt || 0;
+          // When total is negative (credit), categories should display as 0
+          const printDebt = totalDebt < 0 ? 0 : (userData.printDebt || 0);
+          const laminationDebt = totalDebt < 0 ? 0 : (userData.laminationDebt || 0);
           return (
             <Card 
               key={userData.uid} 
@@ -314,7 +315,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                           <Printer className="h-3 w-3" /> Εκτυπώσεις:
                         </span>
                         <span className={printDebt > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
-                          {printDebt > 0 ? formatPrice(printDebt) : printDebt < 0 ? `-${formatPrice(Math.abs(printDebt))}` : formatPrice(printDebt)}
+                          {formatPrice(printDebt)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
@@ -322,7 +323,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                           <CreditCard className="h-3 w-3" /> Πλαστικοποιήσεις:
                         </span>
                         <span className={laminationDebt > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
-                          {laminationDebt > 0 ? formatPrice(laminationDebt) : laminationDebt < 0 ? `-${formatPrice(Math.abs(laminationDebt))}` : formatPrice(laminationDebt)}
+                          {formatPrice(laminationDebt)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center border-t pt-2">

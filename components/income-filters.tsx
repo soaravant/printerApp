@@ -207,13 +207,17 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
                        <Input
                          type="text"
                          aria-label="Ελάχιστο ποσό"
-                         value={Math.round(Number(incomeAmountInputs[0].replace(',', '.'))).toLocaleString('el-GR')}
+                         value={Math.max(
+                           actualMinIncome,
+                           Math.round(Number(incomeAmountInputs[0].replace(',', '.')))
+                         ).toLocaleString('el-GR')}
                          onChange={(e) => {
                            let val = e.target.value.replace(/[^0-9,.]/g, '').replace('.', ',')
                            val = val.replace(/(,.*),/, '$1')
                            setIncomeAmountInputs([val, incomeAmountInputs[1]])
                            const parsed = parseFloat(val.replace(',', '.')) || 0
-                           setIncomeAmountRange([parsed, incomeAmountRange[1]])
+                           const clamped = Math.max(actualMinIncome, parsed)
+                           setIncomeAmountRange([clamped, incomeAmountRange[1]])
                          }}
                          onFocus={e => e.target.select()}
                          className="w-16 h-7 text-sm border-gray-300 rounded-md text-center focus:border-yellow-500"
@@ -226,13 +230,17 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
                        <Input
                          type="text"
                          aria-label="Μέγιστο ποσό"
-                         value={Math.round(Number(incomeAmountInputs[1].replace(',', '.'))).toLocaleString('el-GR')}
+                         value={Math.min(
+                           actualMaxIncome,
+                           Math.round(Number(incomeAmountInputs[1].replace(',', '.')))
+                         ).toLocaleString('el-GR')}
                          onChange={(e) => {
                            let val = e.target.value.replace(/[^0-9,.]/g, '').replace('.', ',')
                            val = val.replace(/(,.*),/, '$1')
                            setIncomeAmountInputs([incomeAmountInputs[0], val])
                            const parsed = parseFloat(val.replace(',', '.')) || 0
-                           setIncomeAmountRange([incomeAmountRange[0], parsed])
+                           const clamped = Math.min(actualMaxIncome, parsed)
+                           setIncomeAmountRange([incomeAmountRange[0], clamped])
                          }}
                          onFocus={e => e.target.select()}
                          className="w-16 h-7 text-sm border-gray-300 rounded-md text-center focus:border-yellow-500"
@@ -362,7 +370,10 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
                    
                    return (
                      <Slider
-                       value={incomeAmountRange}
+                       value={[
+                         Math.max(sliderMin, incomeAmountRange[0]),
+                         Math.min(sliderMax, incomeAmountRange[1])
+                       ]}
                        onValueChange={(value: number[]) => {
                          setIncomeAmountRange(value as [number, number]);
                          setIncomeAmountInputs([
@@ -419,7 +430,7 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
                      
                      // Calculate actual min and max income amounts from filtered data
                      const incomeAmounts = filteredIncomeForCounts.map(income => income.amount || 0);
-                     const actualMinIncome = incomeAmounts.length > 0 ? Math.floor(Math.min(...incomeAmounts)) : 0;
+                       const actualMinIncome = incomeAmounts.length > 0 ? Math.floor(Math.min(...incomeAmounts)) : 0;
                      const actualMaxIncome = incomeAmounts.length > 0 ? Math.ceil(Math.max(...incomeAmounts)) : 100;
                      
                      // Create 4 equally spaced intervals from actual min to actual max

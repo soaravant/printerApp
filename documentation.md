@@ -107,6 +107,12 @@ Real-time Updates: Live data synchronization
 - **Google Cloud Run**: Containerized deployment for Python service
 - **Cloud Scheduler**: Automated job scheduling for data collection
 
+### Firestore Seeding & Clearing
+- Single-source schema: `lib/firebase-schema.ts`
+- Seed script: `pnpm seed:firestore` (uses `scripts/seed-firestore.ts`)
+- Clear script: `pnpm clear:firestore` (uses `scripts/clear-firestore.ts`)
+- Required env: `FIREBASE_SERVICE_ACCOUNT_KEY` (base64 of service account json)
+
 ### Development Tools
 - **ESLint**: Code linting and quality enforcement
 - **PostCSS**: CSS processing and optimization

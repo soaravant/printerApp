@@ -129,8 +129,9 @@ components/
 ```
 lib/
 ├── auth-context.tsx            # Firebase authentication context
-├── data-store.ts               # Data store and state management
+├── data-store.ts               # Data store and state management (dummy/local)
 ├── dummy-database.ts           # Dummy data for development
+├── firebase-schema.ts          # Single source of truth for Firestore collections & document shapes
 ├── refresh-context.tsx         # Global refresh context for data synchronization
 ├── sort-utils.ts               # Table sorting utilities
 └── utils.ts                    # Utility functions and helpers
@@ -149,7 +150,11 @@ python/
 scripts/
 ├── deploy-cloud-run.sh         # Google Cloud Run deployment script
 ├── setup-cloud-scheduler.sh    # Cloud Scheduler setup script
-└── populate-dummy-data.ts      # Dummy data population script
+├── populate-dummy-data.ts      # Dummy data population script
+├── seed-firestore.ts           # Node script to seed Firestore from schema
+├── clear-firestore.ts          # Node script to clear Firestore collections
+└── utils/
+    └── firebase-admin.ts       # Firebase Admin initialization for scripts (uses FIREBASE_SERVICE_ACCOUNT_KEY)
 ```
 
 ## Infrastructure Directory (`infra/`)
