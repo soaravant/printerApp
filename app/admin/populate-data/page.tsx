@@ -21,7 +21,7 @@ export default function PopulateDataPage() {
         {
           uid: "user-1",
           username: "user1",
-          accessLevel: "user",
+          accessLevel: "Χρήστης",
           displayName: "Χρήστης 1",
           createdAt: new Date("2024-01-01"),
           userRole: "Άτομο",
@@ -30,7 +30,7 @@ export default function PopulateDataPage() {
         {
           uid: "user-2",
           username: "user2",
-          accessLevel: "user",
+          accessLevel: "Χρήστης",
           displayName: "Χρήστης 2",
           createdAt: new Date("2024-01-02"),
           userRole: "Άτομο",
@@ -39,7 +39,7 @@ export default function PopulateDataPage() {
         {
           uid: "admin-1",
           username: "admin",
-          accessLevel: "admin",
+          accessLevel: "Διαχειριστής",
           displayName: "Διαχειριστής",
           createdAt: new Date("2024-01-01"),
           userRole: "Άτομο",

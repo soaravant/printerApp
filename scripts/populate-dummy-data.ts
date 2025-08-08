@@ -82,7 +82,7 @@ export function resetDummyData() {
 export function addTestUser(
   username: string,
   displayName: string,
-  accessLevel: "user" | "admin" = "user",
+  accessLevel: "Χρήστης" | "Διαχειριστής" = "Χρήστης",
 ) {
   try {
     const users = dummyDB.getUsers()

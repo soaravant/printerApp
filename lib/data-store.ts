@@ -4,7 +4,7 @@
 export interface User {
   uid: string
   username: string
-  accessLevel: "user" | "admin" | "Υπεύθυνος"
+  accessLevel: "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος"
   displayName: string
   userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας"
   responsiblePerson?: string

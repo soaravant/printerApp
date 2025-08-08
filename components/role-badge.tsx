@@ -1,14 +1,14 @@
 import { Badge } from "@/components/ui/badge"
 
 interface RoleBadgeProps {
-  accessLevel: "user" | "admin" | "Υπεύθυνος"
+  accessLevel: "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος"
   className?: string
 }
 
 export function RoleBadge({ accessLevel, className = "" }: RoleBadgeProps) {
   const getBadgeText = () => {
     switch (accessLevel) {
-      case "admin":
+      case "Διαχειριστής":
         return "Διαχειριστής"
       case "Υπεύθυνος":
         return "Υπεύθυνος"
@@ -19,7 +19,7 @@ export function RoleBadge({ accessLevel, className = "" }: RoleBadgeProps) {
 
   const getBadgeClassName = () => {
     switch (accessLevel) {
-      case "admin":
+      case "Διαχειριστής":
         return "bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
       case "Υπεύθυνος":
         return "bg-black text-white hover:bg-gray-800"

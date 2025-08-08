@@ -44,7 +44,7 @@ export default function AdminPage() {
     username: "",
     password: "",
     displayName: "",
-    accessLevel: "user" as "user" | "admin" | "Υπεύθυνος",
+    accessLevel: "Χρήστης" as "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος",
     userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας",
     memberOf: [] as string[],
     responsibleFor: [] as string[],
@@ -103,7 +103,7 @@ export default function AdminPage() {
   const getAvailableResponsiblePersons = () => {
     const allUsers = dummyDB.getUsers()
     return allUsers
-      .filter(u => u.accessLevel === "Υπεύθυνος" || u.accessLevel === "admin")
+      .filter(u => u.accessLevel === "Υπεύθυνος" || u.accessLevel === "Διαχειριστής")
       .map(u => u.displayName)
   }
 
@@ -145,7 +145,7 @@ export default function AdminPage() {
     if (teamFilter !== "all" && (roleFilter === "all" || roleFilter === "Άτομο")) {
       filtered = filtered.filter((u) => {
         // Exclude admin accounts when a specific team is selected
-        if (u.accessLevel === "admin") {
+        if (u.accessLevel === "Διαχειριστής") {
           return false
         }
         return u.team === teamFilter
@@ -154,8 +154,8 @@ export default function AdminPage() {
 
     // Sort users: first by access level, then by role with specific order
     filtered.sort((a, b) => {
-      // First sort by access level: admin, Υπεύθυνος, user
-      const accessLevelOrder = { admin: 0, Υπεύθυνος: 1, user: 2 }
+      // First sort by access level: Διαχειριστής, Υπεύθυνος, Χρήστης
+      const accessLevelOrder = { Διαχειριστής: 0, Υπεύθυνος: 1, Χρήστης: 2 } as const
       const aLevel = accessLevelOrder[a.accessLevel as keyof typeof accessLevelOrder] ?? 3
       const bLevel = accessLevelOrder[b.accessLevel as keyof typeof accessLevelOrder] ?? 3
       
@@ -445,12 +445,12 @@ export default function AdminPage() {
     const { teams } = getDynamicFilterOptions(users)
     
     const atomoUsersWithoutTeam = users.filter(u => 
-      u.userRole === "Άτομο" && u.accessLevel === "user" && 
+      u.userRole === "Άτομο" && u.accessLevel === "Χρήστης" && 
       (!u.memberOf || !u.memberOf.some(member => teams.includes(member)))
     )
     
     const atomoUsersWithMultipleTeams = users.filter(u => 
-      u.userRole === "Άτομο" && u.accessLevel === "user" && 
+      u.userRole === "Άτομο" && u.accessLevel === "Χρήστης" && 
       u.memberOf && u.memberOf.filter(member => teams.includes(member)).length > 1
     )
     
@@ -472,7 +472,7 @@ export default function AdminPage() {
     }
 
     // Validate username format based on access level
-    if (newUser.accessLevel === "admin") {
+    if (newUser.accessLevel === "Διαχειριστής") {
       if (newUser.username !== "admin") {
         toast({
           title: "Σφάλμα Username",
@@ -494,7 +494,7 @@ export default function AdminPage() {
     }
 
     // Ensure users with "user" access level have a team assigned through memberOf field
-    if (newUser.accessLevel === "user" && newUser.memberOf.length === 0) {
+    if (newUser.accessLevel === "Χρήστης" && newUser.memberOf.length === 0) {
       toast({
         title: "Σφάλμα Επικύρωσης",
         description: "Παρακαλώ επιλέξτε τουλάχιστον μία ομάδα/ναό/τομέα για χρήστες με επίπεδο πρόσβασης 'Χρήστης'",
@@ -504,7 +504,7 @@ export default function AdminPage() {
     }
 
     // Ensure Άτομο users have exactly one team in their members array
-    if (newUser.userRole === "Άτομο" && newUser.accessLevel === "user") {
+    if (newUser.userRole === "Άτομο" && newUser.accessLevel === "Χρήστης") {
       const { teams } = getDynamicFilterOptions(users)
       const teamsInMembers = newUser.memberOf.filter(member => teams.includes(member))
       
@@ -528,7 +528,7 @@ export default function AdminPage() {
     }
 
     // Enforce role restrictions for admin and Υπεύθυνος
-    if ((newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος") && newUser.userRole !== "Άτομο") {
+    if ((newUser.accessLevel === "Διαχειριστής" || newUser.accessLevel === "Υπεύθυνος") && newUser.userRole !== "Άτομο") {
       toast({
         title: "Σφάλμα Ρόλου",
         description: "Διαχειριστές και Υπεύθυνοι μπορούν να έχουν μόνο ρόλο 'Άτομο'",
@@ -561,7 +561,7 @@ export default function AdminPage() {
     try {
       // Auto-assign team field based on members array for Άτομο users
       let teamField: string | undefined = undefined
-      if (newUser.userRole === "Άτομο" && newUser.accessLevel === "user") {
+      if (newUser.userRole === "Άτομο" && newUser.accessLevel === "Χρήστης") {
         const { teams } = getDynamicFilterOptions(users)
         const teamInMembers = newUser.memberOf.find(member => teams.includes(member))
         if (teamInMembers) {
@@ -592,7 +592,7 @@ export default function AdminPage() {
       })
 
       // Reset form
-      setNewUser({ username: "", password: "", displayName: "", accessLevel: "user", userRole: "Άτομο", memberOf: [], responsibleFor: [] })
+      setNewUser({ username: "", password: "", displayName: "", accessLevel: "Χρήστης", userRole: "Άτομο", memberOf: [], responsibleFor: [] })
     } catch (error) {
       toast({
         title: "Σφάλμα",
@@ -671,7 +671,7 @@ export default function AdminPage() {
       username: "",
       password: "",
       displayName: "",
-      accessLevel: "user" as "user" | "admin" | "Υπεύθυνος",
+      accessLevel: "Χρήστης" as "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος",
       userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας",
       memberOf: [] as string[],
       responsibleFor: [] as string[],
@@ -768,7 +768,7 @@ export default function AdminPage() {
                         <Label htmlFor="user" className="text-gray-700">Χρήστης</Label>
                         <SearchableSelect
                           options={users
-                            .filter((u) => u.accessLevel === "user")
+      .filter((u) => u.accessLevel === "Χρήστης")
                             .map((user) => ({
                               value: user.uid,
                               label: user.displayName,
@@ -917,7 +917,7 @@ export default function AdminPage() {
                         <Label htmlFor="user" className="text-gray-700">Χρήστης</Label>
                         <SearchableSelect
                           options={users
-                            .filter((u) => u.accessLevel === "user")
+      .filter((u) => u.accessLevel === "Χρήστης")
                             .map((user) => ({
                               value: user.uid,
                               label: user.displayName,
@@ -1023,7 +1023,7 @@ export default function AdminPage() {
                         <Label htmlFor="debt-user" className="text-gray-700">Χρήστης</Label>
                         <SearchableSelect
                           options={users
-                            .filter((u) => u.accessLevel !== "admin")
+                            .filter((u) => u.accessLevel !== "Διαχειριστής")
                             .map((user) => ({
                               value: user.uid,
                               label: user.displayName,
@@ -1295,28 +1295,28 @@ export default function AdminPage() {
 
                     <div className={`grid grid-cols-1 gap-4 ${
                       (newUser.userRole === "Άτομο" && newUser.accessLevel === "Υπεύθυνος") ? "md:grid-cols-4" : 
-                      (newUser.userRole === "Άτομο" && newUser.accessLevel === "admin") ? "md:grid-cols-2" :
+                      (newUser.userRole === "Άτομο" && newUser.accessLevel === "Διαχειριστής") ? "md:grid-cols-2" :
                       (newUser.userRole === "Άτομο" || newUser.accessLevel === "Υπεύθυνος") ? "md:grid-cols-3" : 
                       "md:grid-cols-2"
                     }`}>
                       <div>
-                        <Label htmlFor="role">Access Level</Label>
+                         <Label htmlFor="role">Επίπεδο Πρόσβασης</Label>
                         <Select value={newUser.accessLevel} onValueChange={accessLevel => {
-                          const newAccessLevel = accessLevel as "user" | "admin" | "Υπεύθυνος"
+                          const newAccessLevel = accessLevel as "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος"
                           setNewUser({ 
                             ...newUser, 
                             accessLevel: newAccessLevel,
                             // Automatically set role to "Άτομο" for admin and Υπεύθυνος
-                            userRole: (newAccessLevel === "admin" || newAccessLevel === "Υπεύθυνος") ? "Άτομο" : newUser.userRole
+                            userRole: (newAccessLevel === "Διαχειριστής" || newAccessLevel === "Υπεύθυνος") ? "Άτομο" : newUser.userRole
                           })
                         }}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="user">Χρήστης</SelectItem>
+                           <SelectItem value="Χρήστης">Χρήστης</SelectItem>
                             <SelectItem value="Υπεύθυνος">Υπεύθυνος</SelectItem>
-                            <SelectItem value="admin">Διαχειριστής</SelectItem>
+                           <SelectItem value="Διαχειριστής">Διαχειριστής</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1326,9 +1326,9 @@ export default function AdminPage() {
                         <Select 
                           value={newUser.userRole} 
                           onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" })}
-                          disabled={newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος"}
+                          disabled={newUser.accessLevel === "Διαχειριστής" || newUser.accessLevel === "Υπεύθυνος"}
                         >
-                          <SelectTrigger className={newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος" ? "bg-gray-100 text-gray-500" : ""}>
+                          <SelectTrigger className={newUser.accessLevel === "Διαχειριστής" || newUser.accessLevel === "Υπεύθυνος" ? "bg-gray-100 text-gray-500" : ""}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1338,14 +1338,14 @@ export default function AdminPage() {
                             <SelectItem value="Τομέας">Τομέας</SelectItem>
                           </SelectContent>
                         </Select>
-                        {(newUser.accessLevel === "admin" || newUser.accessLevel === "Υπεύθυνος") && (
+                        {(newUser.accessLevel === "Διαχειριστής" || newUser.accessLevel === "Υπεύθυνος") && (
                           <p className="text-xs text-gray-500 mt-1">
                             Ρόλος κλειδωμένος σε "Άτομο" για Διαχειριστές και Υπεύθυνους
                           </p>
                         )}
                       </div>
 
-                      {newUser.userRole === "Άτομο" && newUser.accessLevel !== "admin" && (
+                      {newUser.userRole === "Άτομο" && newUser.accessLevel !== "Διαχειριστής" && (
                         <div>
                           <Label>Μέλος (Ομάδα/Ναός/Τομέας)</Label>
                           <TagInput

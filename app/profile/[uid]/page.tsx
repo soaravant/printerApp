@@ -85,7 +85,7 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
   }
 
   const handleInputChange = (field: string, value: any) => {
-    setEditedUser(prev => ({
+    setEditedUser((prev: any) => ({
       ...prev,
       [field]: value
     }))
@@ -175,23 +175,18 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
     const allUsers = dummyDB.getUsers()
     const responsibleUsers: string[] = []
     
-    // For users with "user" access level, find their team's responsible person through members field
-    if (profileUser.accessLevel === "user" && profileUser.memberOf && profileUser.memberOf.length > 0) {
-      // Find the first team in the memberOf list and get its responsible person
+    // For users with "Χρήστης" access level, find their team's responsible person through members field
+    if (profileUser.accessLevel === "Χρήστης" && profileUser.memberOf && profileUser.memberOf.length > 0) {
+      // Find the first team in the memberOf list and then find Υπεύθυνοι responsible for that team
       const firstTeam = profileUser.memberOf.find((member: string) => {
-        const teamAccount = allUsers.find(user => 
-          user.userRole === "Ομάδα" && user.displayName === member
-        )
-        return teamAccount && teamAccount.responsiblePerson
+        return allUsers.some(user => user.userRole === "Ομάδα" && user.displayName === member)
       })
-      
       if (firstTeam) {
-        const teamAccount = allUsers.find(user => 
-          user.userRole === "Ομάδα" && user.displayName === firstTeam
-        )
-        
-        if (teamAccount && teamAccount.responsiblePerson) {
-          responsibleUsers.push(teamAccount.responsiblePerson)
+        const teamResponsibleUsers = allUsers
+          .filter((u: any) => u.accessLevel === "Υπεύθυνος" && Array.isArray(u.responsibleFor) && u.responsibleFor.includes(firstTeam))
+          .map((u: any) => u.displayName)
+        if (teamResponsibleUsers.length > 0) {
+          responsibleUsers.push(...teamResponsibleUsers)
           return responsibleUsers
         }
       }
@@ -247,7 +242,7 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
                 </div>
                 
                 {/* Edit/Save/Cancel buttons for admin */}
-                {currentUser?.accessLevel === "admin" && (
+                {currentUser?.accessLevel === "Διαχειριστής" && (
                   <div className="flex items-center gap-2">
                                          {!isEditMode ? (
                        <Button onClick={handleEdit} className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold">
@@ -354,7 +349,7 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
                       Επίπεδο Πρόσβασης
                     </Label>
                     {isEditMode ? (
-                      <Select
+                        <Select
                         value={editedUser.accessLevel || ''}
                         onValueChange={(value) => handleInputChange('accessLevel', value)}
                       >
@@ -362,14 +357,14 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="user">Χρήστης</SelectItem>
+                          <SelectItem value="Χρήστης">Χρήστης</SelectItem>
                           <SelectItem value="Υπεύθυνος">Υπεύθυνος</SelectItem>
-                          <SelectItem value="admin">Διαχειριστής</SelectItem>
+                          <SelectItem value="Διαχειριστής">Διαχειριστής</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
                       <div className="text-lg">
-                        <RoleBadge accessLevel={profileUser.accessLevel} />
+                         <RoleBadge accessLevel={profileUser.accessLevel as any} />
                       </div>
                     )}
                   </div>

@@ -273,7 +273,7 @@ export default function PricesPage() {
             </div>
 
             {/* Price Calculator - Only show for non-admin users */}
-            {user && user.accessLevel !== "admin" && (
+            {user && user.accessLevel !== "Διαχειριστής" && (
               <Card className="border-yellow-200">
                 <CardHeader className="bg-yellow-100 border-b border-yellow-200">
                   <div className="flex justify-between items-center">

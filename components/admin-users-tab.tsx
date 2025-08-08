@@ -55,8 +55,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
     const allUsers = dummyDB.getUsers()
     const responsibleUsers: string[] = []
     
-    // For Άτομο users with "user" access level, find their team's responsible person
-    if (userData.userRole === "Άτομο" && userData.accessLevel === "user" && userData.memberOf && userData.memberOf.length > 0) {
+    // For Άτομο users with "Χρήστης" access level, find their team's responsible person
+    if (userData.userRole === "Άτομο" && userData.accessLevel === "Χρήστης" && userData.memberOf && userData.memberOf.length > 0) {
       // Find the team the user is a member of
       const userTeam = userData.memberOf.find((member: string) => {
         const teamAccount = allUsers.find((user: any) => 
@@ -212,14 +212,14 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   </div>
                   <Badge 
                     className={
-                      userData.accessLevel === "admin" 
+                      userData.accessLevel === "Διαχειριστής" 
                         ? "bg-yellow-500 hover:bg-yellow-600 text-black font-semibold" 
                         : userData.accessLevel === "Υπεύθυνος" 
                         ? "bg-black text-white hover:bg-gray-800" 
                         : "bg-gray-500 text-white hover:bg-gray-600"
                     }
                   >
-                    {userData.accessLevel === "admin" ? "Διαχειριστής" : userData.accessLevel === "Υπεύθυνος" ? "Υπεύθυνος" : "User"}
+                    {userData.accessLevel === "Διαχειριστής" ? "Διαχειριστής" : userData.accessLevel === "Υπεύθυνος" ? "Υπεύθυνος" : "Χρήστης"}
                   </Badge>
                 </CardTitle>
                 <CardDescription className="flex items-center gap-2">
@@ -272,7 +272,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 })()}
 
                 {/* Responsible persons display for Άτομο users */}
-                {userData.userRole === "Άτομο" && userData.accessLevel === "user" && (() => {
+                {userData.userRole === "Άτομο" && userData.accessLevel === "Χρήστης" && (() => {
                   const responsibleUsers = getResponsibleUsers(userData)
                   return (
                     <div className="space-y-2">
@@ -305,8 +305,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   </div>
                 )}
 
-                {/* Show debts for user and Υπεύθυνος access levels */}
-                {(userData.accessLevel === "user" || userData.accessLevel === "Υπεύθυνος") && (
+                {/* Show debts for Χρήστης and Υπεύθυνος access levels */}
+                {(userData.accessLevel === "Χρήστης" || userData.accessLevel === "Υπεύθυνος") && (
                   <div className="border-t pt-4 mt-auto">
                     <h4 className="font-medium text-sm text-gray-700 mb-2">Οφειλές</h4>
                     <div className="space-y-2 text-sm">

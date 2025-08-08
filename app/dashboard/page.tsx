@@ -136,7 +136,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
 
-    if (user.accessLevel === "admin") {
+   if (user.accessLevel === "Διαχειριστής") {
       // Admin sees all data
       const allPrintJobs = dummyDB.getAllPrintJobs()
       const allLaminationJobs = dummyDB.getAllLaminationJobs()
@@ -218,7 +218,7 @@ export default function DashboardPage() {
     if (allUsers.length > 0) {
       // Calculate the actual debt range from filtered users based on current role filter
       const filteredUsers = allUsers.filter(userData => {
-        if (userData.accessLevel === "admin") return false;
+        if (userData.accessLevel === "Διαχειριστής") return false;
         
         // Apply role filter
         if (roleFilter !== "all" && userData.userRole !== roleFilter) {
@@ -262,7 +262,7 @@ export default function DashboardPage() {
     if (allUsers.length > 0) {
       // Calculate the actual debt range from all users
       const userDebtAmounts = allUsers
-        .filter(userData => userData.accessLevel !== "admin")
+        .filter(userData => userData.accessLevel !== "Διαχειριστής")
         .map(user => user.totalDebt || 0);
       
       if (userDebtAmounts.length > 0) {
@@ -477,7 +477,7 @@ export default function DashboardPage() {
     // Reset price range to actual debt range from data
     if (allUsers.length > 0) {
       const userDebtAmounts = allUsers
-        .filter(userData => userData.accessLevel !== "admin")
+        .filter(userData => userData.accessLevel !== "Διαχειριστής")
         .map(user => user.totalDebt || 0);
       
       if (userDebtAmounts.length > 0) {
@@ -658,12 +658,12 @@ export default function DashboardPage() {
   const allUsersData = dummyDB.getUsers()
   
   // For the top 3 cards, show personal debts for Υπεύθυνος and Χρήστης users
-  const personalDebtUsers = user.accessLevel === "admin" 
+  const personalDebtUsers = user.accessLevel === "Διαχειριστής" 
     ? allUsersData 
     : allUsersData.filter(u => u.uid === user.uid) // Both Υπεύθυνος and Χρήστης see only their personal data
   
   // For the debt table, show different data based on access level
-  const relevantUsers = user.accessLevel === "admin" 
+  const relevantUsers = user.accessLevel === "Διαχειριστής" 
     ? allUsersData 
     : user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0
       ? allUsersData.filter(u => {
@@ -878,7 +878,7 @@ export default function DashboardPage() {
           }
           
           // Apply team filter for admin users to team entries
-          if (user?.accessLevel === "admin" && teamFilter !== "all") {
+          if (user?.accessLevel === "Διαχειριστής" && teamFilter !== "all") {
             // For teams, check if the team name matches the selected team filter
             if (teamEntity.displayName !== teamFilter) {
               return // Skip this team if it doesn't match the team filter
@@ -957,7 +957,7 @@ export default function DashboardPage() {
     // Get all users and their debt information
     relevantUsers.forEach(userData => {
       // Skip admin users from the debt table
-      if (userData.accessLevel === "admin") return
+      if (userData.accessLevel === "Διαχειριστής") return
       
       // Skip if this is a team entry that was already added for Υπεύθυνος users
       if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.includes(userData.displayName) && userData.userRole === "Ομάδα") {
@@ -981,7 +981,7 @@ export default function DashboardPage() {
       }
       
       // Apply team filter for admin users
-      if (user?.accessLevel === "admin" && teamFilter !== "all") {
+      if (user?.accessLevel === "Διαχειριστής" && teamFilter !== "all") {
         // For individual users, check if they belong to the selected team
         if (userData.userRole === "Άτομο") {
           if (!userData.memberOf?.includes(teamFilter)) {
@@ -1065,7 +1065,7 @@ export default function DashboardPage() {
       
       if ((userData.accessLevel as string) === "Υπεύθυνος") {
         responsiblePerson = "-"
-      } else if ((userData.accessLevel as string) === "admin") {
+      } else if ((userData.accessLevel as string) === "Διαχειριστής") {
         responsiblePerson = "Διαχειριστής"
       } else if (userData.userRole === "Άτομο") {
         const responsibleUsers = getResponsibleUsers(userData)
@@ -1153,7 +1153,7 @@ export default function DashboardPage() {
                 <h1 className="text-3xl font-bold text-gray-900">Πίνακας Ελέγχου</h1>
                 <p className="text-gray-600">
                   Καλώς ήρθατε, {user.displayName}
-                  {user.accessLevel === "admin" && " - Προβολή όλων των δεδομένων"}
+                  {user.accessLevel === "Διαχειριστής" && " - Προβολή όλων των δεδομένων"}
                 </p>
               </div>
             </div>
@@ -1168,10 +1168,10 @@ export default function DashboardPage() {
                       <div className="text-center flex-1">
                         <div className="text-lg font-semibold text-yellow-900">ΣΥΝΟΛΟ</div>
                         <div className="text-sm font-medium text-yellow-800">
-                          {user.accessLevel === "admin" ? "Χρέος|Έσοδα" : "Χρέος"}
+                          {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
                         </div>
                       </div>
-                      {user.accessLevel === "admin" && (
+                      {user.accessLevel === "Διαχειριστής" && (
                         <AlertDialog open={showTotalBankResetDialog} onOpenChange={setShowTotalBankResetDialog}>
                           <AlertDialogTrigger asChild>
                             <Button
@@ -1213,13 +1213,13 @@ export default function DashboardPage() {
                     <div className={`text-3xl font-bold ${totalUnpaid <= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
                     </div>
-                    {user.accessLevel === "admin" && (
+                   {user.accessLevel === "Διαχειριστής" && (
                       <div className="text-2xl font-bold text-green-600">
                         {formatPrice(totalBank)}
                       </div>
                     )}
                   </div>
-                  {hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "admin" && (
+                  {hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "Διαχειριστής" && (
                     <div className="text-sm text-gray-500 mt-3">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
                   )}
                 </div>
@@ -1233,10 +1233,10 @@ export default function DashboardPage() {
                       <div className="text-center flex-1">
                         <div className="text-lg font-semibold text-blue-900">ΤΟ. ΦΩ.</div>
                         <div className="text-sm font-medium text-blue-800">
-                          {user.accessLevel === "admin" ? "Χρέος|Έσοδα" : "Χρέος"}
+                          {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
                         </div>
                       </div>
-                    {user.accessLevel === "admin" && (
+                    {user.accessLevel === "Διαχειριστής" && (
                       <AlertDialog open={showPrintBankResetDialog} onOpenChange={setShowPrintBankResetDialog}>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -1278,13 +1278,13 @@ export default function DashboardPage() {
                     <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-blue-600' : 'text-green-600'}`}>
                       {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
                     </div>
-                    {user.accessLevel === "admin" && (
+                    {user.accessLevel === "Διαχειριστής" && (
                       <div className="text-2xl font-bold text-green-600">
                         {formatPrice(printBank)}
                       </div>
                     )}
                   </div>
-                  {hasFilters && printUnpaidPercentage < 100 && user.accessLevel === "admin" && (
+                  {hasFilters && printUnpaidPercentage < 100 && user.accessLevel === "Διαχειριστής" && (
                     <div className="text-sm text-gray-500 mt-3">({printUnpaidPercentage.toFixed(1)}% του {formatPrice(totalPrintUnpaid)})</div>
                   )}
                 </div>
@@ -1298,10 +1298,10 @@ export default function DashboardPage() {
                       <div className="text-center flex-1">
                         <div className="text-lg font-semibold text-green-900">ΠΛΑ. ΤΟ.</div>
                         <div className="text-sm font-medium text-green-800">
-                          {user.accessLevel === "admin" ? "Χρέος|Έσοδα" : "Χρέος"}
+                          {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
                         </div>
                       </div>
-                    {user.accessLevel === "admin" && (
+                    {user.accessLevel === "Διαχειριστής" && (
                       <AlertDialog open={showLaminationBankResetDialog} onOpenChange={setShowLaminationBankResetDialog}>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -1343,13 +1343,13 @@ export default function DashboardPage() {
                     <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-green-600' : 'text-green-600'}`}>
                       {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
                     </div>
-                    {user.accessLevel === "admin" && (
+                    {user.accessLevel === "Διαχειριστής" && (
                       <div className="text-2xl font-bold text-green-600">
                         {formatPrice(laminationBank)}
                       </div>
                     )}
                   </div>
-                  {hasFilters && laminationUnpaidPercentage < 100 && user.accessLevel === "admin" && (
+                  {hasFilters && laminationUnpaidPercentage < 100 && user.accessLevel === "Διαχειριστής" && (
                     <div className="text-sm text-gray-500 mt-3">({laminationUnpaidPercentage.toFixed(1)}% του {formatPrice(totalLaminationUnpaid)})</div>
                   )}
                 </div>
@@ -1399,7 +1399,7 @@ export default function DashboardPage() {
                           <p className="text-sm text-yellow-700">Συγκεντρωμένα δεδομένα χρεώσεων, πληρωμών και πιστώσεων</p>
                         </div>
                       </div>
-                      {(user.accessLevel === "admin" || user.accessLevel === "Υπεύθυνος") && (
+                      {(user.accessLevel === "Διαχειριστής" || user.accessLevel === "Υπεύθυνος") && (
                         <Button
                           onClick={() =>
                             exportTableXLSX(
@@ -1491,7 +1491,7 @@ export default function DashboardPage() {
                           <p className="text-sm text-yellow-700">Ιστορικό εσόδων από πληρωμές</p>
                         </div>
                       </div>
-                      {(user.accessLevel === "admin" || user.accessLevel === "Υπεύθυνος") && (
+                      {(user.accessLevel === "Διαχειριστής" || user.accessLevel === "Υπεύθυνος") && (
                         <Button
                           onClick={() =>
                             exportTableXLSX(
@@ -1596,7 +1596,7 @@ export default function DashboardPage() {
                                 <p className="text-sm text-blue-700">Λεπτομερές ιστορικό όλων των εκτυπώσεων</p>
                               </div>
                             </div>
-                            {(user.accessLevel === "admin" || user.accessLevel === "Υπεύθυνος") && (
+                            {(user.accessLevel === "Διαχειριστής" || user.accessLevel === "Υπεύθυνος") && (
                               <Button
                                 onClick={() => {
                                   // Helper function to get print type label
@@ -1862,7 +1862,7 @@ export default function DashboardPage() {
                                 <p className="text-sm text-green-700">Ιστορικό καταχωρημένων πλαστικοποιήσεων</p>
                               </div>
                             </div>
-                            {(user.accessLevel === "admin" || user.accessLevel === "Υπεύθυνος") && (
+                            {(user.accessLevel === "Διαχειριστής" || user.accessLevel === "Υπεύθυνος") && (
                               <Button
                                 onClick={() =>
                                   exportTableXLSX(

@@ -11,8 +11,8 @@ import type { LaminationJob } from "@/lib/dummy-database"
 const LaminationJobsColGroup = ({ userRole }: { userRole: string }) => (
   <colgroup>
     <col style={{ width: "15%" }} />
-    {userRole === "admin" && <col style={{ width: "12%" }} />}
-    {userRole === "admin" && <col style={{ width: "15%" }} />}
+    {userRole === "Διαχειριστής" && <col style={{ width: "12%" }} />}
+    {userRole === "Διαχειριστής" && <col style={{ width: "15%" }} />}
     <col style={{ width: "15%" }} />
     <col style={{ width: "12%" }} />
     <col style={{ width: "12%" }} />
@@ -69,7 +69,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
             >
               Ημερομηνία
             </SortableTableHeader>
-            {userRole === "admin" && (
+            {userRole === "Διαχειριστής" && (
               <SortableTableHeader
                 sortKey="username"
                 currentSort={sortConfig}
@@ -78,7 +78,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
                 Χρήστης
               </SortableTableHeader>
             )}
-            {userRole === "admin" && (
+            {userRole === "Διαχειριστής" && (
               <SortableTableHeader
                 sortKey="userDisplayName"
                 currentSort={sortConfig}
@@ -119,7 +119,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
           <TableBody>
             {sortedData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={userRole === "admin" ? 6 : 4} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={userRole === "Διαχειριστής" ? 6 : 4} className="text-center py-8 text-gray-500">
                   Δεν βρέθηκαν αποτελέσματα
                 </TableCell>
               </TableRow>
@@ -136,8 +136,8 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
                     onMouseLeave={() => onRowHover?.(null)}
                   >
                     <TableCell className="text-center">{job.timestamp.toLocaleDateString("el-GR")}</TableCell>
-                    {userRole === "admin" && <TableCell className="text-center">{job.username}</TableCell>}
-                    {userRole === "admin" && <TableCell className="text-center">{job.userDisplayName}</TableCell>}
+                    {userRole === "Διαχειριστής" && <TableCell className="text-center">{job.username}</TableCell>}
+                    {userRole === "Διαχειριστής" && <TableCell className="text-center">{job.userDisplayName}</TableCell>}
                     <TableCell className="text-center">
                       <Badge variant="outline">{getLaminationTypeLabel(job.type)}</Badge>
                     </TableCell>

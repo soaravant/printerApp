@@ -112,7 +112,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
             </Select>
           </div>
           {/* Team Filter - Only for Admin users */}
-          {user?.accessLevel === "admin" && (
+          {user?.accessLevel === "Διαχειριστής" && (
             <div>
               <Label htmlFor="debtTeam" className="text-gray-700">Ομάδα</Label>
               <Select value={teamFilter} onValueChange={(value) => {
@@ -187,7 +187,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                 {(() => {
                   // Calculate the actual debt range from filtered data
                   const filteredUsersForRange = users.filter(userData => {
-                    if (userData.accessLevel === "admin") return false;
+                    if (userData.accessLevel === "Διαχειριστής") return false;
                     
                     // Apply search filter
                     if (debtSearchTerm) {
@@ -206,7 +206,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                     }
                     
                     // Apply team filter for admin users
-                    if (user?.accessLevel === "admin" && teamFilter !== "all") {
+                    if (user?.accessLevel === "Διαχειριστής" && teamFilter !== "all") {
                       // For individual users, check if they belong to the selected team
                       if (userData.userRole === "Άτομο") {
                         if (!userData.memberOf?.includes(teamFilter)) {
@@ -307,7 +307,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                     // Calculate filtered data based only on search and role (not price range)
                     // Apply the same responsibleFor filtering logic as the dashboard
                     const filteredUsersForCounts = users.filter(userData => {
-                      if (userData.accessLevel === "admin") return false;
+                      if (userData.accessLevel === "Διαχειριστής") return false;
                       
                       // Apply search filter
                       if (debtSearchTerm) {
@@ -326,7 +326,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                       }
                       
                       // Apply team filter for admin users
-                      if (user?.accessLevel === "admin" && teamFilter !== "all") {
+                      if (user?.accessLevel === "Διαχειριστής" && teamFilter !== "all") {
                         // For individual users, check if they belong to the selected team
                         if (userData.userRole === "Άτομο") {
                           if (!userData.memberOf?.includes(teamFilter)) {
@@ -402,7 +402,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                 {(() => {
                   // Calculate the same range as the histogram for consistency
                   const filteredUsersForSlider = users.filter(userData => {
-                    if (userData.accessLevel === "admin") return false;
+                    if (userData.accessLevel === "Διαχειριστής") return false;
                     
                     // Apply search filter
                     if (debtSearchTerm) {
@@ -421,7 +421,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                     }
                     
                     // Apply team filter for admin users
-                    if (user?.accessLevel === "admin" && teamFilter !== "all") {
+                    if (user?.accessLevel === "Διαχειριστής" && teamFilter !== "all") {
                       // For individual users, check if they belong to the selected team
                       if (userData.userRole === "Άτομο") {
                         if (!userData.memberOf?.includes(teamFilter)) {
@@ -485,7 +485,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                   {(() => {
                     // Use the same filteredUsersForCounts as the histogram for consistency
                     const filteredUsersForCounts = users.filter(userData => {
-                      if (userData.accessLevel === "admin") return false;
+                      if (userData.accessLevel === "Διαχειριστής") return false;
                       
                       // Apply search filter
                       if (debtSearchTerm) {
@@ -504,7 +504,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                       }
                       
                       // Apply team filter for admin users
-                      if (user?.accessLevel === "admin" && teamFilter !== "all") {
+                      if (user?.accessLevel === "Διαχειριστής" && teamFilter !== "all") {
                         // For individual users, check if they belong to the selected team
                         if (userData.userRole === "Άτομο") {
                           if (!userData.memberOf?.includes(teamFilter)) {

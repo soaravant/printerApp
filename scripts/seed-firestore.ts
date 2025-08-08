@@ -80,7 +80,7 @@ async function seedUsers() {
   users.push({
     uid: "admin-1",
     username: "admin",
-    accessLevel: "admin",
+    accessLevel: "Διαχειριστής",
     displayName: "Διαχειριστής",
     createdAt: ts(new Date("2024-01-01")),
     userRole: "Άτομο",
@@ -116,7 +116,7 @@ async function seedUsers() {
     users.push({
       uid: `user-${firstUser}`,
       username: String(firstUser),
-      accessLevel: "user",
+      accessLevel: "Χρήστης",
       displayName: `Χρήστης ${firstUser}`,
       createdAt: ts(now()),
       userRole: "Άτομο",
@@ -127,7 +127,7 @@ async function seedUsers() {
     users.push({
       uid: `user-${firstUser + 1}`,
       username: String(firstUser + 1),
-      accessLevel: "user",
+      accessLevel: "Χρήστης",
       displayName: `Χρήστης ${firstUser + 1}`,
       createdAt: ts(now()),
       userRole: "Άτομο",
@@ -169,7 +169,7 @@ async function seedUsers() {
     users.push({
       uid,
       username: String(code),
-      accessLevel: "user",
+      accessLevel: "Χρήστης",
       displayName: name,
       createdAt: ts(now()),
       userRole: role as FirebaseUser["userRole"],
@@ -211,7 +211,7 @@ async function seedJobs() {
   const usersSnap = await db.collection(FIREBASE_COLLECTIONS.USERS).get()
   const users = usersSnap.docs
     .map((d) => d.data() as FirebaseUser)
-    .filter((u) => u.accessLevel !== "admin")
+   .filter((u) => u.accessLevel !== "Διαχειριστής")
 
   const printerNames = ["Canon Color", "Canon B/W", "Brother", "Κυδωνιών"] as const
   const printTypesAll = [

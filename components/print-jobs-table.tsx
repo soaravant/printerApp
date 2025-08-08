@@ -13,8 +13,8 @@ function PrintJobsColGroup({ userRole }: { userRole: string }) {
   return (
     <colgroup>
       <col className="w-[140px]" />
-      {userRole === "admin" && <col className="w-[100px]" />}
-      {userRole === "admin" && <col className="w-[120px]" />}
+      {userRole === "Διαχειριστής" && <col className="w-[100px]" />}
+      {userRole === "Διαχειριστής" && <col className="w-[120px]" />}
       <col className="w-[120px]" />
       <col className="w-[120px]" />
       <col className="w-[80px]" />
@@ -122,7 +122,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
             >
               Ημερομηνία/Ώρα
             </SortableTableHeader>
-            {userRole === "admin" && (
+            {userRole === "Διαχειριστής" && (
               <SortableTableHeader
                 sortKey="username"
                 currentSort={sortConfig}
@@ -131,7 +131,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
                 Χρήστης
               </SortableTableHeader>
             )}
-            {userRole === "admin" && (
+            {userRole === "Διαχειριστής" && (
               <SortableTableHeader
                 sortKey="userDisplayName"
                 currentSort={sortConfig}
@@ -179,7 +179,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
           <TableBody>
             {sortedData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={userRole === "admin" ? 7 : 5} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={userRole === "Διαχειριστής" ? 7 : 5} className="text-center py-8 text-gray-500">
                   Δεν βρέθηκαν αποτελέσματα
                 </TableCell>
               </TableRow>
@@ -192,8 +192,8 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
                   onMouseLeave={() => onRowHover?.(null)}
                 >
                   <TableCell className="text-center">{row.timestamp.toLocaleString("el-GR")}</TableCell>
-                  {userRole === "admin" && <TableCell className="text-center">{row.username}</TableCell>}
-                  {userRole === "admin" && <TableCell className="text-center">{row.userDisplayName}</TableCell>}
+                  {userRole === "Διαχειριστής" && <TableCell className="text-center">{row.username}</TableCell>}
+                  {userRole === "Διαχειριστής" && <TableCell className="text-center">{row.userDisplayName}</TableCell>}
                   <TableCell className="text-center">
                     <Badge variant="outline">{row.deviceName}</Badge>
                   </TableCell>

@@ -4,7 +4,7 @@ import { roundMoney, calculatePrintCost, calculatePrintJobTotal, multiplyMoney }
 export interface User {
   uid: string
   username: string
-  accessLevel: "user" | "admin" | "Υπεύθυνος" // Added Υπεύθυνος access level
+  accessLevel: "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος" // Greek labels for access levels
   displayName: string
   createdAt: Date
   userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" // New field for the role selection
@@ -103,7 +103,7 @@ class DummyDatabase {
       {
         uid: "admin-1",
         username: "admin",
-        accessLevel: "admin",
+        accessLevel: "Διαχειριστής",
         displayName: "Διαχειριστής",
         createdAt: new Date("2024-01-01"),
         userRole: "Άτομο",
@@ -125,7 +125,7 @@ class DummyDatabase {
       {
         uid: "user-501",
         username: "501",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 501",
         createdAt: new Date("2024-01-02"),
         userRole: "Άτομο",
@@ -135,7 +135,7 @@ class DummyDatabase {
       {
         uid: "user-502",
         username: "502",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 502",
         createdAt: new Date("2024-01-03"),
         userRole: "Άτομο",
@@ -158,7 +158,7 @@ class DummyDatabase {
       {
         uid: "user-503",
         username: "503",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 503",
         createdAt: new Date("2024-01-05"),
         userRole: "Άτομο",
@@ -168,7 +168,7 @@ class DummyDatabase {
       {
         uid: "user-504",
         username: "504",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 504",
         createdAt: new Date("2024-01-06"),
         userRole: "Άτομο",
@@ -191,7 +191,7 @@ class DummyDatabase {
       {
         uid: "user-505",
         username: "505",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 505",
         createdAt: new Date("2024-01-08"),
         userRole: "Άτομο",
@@ -201,7 +201,7 @@ class DummyDatabase {
       {
         uid: "user-506",
         username: "506",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 506",
         createdAt: new Date("2024-01-09"),
         userRole: "Άτομο",
@@ -224,7 +224,7 @@ class DummyDatabase {
       {
         uid: "user-507",
         username: "507",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 507",
         createdAt: new Date("2024-01-11"),
         userRole: "Άτομο",
@@ -234,7 +234,7 @@ class DummyDatabase {
       {
         uid: "user-508",
         username: "508",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 508",
         createdAt: new Date("2024-01-12"),
         userRole: "Άτομο",
@@ -257,7 +257,7 @@ class DummyDatabase {
       {
         uid: "user-509",
         username: "509",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 509",
         createdAt: new Date("2024-01-14"),
         userRole: "Άτομο",
@@ -267,7 +267,7 @@ class DummyDatabase {
       {
         uid: "user-510",
         username: "510",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 510",
         createdAt: new Date("2024-01-15"),
         userRole: "Άτομο",
@@ -290,7 +290,7 @@ class DummyDatabase {
       {
         uid: "user-511",
         username: "511",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 511",
         createdAt: new Date("2024-01-17"),
         userRole: "Άτομο",
@@ -300,7 +300,7 @@ class DummyDatabase {
       {
         uid: "user-512",
         username: "512",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 512",
         createdAt: new Date("2024-01-18"),
         userRole: "Άτομο",
@@ -323,7 +323,7 @@ class DummyDatabase {
       {
         uid: "user-513",
         username: "513",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 513",
         createdAt: new Date("2024-01-20"),
         userRole: "Άτομο",
@@ -333,7 +333,7 @@ class DummyDatabase {
       {
         uid: "user-514",
         username: "514",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 514",
         createdAt: new Date("2024-01-21"),
         userRole: "Άτομο",
@@ -356,7 +356,7 @@ class DummyDatabase {
       {
         uid: "user-515",
         username: "515",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 515",
         createdAt: new Date("2024-01-23"),
         userRole: "Άτομο",
@@ -366,7 +366,7 @@ class DummyDatabase {
       {
         uid: "user-516",
         username: "516",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Χρήστης 516",
         createdAt: new Date("2024-01-24"),
         userRole: "Άτομο",
@@ -378,7 +378,7 @@ class DummyDatabase {
       {
         uid: "team-enwmenoi",
         username: "600",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Ενωμένοι",
         createdAt: new Date("2024-01-05"),
         userRole: "Ομάδα",
@@ -386,7 +386,7 @@ class DummyDatabase {
       {
         uid: "team-sporiades",
         username: "601",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Σποριάδες",
         createdAt: new Date("2024-01-06"),
         userRole: "Ομάδα",
@@ -394,7 +394,7 @@ class DummyDatabase {
       {
         uid: "team-karpoforoi",
         username: "602",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Καρποφόροι",
         createdAt: new Date("2024-01-07"),
         userRole: "Ομάδα",
@@ -402,7 +402,7 @@ class DummyDatabase {
       {
         uid: "team-olofwtoi",
         username: "603",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Ολόφωτοι",
         createdAt: new Date("2024-01-08"),
         userRole: "Ομάδα",
@@ -410,7 +410,7 @@ class DummyDatabase {
       {
         uid: "team-nikhtes",
         username: "604",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Νικητές",
         createdAt: new Date("2024-01-09"),
         userRole: "Ομάδα",
@@ -418,7 +418,7 @@ class DummyDatabase {
       {
         uid: "team-nikhforoi",
         username: "605",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Νικηφόροι",
         createdAt: new Date("2024-01-10"),
         userRole: "Ομάδα",
@@ -426,7 +426,7 @@ class DummyDatabase {
       {
         uid: "team-floga",
         username: "606",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Φλόγα",
         createdAt: new Date("2024-01-11"),
         userRole: "Ομάδα",
@@ -434,7 +434,7 @@ class DummyDatabase {
       {
         uid: "team-sympsyxoi",
         username: "607",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Σύμψυχοι",
         createdAt: new Date("2024-01-12"),
         userRole: "Ομάδα",
@@ -444,7 +444,7 @@ class DummyDatabase {
       {
         uid: "naos-1",
         username: "700",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Ναός 1",
         createdAt: new Date("2024-01-14"),
         userRole: "Ναός",
@@ -452,7 +452,7 @@ class DummyDatabase {
       {
         uid: "naos-2",
         username: "701",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Ναός 2",
         createdAt: new Date("2024-01-15"),
         userRole: "Ναός",
@@ -460,7 +460,7 @@ class DummyDatabase {
       {
         uid: "naos-3",
         username: "703",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Ναός 3",
         createdAt: new Date("2024-01-16"),
         userRole: "Ναός",
@@ -468,7 +468,7 @@ class DummyDatabase {
       {
         uid: "naos-4",
         username: "704",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Ναός 4",
         createdAt: new Date("2024-01-17"),
         userRole: "Ναός",
@@ -476,7 +476,7 @@ class DummyDatabase {
       {
         uid: "naos-5",
         username: "705",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Ναός 5",
         createdAt: new Date("2024-01-18"),
         userRole: "Ναός",
@@ -484,7 +484,7 @@ class DummyDatabase {
       {
         uid: "naos-6",
         username: "706",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Ναός 6",
         createdAt: new Date("2024-01-19"),
         userRole: "Ναός",
@@ -492,7 +492,7 @@ class DummyDatabase {
       {
         uid: "naos-7",
         username: "707",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Ναός 7",
         createdAt: new Date("2024-01-20"),
         userRole: "Ναός",
@@ -500,7 +500,7 @@ class DummyDatabase {
       {
         uid: "naos-8",
         username: "708",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Ναός 8",
         createdAt: new Date("2024-01-21"),
         userRole: "Ναός",
@@ -510,7 +510,7 @@ class DummyDatabase {
       {
         uid: "tomeas-1",
         username: "800",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Τομέας 1",
         createdAt: new Date("2024-01-22"),
         userRole: "Τομέας",
@@ -518,7 +518,7 @@ class DummyDatabase {
       {
         uid: "tomeas-2",
         username: "801",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Τομέας 2",
         createdAt: new Date("2024-01-23"),
         userRole: "Τομέας",
@@ -526,7 +526,7 @@ class DummyDatabase {
       {
         uid: "tomeas-3",
         username: "802",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Τομέας 3",
         createdAt: new Date("2024-01-24"),
         userRole: "Τομέας",
@@ -537,7 +537,7 @@ class DummyDatabase {
       {
         uid: "tomeas-4",
         username: "803",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Τομέας 4",
         createdAt: new Date("2024-01-25"),
         userRole: "Τομέας",
@@ -548,7 +548,7 @@ class DummyDatabase {
       {
         uid: "tomeas-5",
         username: "804",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Τομέας 5",
         createdAt: new Date("2024-01-26"),
         userRole: "Τομέας",
@@ -556,7 +556,7 @@ class DummyDatabase {
       {
         uid: "tomeas-6",
         username: "805",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Τομέας 6",
         createdAt: new Date("2024-01-27"),
         userRole: "Τομέας",
@@ -564,7 +564,7 @@ class DummyDatabase {
       {
         uid: "tomeas-7",
         username: "806",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Τομέας 7",
         createdAt: new Date("2024-01-28"),
         userRole: "Τομέας",
@@ -572,7 +572,7 @@ class DummyDatabase {
       {
         uid: "tomeas-8",
         username: "807",
-        accessLevel: "user",
+        accessLevel: "Χρήστης",
         displayName: "Τομέας 8",
         createdAt: new Date("2024-01-29"),
         userRole: "Τομέας",
@@ -629,7 +629,7 @@ class DummyDatabase {
   private generateSampleData() {
     const now = new Date();
     // Include all users except admin in job generation (including Ομάδα, Ναός, Τομέας accounts)
-    const userIds = this.users.filter((u) => u.accessLevel !== "admin").map((u) => u.uid);
+    const userIds = this.users.filter((u) => u.accessLevel !== "Διαχειριστής").map((u) => u.uid);
 
     // Generate print and lamination jobs for the last 6 months
     for (let monthOffset = 0; monthOffset < 6; monthOffset++) {

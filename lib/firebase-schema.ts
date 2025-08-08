@@ -33,7 +33,7 @@ export interface FirebaseUser {
   userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας"
   memberOf?: string[]
   responsibleFor?: string[]
-  accessLevel: "user" | "admin" | "Υπεύθυνος"
+  accessLevel: "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος"
   team?: string
   // For compatibility with current firestore.rules which check `role == 'admin'`
   role?: "admin" | "user"

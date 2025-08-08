@@ -24,29 +24,29 @@ export function Navigation() {
       href: "/dashboard",
       label: "Πίνακας Ελέγχου",
       icon: Printer,
-      roles: ["user", "admin", "Υπεύθυνος", "Χρήστης"],
+      roles: ["Χρήστης", "Διαχειριστής", "Υπεύθυνος"],
     },
     {
       href: "/admin",
       label: "Διαχείριση",
       icon: Settings,
-      roles: ["admin"],
+      roles: ["Διαχειριστής"],
     },
     {
       href: "/prices",
       label: "Τιμές",
       icon: Euro,
-      roles: ["admin", "Υπεύθυνος", "Χρήστης"],
+      roles: ["Διαχειριστής", "Υπεύθυνος", "Χρήστης"],
     },
     {
       href: `/profile/${user.uid}`,
       label: "Προφίλ",
       icon: UserIcon,
-      roles: ["user", "admin", "Υπεύθυνος", "Χρήστης"],
+      roles: ["Χρήστης", "Διαχειριστής", "Υπεύθυνος"],
     },
   ]
 
-  const visibleItems = navItems.filter((item) => item.roles.includes(user.accessLevel))
+  const visibleItems = navItems.filter((item) => item.roles.includes(user.accessLevel as any))
 
   // Truncate username if too long
   const truncateText = (text: string, maxLength: number) => {
