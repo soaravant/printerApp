@@ -5,6 +5,7 @@ import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
 import { RefreshProvider } from "@/lib/refresh-context"
 import { Toaster } from "@/components/ui/toaster"
+import { GlobalErrorHandler } from "@/components/global-error-handler"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -19,19 +20,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Add global error handler for unhandled promise rejections
-  if (typeof window !== "undefined") {
-    window.addEventListener("unhandledrejection", (event) => {
-      console.error("Unhandled promise rejection:", event.reason)
-      event.preventDefault()
-    })
-  }
-
   return (
     <html lang="el">
       <body className={inter.className}>
         <AuthProvider>
           <RefreshProvider>
+            <GlobalErrorHandler />
             {children}
             <Toaster />
           </RefreshProvider>
