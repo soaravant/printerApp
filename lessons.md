@@ -1,5 +1,21 @@
 # Development Lessons & Solutions
 
+## Recent Fixes (August 2025)
+
+### Amount Input Spinner Behavior in Debt Reduction (Ξεχρέωση)
+- Problem: Using the up/down arrows on the payment amount field adjusted by cents due to `step="0.01"`. Desired behavior was increments of €1 via arrows while still allowing users to type cents manually.
+- Solution: Set `step="1"` on the amount input so arrow keys/spinner move by €1. Free typing still accepts decimals (e.g., 12,34).
+- File: `app/admin/page.tsx` (input with id `debt-amount`).
+
+### Debt Preview Respects Existing Credit and Accumulates New Payments
+- Problem: When a user already had credit (negative `totalDebt`), the Ξεχρέωση preview didn’t include that credit, and entering a new payment appeared to overwrite instead of increase credit.
+- Solution:
+  - Initialize preview state with existing credit when `totalDebt < 0`.
+  - Clamp category debts to non-negative in the preview.
+  - When there is remaining payment after clearing category debts, add it to credit using accumulation (`extraCredit += remainingPayment`) rather than replacing.
+- Impact: The “Σύνολο” shows negative totals correctly on load, and additional income increases the credit (becomes more negative), matching the ledger rules used in the data layer.
+- File: `app/admin/page.tsx` (debt reduction preview calculation block).
+
 ## Date Initialization Fix for Printing Tab (December 2024)
 
 ### Set Default Date to Today in Admin Printing Form
@@ -195,6 +211,49 @@ const getPricePropertyName = (printType: string): string => {
 
 **Files Modified**:
 - `app/admin/page.tsx` - Added mapping function and updated all price references
+## Sequential Debt & Credit Logic (January 2025)
+
+**Problem**: When users had negative total debt (credit), category debts (`printDebt`, `laminationDebt`) could also become negative and new charges were added directly to categories ignoring the credit-first rule.
+
+**Solution**: Implemented a sequential ledger algorithm that:
+- Keeps category debts non-negative; any overpayment becomes credit that appears only in `totalDebt` (negative total).
+- Consumes credit first when new print/lamination charges are added; only the remainder increases the relevant category.
+- Applies payments to lamination first, then print; leftover increases credit and does not affect category values.
+
+**Changes Made**:
+- `lib/dummy-database.ts`
+  
+## Negative Minimum Debt in Filters (January 2025)
+
+Problem: The "Συνολικό Χρέος" filter clamped the minimum value to 0. As a result, users with negative total debt (credit) were excluded when filtering by ranges like "Έως 14€" if the actual minimum was below 0.
+
+Solution: Removed the 0 clamp from range calculations and inputs so the minimum can extend into negative numbers. Updated text inputs to accept a leading minus sign and keep values synchronized with the slider.
+
+Changes Made:
+- `components/debt-filters.tsx`
+  - Allow negative minimum for computed ranges (actualMinDebt, sliderMin).
+  - Accept '-' and ',' in the amount inputs and propagate parsed values to state.
+  - Ensure quick range presets and histogram use true min without clamping.
+
+Result: Filtering by total debt correctly includes users with negative debt when the range minimum is below zero; presets and slider reflect the real data range.
+  - Rewrote `getNetDebtForUser` to process all events (print jobs, lamination jobs, incomes) chronologically, tracking `printDebt`, `laminationDebt`, and `totalCredit`.
+  - Adjusted `addIncome` to update banks and then recalculate debts with the new rule.
+  - Simplified `applyDebtReduction` to only move money into `printBank`/`laminationBank` based on current positive debts.
+  - `updateUserDebtFields` now rounds values and uses the new net debt function.
+- `components/admin-users-tab.tsx`
+  - When `totalDebt` is negative, show 0 for category debts and display only negative total.
+- `app/admin/page.tsx`
+  - Debt preview in the Debt Reduction tab now factors leftover payment as credit that affects only the total.
+
+**Impact**:
+- User cards display 0 for print/lamination when total is negative, matching the expected behavior shown in UI mockups.
+- Adding new jobs while user has credit first reduces the negative total, then increases category debts as needed.
+
+**Testing**:
+- Create payment that exceeds current debts → `totalDebt` negative, categories 0.
+- Add a new print job less than the credit → `totalDebt` closer to 0, categories remain 0.
+- Add a job larger than remaining credit → credit consumed, remainder increases the respective category.
+
 
 **Testing Considerations**:
 - Verify all print types show correct prices in the dropdown

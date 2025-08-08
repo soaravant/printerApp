@@ -1041,7 +1041,7 @@ export default function AdminPage() {
                         <Input
                           id="debt-amount"
                           type="number"
-                          step="0.01"
+                           step="1"
                           min="0"
                           value={debtReductionAmount}
                           onChange={(e) => setDebtReductionAmount(e.target.value)}
@@ -1067,9 +1067,11 @@ export default function AdminPage() {
                       const currentTotalDebt = selectedUserData?.totalDebt || 0
                       const paymentAmount = parseFloat(debtReductionAmount) || 0
                       
-                      // Calculate remaining debt after payment (allowing negative values for credit)
-                      let remainingLamination = currentLaminationDebt
-                      let remainingPrint = currentPrintDebt
+                       // Calculate remaining debt after payment
+                       // Start from current category debts and any existing credit (negative total)
+                       let remainingLamination = Math.max(0, currentLaminationDebt)
+                       let remainingPrint = Math.max(0, currentPrintDebt)
+                       let extraCredit = currentTotalDebt < 0 ? Math.abs(currentTotalDebt) : 0
                       
                       if (paymentAmount > 0) {
                         // Apply payment to debts (lamination first, then printing)
@@ -1089,14 +1091,13 @@ export default function AdminPage() {
                           remainingPayment -= printPayment
                         }
                         
-                        // If there's still payment remaining, create credit
-                        if (remainingPayment > 0) {
-                          // Apply remaining payment as credit to print first
-                          remainingPrint -= remainingPayment
-                        }
+                         // If there's still payment remaining, increase credit (affects only total)
+                         if (remainingPayment > 0) {
+                           extraCredit += remainingPayment
+                         }
                       }
                       
-                      const remainingTotal = remainingLamination + remainingPrint
+                       const remainingTotal = remainingLamination + remainingPrint - extraCredit
                       
                       return (
                         <div className="bg-gray-50 rounded-lg p-4">
