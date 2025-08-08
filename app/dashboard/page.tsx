@@ -1275,7 +1275,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-blue-600' : 'text-green-600'}`}>
                       {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
                     </div>
                     {user.accessLevel === "admin" && (
@@ -1340,7 +1340,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-green-600' : 'text-green-600'}`}>
                       {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
                     </div>
                     {user.accessLevel === "admin" && (
