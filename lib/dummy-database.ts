@@ -1097,9 +1097,9 @@ class DummyDatabase {
     printBankIncrease += printPayment
     remainingAmount -= printPayment
 
-    // Allocate any remaining (excess) income to lamination bank as per business rule
+    // Allocate any remaining (excess) income to print bank as per business rule
     if (remainingAmount > 0) {
-      laminationBankIncrease += remainingAmount
+      printBankIncrease += remainingAmount
       remainingAmount = 0
     }
 

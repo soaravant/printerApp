@@ -61,11 +61,11 @@ export function Navigation() {
     <nav className="bg-white shadow-sm border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Left: Title */}
-          <div className="flex items-center">
+          {/* Left: Title (clickable to dashboard) */}
+          <Link href="/dashboard" className="flex items-center hover:opacity-90" aria-label="Μετάβαση στον Πίνακα Ελέγχου">
             <Printer className="h-8 w-8 text-blue-600" />
             <span className="ml-2 text-xl font-bold text-gray-900 whitespace-nowrap">Σύστημα Χρέωσης</span>
-          </div>
+          </Link>
 
           {/* Center: Navigation Links */}
           <div className="hidden md:flex items-center space-x-4">
