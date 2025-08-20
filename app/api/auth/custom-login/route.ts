@@ -16,11 +16,19 @@ export async function POST(req: Request) {
     const auth = getAdminAuth()
 
     // Look up user by username
-    const snap = await db
-      .collection(FIREBASE_COLLECTIONS.USERS)
-      .where("username", "==", String(username))
-      .limit(1)
-      .get()
+    let snap
+    try {
+      snap = await db
+        .collection(FIREBASE_COLLECTIONS.USERS)
+        .where("username", "==", String(username))
+        .limit(1)
+        .get()
+    } catch (e: any) {
+      const msg = String(e?.message || "")
+      console.error("custom-login firestore query failed", e)
+      const payload: any = { error: "service_unavailable", stage: "firestore_get", message: msg.slice(0, 300) }
+      return NextResponse.json(payload, { status: 503 })
+    }
 
     if (snap.empty) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
 
@@ -36,21 +44,29 @@ export async function POST(req: Request) {
     const uid = userData.uid || userDoc.id
 
     // Create a custom token and return (no need to pre-create Auth user)
-    const customToken = await auth.createCustomToken(uid, {
-      role: userData.role || "user",
-      accessLevel: userData.accessLevel || "Χρήστης",
-    })
+    let customToken: string
+    try {
+      customToken = await auth.createCustomToken(uid, {
+        role: userData.role || "user",
+        accessLevel: userData.accessLevel || "Χρήστης",
+      })
+    } catch (e: any) {
+      const msg = String(e?.message || "")
+      console.error("custom-login createCustomToken failed", e)
+      const payload: any = { error: "service_unavailable", stage: "create_custom_token", message: msg.slice(0, 300) }
+      return NextResponse.json(payload, { status: 503 })
+    }
 
     return NextResponse.json({ token: customToken, uid })
   } catch (err: any) {
     console.error("custom-login error", err)
     const message = String(err?.message || "").toLowerCase()
     if (message.includes("quota") || message.includes("exceed") || message.includes("unavailable")) {
-      return NextResponse.json({ error: "service_unavailable" }, { status: 503 })
+      return NextResponse.json({ error: "service_unavailable", message: message.slice(0, 300) }, { status: 503 })
     }
     if (message.includes("permission") || message.includes("insufficient") || message.includes("denied")) {
-      return NextResponse.json({ error: "permission_denied" }, { status: 403 })
+      return NextResponse.json({ error: "permission_denied", message: message.slice(0, 300) }, { status: 403 })
     }
-    return NextResponse.json({ error: "server_error" }, { status: 500 })
+    return NextResponse.json({ error: "server_error", message: message.slice(0, 300) }, { status: 500 })
   }
 }

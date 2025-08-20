@@ -181,8 +181,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     })
-    if (!res.ok) return false
-    const { token, uid } = await res.json()
+    let payload: any = null
+    try { payload = await res.json() } catch {}
+    if (!res.ok) {
+      console.error("/api/auth/custom-login failed", res.status, payload)
+      return false
+    }
+    const { token, uid } = payload || {}
     const { signInWithCustomToken } = await import("./firebase-auth")
     await signInWithCustomToken(auth, token)
     const u = await fetchUserById(uid)
