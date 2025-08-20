@@ -11,15 +11,18 @@ import { getApps, initializeApp } from "firebase/app"
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore"
 import { getAuth } from "firebase/auth"
 
-let app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
+const isBrowser = typeof window !== "undefined"
+const shouldUseFirestore = process.env.NEXT_PUBLIC_USE_FIRESTORE === "true"
 
-// Enable persistent cache (IndexedDB) with multi-tab support
-// Safe to call once on client side; no-op on server
-try {
-  initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-  })
-} catch {}
+let app: ReturnType<typeof initializeApp> | undefined
+if (isBrowser && shouldUseFirestore) {
+  app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
+  try {
+    initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    })
+  } catch {}
+}
 
-export const db = getFirestore(app)
-export const auth = getAuth(app)
+export const db = app ? getFirestore(app) : (undefined as unknown as ReturnType<typeof getFirestore>)
+export const auth = app ? getAuth(app) : (undefined as unknown as ReturnType<typeof getAuth>)
