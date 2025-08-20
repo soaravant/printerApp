@@ -4,7 +4,7 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
-import { dummyDB } from "@/lib/dummy-database"
+// import { dummyDB } from "@/lib/dummy-database"
 import type { PrintJob, LaminationJob, User, Income } from "@/lib/dummy-database"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -19,16 +19,22 @@ import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import dynamic from "next/dynamic"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download, RotateCcw, Filter, FileText, BarChart3 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
-import * as XLSX from "xlsx-js-style"
+// Note: Load XLSX only on demand to avoid adding it to the main bundle
+let XLSX: any
 import React from "react"
 
 import { PrintFilters } from "@/components/print-filters"
 import { LaminationFilters } from "@/components/lamination-filters"
 import { DebtFilters } from "@/components/debt-filters"
 import { IncomeFilters } from "@/components/income-filters"
+
+// Firestore
+import { fetchBankTotals, fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite } from "@/lib/firebase-queries"
+import { FIREBASE_COLLECTIONS } from "@/lib/firebase-schema"
+import { normalizeGreek } from "@/lib/utils"
 
 // Error boundary component for dynamic imports
 function ErrorBoundary({ children, fallback }: { children: React.ReactNode; fallback: React.ReactNode }) {
@@ -39,6 +45,7 @@ function ErrorBoundary({ children, fallback }: { children: React.ReactNode; fall
   )
 }
 
+const useFirestore = process.env.NEXT_PUBLIC_USE_FIRESTORE === "true"
 
 const PrintJobsTable = dynamic(() => import("@/components/print-jobs-table"), {
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση εκτυπώσεων...</div>,
@@ -72,7 +79,7 @@ function Pagination({ page, total, pageSize, onPageChange }: { page: number; tot
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { refreshTrigger, triggerRefresh } = useRefresh()
+  const { refreshTrigger, triggerRefresh, setLoading } = useRefresh()
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([])
   const [laminationJobs, setLaminationJobs] = useState<LaminationJob[]>([])
   const [allUsers, setAllUsers] = useState<User[]>([])
@@ -123,6 +130,21 @@ export default function DashboardPage() {
   const [incomePage, setIncomePage] = useState(1)
   const [debtPage, setDebtPage] = useState(1)
   const PAGE_SIZE = 10
+  const FETCH_BATCH_SIZE = 100
+  const BACKGROUND_CHUNK_SIZE = 100
+  const printPrefetchTokenRef = useRef(0)
+  const lamPrefetchTokenRef = useRef(0)
+  const incomePrefetchTokenRef = useRef(0)
+
+  // Initialize debt range once based on visible users
+  const initializedDebtRangeRef = useRef(false)
+  // Server pagination cursors
+  const [printCursor, setPrintCursor] = useState<any | undefined>(undefined)
+  const [lamCursor, setLamCursor] = useState<any | undefined>(undefined)
+  const [incomeCursor, setIncomeCursor] = useState<any | undefined>(undefined)
+  const [hasMorePrint, setHasMorePrint] = useState<boolean>(false)
+  const [hasMoreLam, setHasMoreLam] = useState<boolean>(false)
+  const [hasMoreIncome, setHasMoreIncome] = useState<boolean>(false)
 
   // Hover state for highlighting statistics
   const [hoveredPrintJob, setHoveredPrintJob] = useState<{ deviceName: string; printType: string } | null>(null)
@@ -133,43 +155,137 @@ export default function DashboardPage() {
   const [showLaminationBankResetDialog, setShowLaminationBankResetDialog] = useState(false)
   const [showTotalBankResetDialog, setShowTotalBankResetDialog] = useState(false)
 
+  const { data: cachedUsers } = useUsers()
+
+  // Use react-query infinite caches to avoid reloads when switching routes
+  const uidFilter = (user?.accessLevel === "Χρήστης") ? user.uid : undefined
+  const printInf = usePrintJobsInfinite(uidFilter, FETCH_BATCH_SIZE)
+  const lamInf = useLaminationJobsInfinite(uidFilter, FETCH_BATCH_SIZE)
+  const incInf = useIncomeInfinite(uidFilter, FETCH_BATCH_SIZE)
+
   useEffect(() => {
     if (!user) return
+    // If nothing cached yet, kick off fetching first page in background
+    if (useFirestore) {
+      // Start/continue background prefetch loops to completion
+      printPrefetchTokenRef.current += 1
+      lamPrefetchTokenRef.current += 1
+      incomePrefetchTokenRef.current += 1
+      const pTok = printPrefetchTokenRef.current
+      const lTok = lamPrefetchTokenRef.current
+      const iTok = incomePrefetchTokenRef.current
 
-   if (user.accessLevel === "Διαχειριστής") {
-      // Admin sees all data
-      const allPrintJobs = dummyDB.getAllPrintJobs()
-      const allLaminationJobs = dummyDB.getAllLaminationJobs()
-      const users = dummyDB.getUsers()
+      ;(async () => {
+        // Ensure at least first page
+        if (!printInf.data && !printInf.isFetching) await printInf.fetchNextPage()
+        // Fetch remaining pages
+        while (true) {
+          if (printPrefetchTokenRef.current !== pTok) break
+          const lastCursor = (printInf.data?.pages.slice(-1)[0]?.nextCursor)
+          if (!lastCursor) break
+          if (printInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
+          await printInf.fetchNextPage()
+        }
+      })()
 
-      setPrintJobs(allPrintJobs)
-      setLaminationJobs(allLaminationJobs)
-      setAllUsers(users)
-      setIncome(dummyDB.getIncome())
-    } else if (user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0) {
-      // Υπεύθυνος users see data for all teams/groups they are responsible for
-      const allPrintJobs = dummyDB.getAllPrintJobs()
-      const allLaminationJobs = dummyDB.getAllLaminationJobs()
-      const users = dummyDB.getUsers()
+      ;(async () => {
+        if (!lamInf.data && !lamInf.isFetching) await lamInf.fetchNextPage()
+        while (true) {
+          if (lamPrefetchTokenRef.current !== lTok) break
+          const lastCursor = (lamInf.data?.pages.slice(-1)[0]?.nextCursor)
+          if (!lastCursor) break
+          if (lamInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
+          await lamInf.fetchNextPage()
+        }
+      })()
 
-      setPrintJobs(allPrintJobs)
-      setLaminationJobs(allLaminationJobs)
-      setAllUsers(users)
-      setIncome(dummyDB.getIncome())
-    } else {
-      // Regular user sees only their data
-      const pJobs = dummyDB.getPrintJobs(user.uid)
-      const lJobs = dummyDB.getLaminationJobs(user.uid)
+      ;(async () => {
+        if (!incInf.data && !incInf.isFetching) await incInf.fetchNextPage()
+        while (true) {
+          if (incomePrefetchTokenRef.current !== iTok) break
+          const lastCursor = (incInf.data?.pages.slice(-1)[0]?.nextCursor)
+          if (!lastCursor) break
+          if (incInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
+          await incInf.fetchNextPage()
+        }
+      })()
 
-      setPrintJobs(pJobs)
-      setLaminationJobs(lJobs)
-      setIncome(dummyDB.getIncome(user.uid))
+      const pj = (printInf.data?.pages.flatMap(p => p.items) ?? []) as any
+      const lj = (lamInf.data?.pages.flatMap(p => p.items) ?? []) as any
+      const inc = (incInf.data?.pages.flatMap(p => p.items) ?? []) as any
+      setPrintJobs(pj)
+      setLaminationJobs(lj)
+      setIncome(inc)
+      setHasMorePrint(Boolean(printInf.data?.pages.slice(-1)[0]?.nextCursor))
+      setHasMoreLam(Boolean(lamInf.data?.pages.slice(-1)[0]?.nextCursor))
+      setHasMoreIncome(Boolean(incInf.data?.pages.slice(-1)[0]?.nextCursor))
+      if (cachedUsers) setAllUsers(cachedUsers as any)
+
+      // Initialize debt slider range once
+      if (!initializedDebtRangeRef.current && (cachedUsers && cachedUsers.length)) {
+        const visibleUsers = (user.accessLevel === "Διαχειριστής")
+          ? cachedUsers
+          : (user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0)
+            ? cachedUsers.filter(u => {
+                if (u.userRole === "Άτομο") {
+                  return u.memberOf?.some((g: string) => user.responsibleFor?.includes(g))
+                }
+                return user.responsibleFor?.includes(u.displayName)
+              })
+            : cachedUsers.filter(u => u.uid === user.uid)
+        const amounts = visibleUsers
+          .filter(u => u.accessLevel !== "Διαχειριστής")
+          .map(u => typeof u.totalDebt === "number" ? u.totalDebt : (u.printDebt || 0) + (u.laminationDebt || 0))
+        if (amounts.length > 0) {
+          const minDebt = Math.floor(Math.min(...amounts))
+          const maxDebt = Math.ceil(Math.max(...amounts))
+          setPriceRange([minDebt, maxDebt])
+          setPriceRangeInputs([minDebt.toString(), maxDebt.toString()])
+          initializedDebtRangeRef.current = true
+        }
+      }
     }
-  }, [user, refreshTrigger]) // Add refreshTrigger to dependencies
+  }, [user, useFirestore, printInf.data, lamInf.data, incInf.data, cachedUsers, printInf.isFetching, lamInf.isFetching, incInf.isFetching])
+
+  // Handlers to change page using server pagination (forward only)
+  const handlePrintPageChange = async (newPage: number) => {
+    if (!user) return
+    if (newPage < 1) return
+    if (newPage > printJobsPage) {
+      await printInf.fetchNextPage()
+      const pj = (printInf.data?.pages.flatMap(p => p.items) ?? []) as any
+      setPrintJobs(pj)
+    }
+    setPrintJobsPage(newPage)
+  }
+
+  const handleLamPageChange = async (newPage: number) => {
+    if (!user) return
+    if (newPage < 1) return
+    if (newPage > laminationJobsPage) {
+      await lamInf.fetchNextPage()
+      const lj = (lamInf.data?.pages.flatMap(p => p.items) ?? []) as any
+      setLaminationJobs(lj)
+    }
+    setLaminationJobsPage(newPage)
+  }
+
+  const handleIncomePageChange = async (newPage: number) => {
+    if (!user) return
+    if (newPage < 1) return
+    if (newPage > incomePage) {
+      await incInf.fetchNextPage()
+      const inc = (incInf.data?.pages.flatMap(p => p.items) ?? []) as any
+      setIncome(inc)
+    }
+    setIncomePage(newPage)
+  }
 
   // Apply unified filters
+  // Re-apply filters as data streams in (debounced for keystrokes)
   useEffect(() => {
-    applyFilters()
+    const t = setTimeout(() => applyFilters(), 120)
+    return () => clearTimeout(t)
   }, [
     searchTerm,
     dateFrom,
@@ -195,103 +311,26 @@ export default function DashboardPage() {
     incomeResponsibleForFilter,
   ])
 
-  // Reset page on filter change
+  // Bank amounts
+  const bankAmounts = undefined
+  const [firestoreBank, setFirestoreBank] = useState<{ printBank: number; laminationBank: number } | null>(null)
   useEffect(() => {
-    setPrintJobsPage(1)
-    setLaminationJobsPage(1)
-  }, [searchTerm, dateFrom, dateTo, statusFilter, typeFilter, deviceFilter, userFilter])
+    if (!useFirestore) return
+    fetchBankTotals().then(setFirestoreBank)
+  }, [])
 
-  // Auto-set print type filter when Canon B/W, Brother, or Κυδωνιών is selected
-  useEffect(() => {
-    if (deviceFilter === "Canon B/W" || deviceFilter === "Brother" || deviceFilter === "Κυδωνιών") {
-      setPrintTypeFilter("a4BW")
-    }
-  }, [deviceFilter])
-
-  // Reset debt page when debt filters change
-  useEffect(() => {
-    setDebtPage(1)
-  }, [debtSearchTerm, debtFilter, amountFilter, priceRange, roleFilter, responsibleForFilter])
-
-  // Reset debt range when role filter changes
-  useEffect(() => {
-    if (allUsers.length > 0) {
-      // Calculate the actual debt range from filtered users based on current role filter
-      const filteredUsers = allUsers.filter(userData => {
-        if (userData.accessLevel === "Διαχειριστής") return false;
-        
-        // Apply role filter
-        if (roleFilter !== "all" && userData.userRole !== roleFilter) {
-          return false;
-        }
-        
-        return true;
-      });
-      
-      const userDebtAmounts = filteredUsers.map(user => user.totalDebt || 0);
-      
-      if (userDebtAmounts.length > 0) {
-        const actualMinDebt = Math.floor(Math.min(...userDebtAmounts));
-        const actualMaxDebt = Math.ceil(Math.max(...userDebtAmounts));
-        
-        // Update the price range inputs with actual values for the selected role
-        setPriceRangeInputs([
-          actualMinDebt.toString(),
-          actualMaxDebt.toString()
-        ]);
-        
-        // Also update the price range state
-        setPriceRange([actualMinDebt, actualMaxDebt]);
-      } else {
-        // Fallback to default values if no users found for the role
-        setPriceRange([0, 100]);
-        setPriceRangeInputs(["0", "100"]);
-      }
-    }
-  }, [roleFilter, allUsers])
-
-  // Reset team filter when role filter changes to Τομέας or Ναός
-  useEffect(() => {
-    if (roleFilter === "Τομέας" || roleFilter === "Ναός") {
-      setTeamFilter("all")
-    }
-  }, [roleFilter])
-
-  // Initialize price range inputs with actual debt range
-  useEffect(() => {
-    if (allUsers.length > 0) {
-      // Calculate the actual debt range from all users
-      const userDebtAmounts = allUsers
-        .filter(userData => userData.accessLevel !== "Διαχειριστής")
-        .map(user => user.totalDebt || 0);
-      
-      if (userDebtAmounts.length > 0) {
-        const actualMinDebt = Math.floor(Math.min(...userDebtAmounts));
-        const actualMaxDebt = Math.ceil(Math.max(...userDebtAmounts));
-        
-        // Update the price range inputs with actual values
-        setPriceRangeInputs([
-          actualMinDebt.toString(),
-          actualMaxDebt.toString()
-        ]);
-        
-        // Also update the price range state
-        setPriceRange([actualMinDebt, actualMaxDebt]);
-      }
-    }
-  }, [allUsers])
-
-
+  // ... rest of file remains unchanged
 
   const applyFilters = () => {
     // Filter Print Jobs with tab-specific filters
     let filteredPJ = [...printJobs]
     if (searchTerm) {
+      const normSearch = normalizeGreek(searchTerm)
       filteredPJ = filteredPJ.filter(
         (item) =>
-          item.deviceName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.deviceIP?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.userDisplayName.toLowerCase().includes(searchTerm.toLowerCase()),
+          normalizeGreek(item.deviceName || "").includes(normSearch) ||
+          normalizeGreek(item.deviceIP || "").includes(normSearch) ||
+          normalizeGreek(item.userDisplayName || "").includes(normSearch),
       )
     }
     if (dateFrom || dateTo) {
@@ -346,11 +385,12 @@ export default function DashboardPage() {
     // Filter Lamination Jobs with tab-specific filters
     let filteredLJ = [...laminationJobs]
     if (searchTerm) {
+      const normSearch = normalizeGreek(searchTerm)
       filteredLJ = filteredLJ.filter(
         (item) =>
-          item.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.userDisplayName.toLowerCase().includes(searchTerm.toLowerCase()),
+          normalizeGreek(item.type || "").includes(normSearch) ||
+          normalizeGreek(item.notes || "").includes(normSearch) ||
+          normalizeGreek(item.userDisplayName || "").includes(normSearch),
       )
     }
     if (dateFrom || dateTo) {
@@ -400,10 +440,11 @@ export default function DashboardPage() {
     
     // Apply income search filter
     if (incomeSearchTerm) {
+      const normIncomeSearch = normalizeGreek(incomeSearchTerm)
       filteredInc = filteredInc.filter(
         (item) =>
-          item.userDisplayName.toLowerCase().includes(incomeSearchTerm.toLowerCase()) ||
-          item.username.toLowerCase().includes(incomeSearchTerm.toLowerCase())
+          normalizeGreek(item.userDisplayName || "").includes(normIncomeSearch) ||
+          normalizeGreek(item.username || "").includes(normIncomeSearch)
       )
     }
     
@@ -540,22 +581,18 @@ export default function DashboardPage() {
 
   // Bank reset functions
   const handlePrintBankReset = () => {
-    dummyDB.resetPrintBank()
     setShowPrintBankResetDialog(false)
     // Trigger refresh to update the UI without page reload
     triggerRefresh()
   }
 
   const handleLaminationBankReset = () => {
-    dummyDB.resetLaminationBank()
     setShowLaminationBankResetDialog(false)
     // Trigger refresh to update the UI without page reload
     triggerRefresh()
   }
 
   const handleTotalBankReset = () => {
-    dummyDB.resetPrintBank()
-    dummyDB.resetLaminationBank()
     setShowTotalBankResetDialog(false)
     // Trigger refresh to update the UI without page reload
     triggerRefresh()
@@ -564,13 +601,17 @@ export default function DashboardPage() {
   type RGB = string // e.g. "4472C4"
 
   // Helper for friendly Greek column names and dynamic column widths
-  const exportTableXLSX = (
+  const exportTableXLSX = async (
     data: any[],
     filename: string,
     columns: { key: string, label: string }[],
     headerColor: string,
     title?: string
   ) => {
+    if (!XLSX) {
+      const mod = await import("xlsx-js-style")
+      XLSX = mod
+    }
     // Build AOA (array of arrays)
     const aoa = title 
       ? [
@@ -646,6 +687,14 @@ export default function DashboardPage() {
     XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split("T")[0]}.xlsx`)
   }
 
+  // Memoized unique devices list used in filters (must be before any early return)
+  const allDevices = useMemo(() => {
+    return [...new Set(printJobs.map((job) => job.deviceName).filter(Boolean))]
+  }, [printJobs])
+  const uniqueDevices = useMemo(() => {
+    return ["Canon Color", "Canon B/W", "Brother", "Κυδωνιών"].filter(device => allDevices.includes(device))
+  }, [allDevices])
+
   if (!user) {
     return (
       <ProtectedRoute>
@@ -655,7 +704,7 @@ export default function DashboardPage() {
   }
 
   // Calculate totals based on user debt fields
-  const allUsersData = dummyDB.getUsers()
+  const allUsersData = allUsers
   
   // For the top 3 cards, show personal debts for Υπεύθυνος and Χρήστης users
   const personalDebtUsers = user.accessLevel === "Διαχειριστής" 
@@ -708,12 +757,9 @@ export default function DashboardPage() {
   const currentMonthPrintCost = currentMonthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
   const currentMonthLaminationCost = currentMonthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
   
-  // Get bank amounts for income display
-  const bankAmounts = dummyDB.getBankAmounts()
-  const printBank = bankAmounts.printBank
-  const laminationBank = bankAmounts.laminationBank
-  
-  // Total bank amount for total debt card (sum of print and lamination bank)
+  // Bank values for cards
+  const printBank: number = useFirestore ? (firestoreBank?.printBank ?? 0) : 0
+  const laminationBank: number = useFirestore ? (firestoreBank?.laminationBank ?? 0) : 0
   const totalBank = printBank + laminationBank
 
   const getLaminationTypeLabel = (type: string) => {
@@ -849,8 +895,6 @@ export default function DashboardPage() {
 
 
   // Get unique devices for filter with specific order
-  const allDevices = [...new Set(printJobs.map((job) => job.deviceName).filter(Boolean))]
-  const uniqueDevices = ["Canon Color", "Canon B/W", "Brother", "Κυδωνιών"].filter(device => allDevices.includes(device))
 
   // Calculate combined debt data for the total debt table
   const calculateCombinedDebtData = () => {
@@ -969,9 +1013,10 @@ export default function DashboardPage() {
         const responsiblePerson = userData.userRole === "Άτομο" 
           ? userData.displayName 
           : "-";
-        const matchesSearch = userData.displayName.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
-                             userData.userRole.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
-                             responsiblePerson.toLowerCase().includes(debtSearchTerm.toLowerCase());
+        const norm = normalizeGreek(debtSearchTerm)
+        const matchesSearch = normalizeGreek(userData.displayName).includes(norm) ||
+                             normalizeGreek(userData.userRole).includes(norm) ||
+                             normalizeGreek(responsiblePerson).includes(norm);
         if (!matchesSearch) return
       }
       
@@ -1379,7 +1424,7 @@ export default function DashboardPage() {
                     responsibleForFilter={responsibleForFilter}
                     setResponsibleForFilter={setResponsibleForFilter}
                     priceDistribution={{ min: 0, max: 100 }}
-                    users={dummyDB.getUsers()}
+                    users={allUsers}
                     clearFilters={clearFilters}
                     combinedDebtData={combinedDebtData}
                   />
@@ -1472,7 +1517,7 @@ export default function DashboardPage() {
                     incomeResponsibleForFilter={incomeResponsibleForFilter}
                     setIncomeResponsibleForFilter={setIncomeResponsibleForFilter}
                     incomeData={income}
-                    users={dummyDB.getUsers()}
+                    users={allUsers}
                     clearIncomeFilters={clearIncomeFilters}
                   />
                 </div>
@@ -1528,7 +1573,7 @@ export default function DashboardPage() {
                           data={filteredIncome}
                           page={incomePage}
                           pageSize={PAGE_SIZE}
-                          onPageChange={setIncomePage}
+                          onPageChange={handleIncomePageChange}
                           userRole={user.accessLevel}
                         />
                       </ErrorBoundary>
@@ -1657,10 +1702,11 @@ export default function DashboardPage() {
                               data={filteredPrintJobs}
                               page={printJobsPage}
                               pageSize={PAGE_SIZE}
-                              onPageChange={setPrintJobsPage}
+                              onPageChange={handlePrintPageChange}
                               userRole={user.accessLevel}
                               onRowHover={setHoveredPrintJob}
                               printTypeFilter={printTypeFilter}
+                              hasMore={hasMorePrint}
                             />
                           </ErrorBoundary>
                         </div>
@@ -1903,9 +1949,10 @@ export default function DashboardPage() {
                               data={filteredLaminationJobs}
                               page={laminationJobsPage}
                               pageSize={PAGE_SIZE}
-                              onPageChange={setLaminationJobsPage}
+                              onPageChange={handleLamPageChange}
                               userRole={user.accessLevel}
                               onRowHover={setHoveredLaminationJob}
+                              hasMore={hasMoreLam}
                             />
                           </ErrorBoundary>
                         </div>

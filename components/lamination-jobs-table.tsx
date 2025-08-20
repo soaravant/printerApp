@@ -26,9 +26,10 @@ interface LaminationJobsTableProps {
   onPageChange: (page: number) => void
   userRole: string
   onRowHover?: (hoveredJob: { machine: string; type: string } | null) => void
+  hasMore?: boolean
 }
 
-export default function LaminationJobsTable({ data, page, pageSize, onPageChange, userRole, onRowHover }: LaminationJobsTableProps) {
+export default function LaminationJobsTable({ data, page, pageSize, onPageChange, userRole, onRowHover, hasMore }: LaminationJobsTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
   const [sortedData, setSortedData] = useState(data)
 
@@ -151,7 +152,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
         </Table>
       </div>
 
-              <SimplePagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
+      <SimplePagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} hasMore={hasMore} />
     </div>
   )
 } 

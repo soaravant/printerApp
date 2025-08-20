@@ -8,7 +8,8 @@ import { RoleBadge } from "@/components/role-badge"
 import { User, Mail, Building, Shield, Calendar, Users, Church, MapPin, ArrowLeft, Edit, Save, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, use } from "react"
-import { dummyDB } from "@/lib/dummy-database"
+// import { dummyDB } from "@/lib/dummy-database"
+import { fetchUserById, updateUserServer } from "@/lib/firebase-queries"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -40,16 +41,15 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
   const uid = unwrappedParams.uid
 
   useEffect(() => {
-    const allUsers = dummyDB.getUsers()
-    const user = allUsers.find(u => u.uid === uid)
-    
-    if (user) {
-      setProfileUser(user)
-      setEditedUser({ ...user }) // Create a copy for editing
-    } else {
-      setNotFound(true)
-    }
-    setIsLoading(false)
+    fetchUserById(uid).then((user: any) => {
+      if (user) {
+        setProfileUser(user)
+        setEditedUser({ ...user })
+      } else {
+        setNotFound(true)
+      }
+      setIsLoading(false)
+    })
   }, [uid])
 
   const handleEdit = () => {
@@ -62,10 +62,9 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
     setEditedUser({ ...profileUser })
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
-      // Update the user in the database
-      dummyDB.updateUser(editedUser)
+      await updateUserServer(editedUser.uid, editedUser)
       
       // Update local state
       setProfileUser(editedUser)
@@ -93,14 +92,14 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
 
   // Helper functions to get available options for TagInput
   const getAvailableMembers = () => {
-    const allUsers = dummyDB.getUsers()
+    const allUsers = [profileUser]
     return allUsers
       .filter(u => u.userRole !== "Άτομο")
       .map(u => u.displayName)
   }
 
   const getAvailableResponsibleFor = () => {
-    const allUsers = dummyDB.getUsers()
+    const allUsers = [profileUser]
     return allUsers
       .filter(u => u.userRole !== "Άτομο")
       .map(u => u.displayName)
@@ -172,7 +171,7 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
 
   // Function to get responsible users based on current user's role and members
   const getResponsibleUsers = () => {
-    const allUsers = dummyDB.getUsers()
+    const allUsers = [profileUser]
     const responsibleUsers: string[] = []
     
     // For users with "Χρήστης" access level, find their team's responsible person through members field

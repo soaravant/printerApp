@@ -3,7 +3,9 @@
 import { ProtectedRoute } from "@/components/protected-route"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { dummyDB } from "@/lib/dummy-database"
+// import { dummyDB } from "@/lib/dummy-database"
+import { useEffect, useState } from "react"
+import { usePriceTable } from "@/lib/firebase-queries"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,8 +28,11 @@ export default function PricesPage() {
     price: number
   }>>([])
 
-  const laminationPrices = dummyDB.getPriceTable("lamination")?.prices || {}
-  const printingPrices = dummyDB.getPriceTable("printing")?.prices || {}
+  const useFirestore = process.env.NEXT_PUBLIC_USE_FIRESTORE === "true"
+  const { data: lamTable } = usePriceTable("lamination")
+  const { data: printTable } = usePriceTable("printing")
+  const laminationPrices = lamTable?.prices || {}
+  const printingPrices = printTable?.prices || {}
 
   // Utility function to format prices with comma as decimal separator
   const formatPrice = (price: number | undefined): string => {

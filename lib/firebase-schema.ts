@@ -12,6 +12,8 @@ export const FIREBASE_COLLECTIONS = {
   PRICE_TABLES: "priceTables",
   PRINT_JOBS: "printJobs",
   LAMINATION_JOBS: "laminationJobs",
+  INCOME: "income",
+  BANK: "bank",
   TRANSACTIONS: "transactions",
   BILLING: "billing",
   SETTINGS: "settings",
@@ -91,6 +93,25 @@ export interface FirebaseLaminationJob {
   timestamp: Timestamp
   status: "completed" | "pending" | "failed"
   notes?: string
+}
+
+// Income (payments)
+export interface FirebaseIncome {
+  incomeId: string
+  uid: string
+  username: string
+  userDisplayName: string
+  amount: number
+  timestamp: Timestamp
+}
+
+// Bank aggregates
+export interface FirebaseBank {
+  bankId: string
+  printBank: number
+  laminationBank: number
+  timestamp: Timestamp
+  lastUpdated: Timestamp
 }
 
 // Payment or other transaction (optional for future use)

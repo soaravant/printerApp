@@ -5,7 +5,9 @@ import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
 import { RefreshProvider } from "@/lib/refresh-context"
 import { Toaster } from "@/components/ui/toaster"
+import { ReactQueryProvider } from "@/lib/react-query"
 import { GlobalErrorHandler } from "@/components/global-error-handler"
+import { LoaderOverlayBridge } from "@/components/loader-overlay-bridge"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -21,14 +23,18 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="el">
+    <html lang="el" suppressHydrationWarning>
       <body className={inter.className}>
         <AuthProvider>
-          <RefreshProvider>
-            <GlobalErrorHandler />
-            {children}
-            <Toaster />
-          </RefreshProvider>
+          <ReactQueryProvider>
+            <RefreshProvider>
+              <GlobalErrorHandler />
+              <LoaderOverlayBridge>
+                {children}
+              </LoaderOverlayBridge>
+              <Toaster />
+            </RefreshProvider>
+          </ReactQueryProvider>
         </AuthProvider>
       </body>
     </html>

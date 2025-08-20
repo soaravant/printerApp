@@ -31,6 +31,7 @@ interface PrintJobsTableProps {
   userRole: string
   onRowHover?: (hoveredJob: { deviceName: string; printType: string } | null) => void
   printTypeFilter?: string // New prop for filtering expanded rows
+  hasMore?: boolean
 }
 
 // Helper function to get print type label
@@ -87,7 +88,7 @@ const filterRowsByType = (rows: any[], printTypeFilter: string) => {
   return rows.filter(row => row.type === targetType)
 }
 
-export default function PrintJobsTable({ data, page, pageSize, onPageChange, userRole, onRowHover, printTypeFilter }: PrintJobsTableProps) {
+export default function PrintJobsTable({ data, page, pageSize, onPageChange, userRole, onRowHover, printTypeFilter, hasMore }: PrintJobsTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
   const [sortedData, setSortedData] = useState<any[]>([])
 
@@ -207,7 +208,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
         </Table>
       </div>
 
-      <SimplePagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} />
+      <SimplePagination page={page} total={sortedData.length} pageSize={pageSize} onPageChange={onPageChange} hasMore={hasMore} />
     </div>
   )
 } 

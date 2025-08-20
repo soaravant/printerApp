@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "outDir": ".scripts-dist",
+    "noEmit": false,
+    "target": "ES2019",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "isolatedModules": false
+  },
+  "include": [
+    "scripts/seed-firestore.ts",
+    "scripts/clear-firestore.ts",
+    "scripts/utils/firebase-admin.ts",
+    "lib/firebase-schema.ts",
+    "lib/utils.ts"
+  ]
+}
+
+

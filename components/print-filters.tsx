@@ -35,6 +35,14 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
   uniqueDevices,
   clearFilters,
 }) => {
+  const [localSearch, setLocalSearch] = React.useState(searchTerm)
+  React.useEffect(() => {
+    setLocalSearch(searchTerm)
+  }, [searchTerm])
+  React.useEffect(() => {
+    const t = setTimeout(() => setSearchTerm(localSearch), 200)
+    return () => clearTimeout(t)
+  }, [localSearch, setSearchTerm])
   return (
     <div className="bg-white rounded-lg border border-blue-200 shadow-sm overflow-hidden h-full flex flex-col">
       <div className="bg-blue-100 px-6 py-4 border-b border-blue-200 flex-shrink-0">
@@ -67,8 +75,8 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
               <Input
                 id="search"
                 placeholder="Αναζήτηση..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
                 className={`border-gray-200 focus:border-blue-500 ${searchTerm ? "pr-10" : ""}`}
               />
               {searchTerm && (
@@ -77,7 +85,7 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
                   variant="ghost"
                   size="sm"
                   className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
-                  onClick={() => setSearchTerm("")}
+                  onClick={() => setLocalSearch("")}
                 >
                   <X className="h-3 w-3" />
                 </Button>

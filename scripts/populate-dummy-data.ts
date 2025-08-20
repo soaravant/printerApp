@@ -1,6 +1,6 @@
 "use client"
 
-import { dummyDB } from "@/lib/dummy-database"
+// Deprecated script: replaced by Firestore seed scripts.
 import type { User } from "@/lib/dummy-database"
 
 export function populateDummyData() {

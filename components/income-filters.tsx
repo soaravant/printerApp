@@ -1,4 +1,5 @@
 import React from "react"
+import { normalizeGreek } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -169,8 +170,9 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
                    const filteredIncomeForRange = incomeData.filter(income => {
                      // Apply search filter
                      if (incomeSearchTerm) {
-                       const matchesSearch = income.userDisplayName.toLowerCase().includes(incomeSearchTerm.toLowerCase()) ||
-                                            income.username.toLowerCase().includes(incomeSearchTerm.toLowerCase());
+                       const norm = normalizeGreek(incomeSearchTerm)
+                       const matchesSearch = normalizeGreek(income.userDisplayName || "").includes(norm) ||
+                                            normalizeGreek(income.username || "").includes(norm);
                        if (!matchesSearch) return false;
                      }
                      
@@ -263,8 +265,9 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
                      const filteredIncomeForCounts = incomeData.filter(income => {
                        // Apply search filter
                        if (incomeSearchTerm) {
-                         const matchesSearch = income.userDisplayName.toLowerCase().includes(incomeSearchTerm.toLowerCase()) ||
-                                              income.username.toLowerCase().includes(incomeSearchTerm.toLowerCase());
+                         const norm = normalizeGreek(incomeSearchTerm)
+                         const matchesSearch = normalizeGreek(income.userDisplayName || "").includes(norm) ||
+                                              normalizeGreek(income.username || "").includes(norm);
                          if (!matchesSearch) return false;
                        }
                        
@@ -335,8 +338,9 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
                    const filteredIncomeForSlider = incomeData.filter(income => {
                      // Apply search filter
                      if (incomeSearchTerm) {
-                       const matchesSearch = income.userDisplayName.toLowerCase().includes(incomeSearchTerm.toLowerCase()) ||
-                                            income.username.toLowerCase().includes(incomeSearchTerm.toLowerCase());
+                       const norm = normalizeGreek(incomeSearchTerm)
+                       const matchesSearch = normalizeGreek(income.userDisplayName || "").includes(norm) ||
+                                            normalizeGreek(income.username || "").includes(norm);
                        if (!matchesSearch) return false;
                      }
                      

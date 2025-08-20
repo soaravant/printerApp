@@ -5,6 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Normalize Greek text by removing diacritics (τόνοι) and lowercasing
+// Example: "Άγγελος" -> "αγγελος"
+export function normalizeGreek(input: string): string {
+  return input
+    .normalize("NFD")
+    .replace(/\p{Diacritic}+/gu, "")
+    .toLowerCase()
+}
+
 /**
  * Formats a date in Greek locale (el-GR)
  * @param date - Date to format

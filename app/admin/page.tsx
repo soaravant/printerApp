@@ -4,7 +4,7 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
-import { dummyDB } from "@/lib/dummy-database"
+// import { dummyDB } from "@/lib/dummy-database"
 import { multiplyMoney, roundMoney, getDynamicFilterOptions } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -22,11 +22,13 @@ import { Plus, CreditCard, Users, Building, Printer, RotateCcw, Euro, Eye, EyeOf
 import type { User, LaminationJob, Income, PrintJob } from "@/lib/dummy-database"
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import { TagInput } from "@/components/ui/tag-input"
+import { addPrintJobServer, addLaminationJobServer, addIncomeServer, addUserServer, usePriceTable, useUsers, useUsersMutations, useJobsMutations } from "@/lib/firebase-queries"
+import { normalizeGreek } from "@/lib/utils"
 
 export default function AdminPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const { triggerRefresh } = useRefresh()
+  const { triggerRefresh, setLoading } = useRefresh()
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [usersTabSearchTerm, setUsersTabSearchTerm] = useState("")
@@ -39,7 +41,7 @@ export default function AdminPage() {
   const [printingType, setPrintingType] = useState<"A4BW" | "A4Color" | "A3BW" | "A3Color" | "RizochartoA3" | "RizochartoA4" | "ChartoniA3" | "ChartoniA4" | "Autokollito">("A4BW")
   const [quantity, setQuantity] = useState("1")
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-  const [loading, setLoading] = useState(false)
+  const [localLoading, setLocalLoading] = useState(false)
   const [newUser, setNewUser] = useState({
     username: "",
     password: "",
@@ -94,45 +96,46 @@ export default function AdminPage() {
 
   // Get available options for tag system
   const getAvailableMembers = () => {
-    const allUsers = dummyDB.getUsers()
+    const allUsers = users
     return allUsers
       .filter(u => u.userRole !== "Άτομο")
       .map(u => u.displayName)
   }
 
   const getAvailableResponsiblePersons = () => {
-    const allUsers = dummyDB.getUsers()
+    const allUsers = users
     return allUsers
       .filter(u => u.accessLevel === "Υπεύθυνος" || u.accessLevel === "Διαχειριστής")
       .map(u => u.displayName)
   }
 
   const getAvailableResponsibleFor = () => {
-    const allUsers = dummyDB.getUsers()
+    const allUsers = users
     return allUsers
       .filter(u => u.userRole !== "Άτομο")
       .map(u => u.displayName)
   }
 
+  const { data: cachedUsers } = useUsers()
+  const { invalidate: invalidateUsers } = useUsersMutations()
+  const { invalidatePrint, invalidateLam, invalidateInc } = useJobsMutations()
   useEffect(() => {
-    // Refresh all user debt fields to ensure they're up to date
-    dummyDB.refreshAllUserDebtFields()
-    
-    const allUsers = dummyDB.getUsers()
-    setUsers(allUsers)
-    setFilteredUsers(allUsers)
-  }, [])
+    if (cachedUsers) {
+      setUsers(cachedUsers as any)
+      setFilteredUsers(cachedUsers as any)
+    }
+  }, [cachedUsers])
 
   // Filter and sort users based on search term, role filter, and team filter
   useEffect(() => {
     let filtered = [...users]
 
-    // Apply search filter
+    // Apply search filter (accent-insensitive)
     if (usersTabSearchTerm) {
-      filtered = filtered.filter(
-        (u) =>
-          u.displayName.toLowerCase().includes(usersTabSearchTerm.toLowerCase()) ||
-          u.username.toLowerCase().includes(usersTabSearchTerm.toLowerCase()),
+      const norm = normalizeGreek(usersTabSearchTerm)
+      filtered = filtered.filter((u) =>
+        normalizeGreek(u.displayName || "").includes(norm) ||
+        normalizeGreek(u.username || "").includes(norm),
       )
     }
 
@@ -186,8 +189,10 @@ export default function AdminPage() {
     setSelectedDate(new Date().toISOString().split('T')[0])
   }, [])
 
-  const laminationPrices = dummyDB.getPriceTable("lamination")?.prices || {}
-  const printingPrices = dummyDB.getPriceTable("printing")?.prices || {}
+  const { data: laminationPriceTable } = usePriceTable("lamination")
+  const { data: printingPriceTable } = usePriceTable("printing")
+  const laminationPrices = laminationPriceTable?.prices || {}
+  const printingPrices = printingPriceTable?.prices || {}
 
   const handleAddPrinting = async () => {
     if (!selectedUser || !quantity) {
@@ -199,10 +204,13 @@ export default function AdminPage() {
       return
     }
 
+    setLocalLoading(true)
     setLoading(true)
     try {
       const selectedUserData = users.find((u) => u.uid === selectedUser)
-      if (!selectedUserData) return
+      if (!selectedUserData) {
+        throw new Error("Ο χρήστης δεν βρέθηκε")
+      }
 
       const pricePerUnit = printingPrices[getPricePropertyName(printingType)] || 0
       const totalCost = multiplyMoney(pricePerUnit, Number.parseInt(quantity))
@@ -223,7 +231,7 @@ export default function AdminPage() {
         status: "completed",
       }
 
-      dummyDB.addPrintJob(newJob)
+      const res = await addPrintJobServer(newJob as any)
 
       toast({
         title: "Επιτυχία",
@@ -231,12 +239,22 @@ export default function AdminPage() {
         variant: "success",
       })
 
-      // Trigger refresh to update dashboard
+      // Merge updated user locally; also invalidate shared cache
+      if (res?.user) {
+        setUsers(prev => {
+          const idx = prev.findIndex(u => u.uid === res.user.uid)
+          if (idx === -1) return prev
+          const next = [...prev]
+          next[idx] = { ...next[idx], ...res.user } as any
+          return next
+        })
+        await invalidateUsers()
+        // Invalidate jobs caches (both global and per-user) so dashboards stay fresh
+        await invalidatePrint()
+        await invalidatePrint(selectedUser)
+      }
+      // Trigger refresh to update dashboard lists lazily
       triggerRefresh()
-
-      // Refresh users list to get updated debt fields
-      const updatedUsers = dummyDB.getUsers()
-      setUsers(updatedUsers)
 
       // Don't reset any form fields - they persist for convenience
     } catch (error) {
@@ -246,6 +264,7 @@ export default function AdminPage() {
         variant: "destructive",
       })
     } finally {
+      setLocalLoading(false)
       setLoading(false)
     }
   }
@@ -260,10 +279,13 @@ export default function AdminPage() {
       return
     }
 
+    setLocalLoading(true)
     setLoading(true)
     try {
       const selectedUserData = users.find((u) => u.uid === selectedUser)
-      if (!selectedUserData) return
+      if (!selectedUserData) {
+        throw new Error("Ο χρήστης δεν βρέθηκε")
+      }
 
       const pricePerUnit = laminationPrices[laminationType] || 0
       const totalCost = multiplyMoney(pricePerUnit, Number.parseInt(quantity))
@@ -282,7 +304,7 @@ export default function AdminPage() {
         status: "completed",
       }
 
-      dummyDB.addLaminationJob(newJob)
+      const res = await addLaminationJobServer(newJob as any)
 
       toast({
         title: "Επιτυχία",
@@ -290,12 +312,20 @@ export default function AdminPage() {
         variant: "success",
       })
 
-      // Trigger refresh to update dashboard
+      // Merge updated user locally and invalidate cache
+      if (res?.user) {
+        setUsers(prev => {
+          const idx = prev.findIndex(u => u.uid === res.user.uid)
+          if (idx === -1) return prev
+          const next = [...prev]
+          next[idx] = { ...next[idx], ...res.user } as any
+          return next
+        })
+        await invalidateUsers()
+        await invalidateLam()
+        await invalidateLam(selectedUser)
+      }
       triggerRefresh()
-
-      // Refresh users list to get updated debt fields
-      const updatedUsers = dummyDB.getUsers()
-      setUsers(updatedUsers)
 
       // Don't reset any form fields - they persist for convenience
     } catch (error) {
@@ -305,6 +335,7 @@ export default function AdminPage() {
         variant: "destructive",
       })
     } finally {
+      setLocalLoading(false)
       setLoading(false)
     }
   }
@@ -339,9 +370,12 @@ export default function AdminPage() {
     }
 
     setDebtReductionLoading(true)
+    setLoading(true)
     try {
       const selectedUserData = users.find((u) => u.uid === debtReductionUser)
-      if (!selectedUserData) return
+      if (!selectedUserData) {
+        throw new Error("Ο χρήστης δεν βρέθηκε")
+      }
 
       const newIncome: Income = {
         incomeId: `income-${Date.now()}`,
@@ -352,7 +386,7 @@ export default function AdminPage() {
         timestamp: new Date(debtReductionDate),
       }
 
-      dummyDB.addIncome(newIncome)
+      const res = await addIncomeServer(newIncome as any)
 
       toast({
         title: "Επιτυχία",
@@ -360,12 +394,20 @@ export default function AdminPage() {
         variant: "success",
       })
 
-      // Trigger refresh to update dashboard
+      // Merge updated user locally and invalidate cache
+      if (res?.user) {
+        setUsers(prev => {
+          const idx = prev.findIndex(u => u.uid === res.user.uid)
+          if (idx === -1) return prev
+          const next = [...prev]
+          next[idx] = { ...next[idx], ...res.user } as any
+          return next
+        })
+        await invalidateUsers()
+        await invalidateInc()
+        await invalidateInc(debtReductionUser)
+      }
       triggerRefresh()
-
-      // Refresh users list to get updated debt fields
-      const updatedUsers = dummyDB.getUsers()
-      setUsers(updatedUsers)
 
       // Reset form
       setDebtReductionUser("")
@@ -379,6 +421,7 @@ export default function AdminPage() {
       })
     } finally {
       setDebtReductionLoading(false)
+      setLoading(false)
     }
   }
 
@@ -581,9 +624,8 @@ export default function AdminPage() {
         responsibleFor: newUser.responsibleFor,
       }
 
-      const updatedUsers = [...users, userToAdd]
-      dummyDB.saveUsers(updatedUsers)
-      setUsers(updatedUsers)
+      await addUserServer(userToAdd as any)
+      await invalidateUsers()
 
       toast({
         title: "Επιτυχία",
@@ -870,8 +912,8 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <Button onClick={handleAddPrinting} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                      {loading ? "Προσθήκη..." : "Προσθήκη Χρέους ΤΟ. ΦΩ."}
+                    <Button onClick={handleAddPrinting} disabled={localLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                      {localLoading ? "Προσθήκη..." : "Προσθήκη Χρέους ΤΟ. ΦΩ."}
                     </Button>
                   </CardContent>
                 </Card>
@@ -980,8 +1022,8 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <Button onClick={handleAddLamination} disabled={loading} className="w-full bg-green-600 hover:bg-green-700 text-white">
-                      {loading ? "Προσθήκη..." : "Προσθήκη Χρέους Πλαστικοποιητή"}
+                    <Button onClick={handleAddLamination} disabled={localLoading} className="w-full bg-green-600 hover:bg-green-700 text-white">
+                      {localLoading ? "Προσθήκη..." : "Προσθήκη Χρέους Πλαστικοποιητή"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -1400,7 +1442,6 @@ export default function AdminPage() {
                   setTeamFilter={setTeamFilter}
                   filteredUsers={filteredUsers}
                   formatPrice={formatPrice}
-                  dummyDB={dummyDB}
                 />
               </TabsContent>
 

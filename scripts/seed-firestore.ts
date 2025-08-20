@@ -1,4 +1,8 @@
 /* eslint-disable no-console */
+import { config } from 'dotenv'
+import { existsSync } from 'fs'
+if (existsSync('.env.local')) config({ path: '.env.local' })
+else config()
 import { Timestamp } from "../lib/firebase-schema"
 import getAdminDb from "./utils/firebase-admin"
 import {
@@ -7,11 +11,15 @@ import {
   FirebasePriceTable,
   FirebasePrintJob,
   FirebaseLaminationJob,
+  FirebaseIncome,
+  FirebaseBank,
 } from "../lib/firebase-schema"
+import { roundMoney, multiplyMoney } from "../lib/utils"
 
 // Utilities
 const now = () => new Date()
 const ts = (d: Date): Timestamp => d
+const asDate = (v: any): Date => (v && typeof v.toDate === "function" ? v.toDate() : new Date(v))
 
 async function seedPriceTables() {
   const db = getAdminDb()
@@ -230,7 +238,7 @@ async function seedJobs() {
   let created = 0
 
   const nowDate = new Date()
-  for (let monthOffset = 0; monthOffset < 3; monthOffset++) {
+  for (let monthOffset = 0; monthOffset < 6; monthOffset++) {
     for (const user of users) {
       const jobsCount = Math.floor(Math.random() * 6) + 5 // 5-10 sessions/month
       for (let i = 0; i < jobsCount; i++) {
@@ -271,7 +279,7 @@ async function seedJobs() {
             type,
             quantity,
             pricePerUnit,
-            totalCost: +(pricePerUnit * quantity).toFixed(2),
+            totalCost: multiplyMoney(pricePerUnit, quantity),
             deviceIP: `192.168.1.${100 + Math.floor(Math.random() * 3)}`,
             deviceName,
             timestamp: ts(jobDate),
@@ -298,7 +306,7 @@ async function seedJobs() {
     "plastic_cover",
   ] as const
 
-  for (let monthOffset = 0; monthOffset < 3; monthOffset++) {
+  for (let monthOffset = 0; monthOffset < 6; monthOffset++) {
     for (const user of users) {
       const jobsCount = Math.floor(Math.random() * 4) + 3 // 3-6/month
       for (let i = 0; i < jobsCount; i++) {
@@ -318,10 +326,12 @@ async function seedJobs() {
           type,
           quantity,
           pricePerUnit,
-          totalCost: +(pricePerUnit * quantity).toFixed(2),
+          totalCost: multiplyMoney(pricePerUnit, quantity),
           timestamp: ts(jobDate),
           status: "completed",
-          notes: Math.random() > 0.7 ? "Επείγον" : undefined,
+        }
+        if (Math.random() > 0.7) {
+          (doc as any).notes = "Επείγον"
         }
         const ref = db
           .collection(FIREBASE_COLLECTIONS.LAMINATION_JOBS)
@@ -336,10 +346,254 @@ async function seedJobs() {
   console.log(`Seeded ${created} jobs (print + lamination)`) 
 }
 
+function generateIncomePattern(user: FirebaseUser, totalDebt: number, billingDate: Date) {
+  const income: Array<{ amount: number; timestamp: Date }> = []
+  const userRole = user.userRole
+  const isHighDebt = totalDebt > 50
+  const isLowDebt = totalDebt < 10
+
+  let incomeProbability = 0.8
+  let incomeDelay = 15
+
+  switch (userRole) {
+    case "Άτομο":
+      incomeProbability = 0.9
+      incomeDelay = 10
+      break
+    case "Ομάδα":
+      incomeProbability = 0.7
+      incomeDelay = 20
+      break
+    case "Ναός":
+      incomeProbability = 0.6
+      incomeDelay = 25
+      break
+    case "Τομέας":
+      incomeProbability = 0.5
+      incomeDelay = 30
+      break
+  }
+
+  if (isHighDebt) {
+    incomeProbability *= 0.8
+    incomeDelay += 10
+  } else if (isLowDebt) {
+    incomeProbability *= 1.2
+    incomeDelay -= 5
+  }
+
+  if (Math.random() < incomeProbability) {
+    if (Math.random() < 0.7) {
+      const incomeDate = new Date(billingDate.getTime() + (incomeDelay + Math.random() * 10) * 24 * 60 * 60 * 1000)
+      income.push({ amount: roundMoney(totalDebt), timestamp: incomeDate })
+    } else {
+      const numPayments = Math.floor(Math.random() * 3) + 2
+      let remainingDebt = totalDebt
+      for (let i = 0; i < numPayments && remainingDebt > 0; i++) {
+        const incomeAmount = i === numPayments - 1 ? remainingDebt : roundMoney(remainingDebt * (0.3 + Math.random() * 0.4))
+        const incomeDate = new Date(billingDate.getTime() + (incomeDelay + i * 7 + Math.random() * 5) * 24 * 60 * 60 * 1000)
+        income.push({ amount: roundMoney(incomeAmount), timestamp: incomeDate })
+        remainingDebt = roundMoney(remainingDebt - incomeAmount)
+      }
+    }
+  } else {
+    if (Math.random() < 0.3) {
+      const lateIncomeDate = new Date(billingDate.getTime() + (60 + Math.random() * 30) * 24 * 60 * 60 * 1000)
+      const lateIncomeAmount = roundMoney(totalDebt * (0.5 + Math.random() * 0.3))
+      income.push({ amount: lateIncomeAmount, timestamp: lateIncomeDate })
+    }
+  }
+
+  income.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+  return income
+}
+
+type UserDebts = { printDebt: number; laminationDebt: number; totalDebt: number }
+type BankIncrements = { printBank: number; laminationBank: number }
+
+function computeDebtsAndBankForUser(events: Array<{ kind: "print" | "lamination" | "income"; amount: number; timestamp: Date }>): { debts: UserDebts; bank: BankIncrements } {
+  events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+  let printDebt = 0
+  let laminationDebt = 0
+  let totalCredit = 0
+  let printBank = 0
+  let laminationBank = 0
+
+  for (const e of events) {
+    if (e.kind === "print") {
+      if (totalCredit > 0) {
+        if (e.amount <= totalCredit) {
+          totalCredit = roundMoney(totalCredit - e.amount)
+        } else {
+          const remainder = roundMoney(e.amount - totalCredit)
+          totalCredit = 0
+          printDebt = roundMoney(printDebt + remainder)
+        }
+      } else {
+        printDebt = roundMoney(printDebt + e.amount)
+      }
+    } else if (e.kind === "lamination") {
+      if (totalCredit > 0) {
+        if (e.amount <= totalCredit) {
+          totalCredit = roundMoney(totalCredit - e.amount)
+        } else {
+          const remainder = roundMoney(e.amount - totalCredit)
+          totalCredit = 0
+          laminationDebt = roundMoney(laminationDebt + remainder)
+        }
+      } else {
+        laminationDebt = roundMoney(laminationDebt + e.amount)
+      }
+    } else {
+      // income: pay lamination first, then print; leftover increases credit
+      let remaining = e.amount
+      if (laminationDebt > 0) {
+        const payL = Math.min(remaining, laminationDebt)
+        laminationDebt = roundMoney(laminationDebt - payL)
+        remaining = roundMoney(remaining - payL)
+        laminationBank = roundMoney(laminationBank + payL)
+      }
+      if (remaining > 0 && printDebt > 0) {
+        const payP = Math.min(remaining, printDebt)
+        printDebt = roundMoney(printDebt - payP)
+        remaining = roundMoney(remaining - payP)
+        printBank = roundMoney(printBank + payP)
+      }
+      if (remaining > 0) {
+        // credit goes to totalCredit; and business rule allocates remaining to print bank
+        totalCredit = roundMoney(totalCredit + remaining)
+        printBank = roundMoney(printBank + remaining)
+        remaining = 0
+      }
+    }
+  }
+
+  const totalDebt = roundMoney(printDebt + laminationDebt - totalCredit)
+  return { debts: { printDebt, laminationDebt, totalDebt }, bank: { printBank, laminationBank } }
+}
+
+async function seedIncomeAndDebts() {
+  const db = getAdminDb()
+
+  // Load users
+  const usersSnap = await db.collection(FIREBASE_COLLECTIONS.USERS).get()
+  const users = usersSnap.docs.map((d) => d.data() as FirebaseUser)
+
+  // Load jobs
+  const printSnap = await db.collection(FIREBASE_COLLECTIONS.PRINT_JOBS).get()
+  const lamSnap = await db.collection(FIREBASE_COLLECTIONS.LAMINATION_JOBS).get()
+  const printJobs = printSnap.docs.map((d) => d.data() as FirebasePrintJob)
+  const laminationJobs = lamSnap.docs.map((d) => d.data() as FirebaseLaminationJob)
+
+  // Group jobs by user and by period (YYYY-MM)
+  const jobsByUserByPeriod = new Map<string, Map<string, { printTotal: number; laminationTotal: number }>>()
+  const toPeriod = (date: any) => asDate(date).toISOString().slice(0, 7)
+
+  for (const pj of printJobs) {
+    const period = toPeriod(pj.timestamp as any)
+    let perUser = jobsByUserByPeriod.get(pj.uid)
+    if (!perUser) {
+      perUser = new Map()
+      jobsByUserByPeriod.set(pj.uid, perUser)
+    }
+    const agg = perUser.get(period) || { printTotal: 0, laminationTotal: 0 }
+    agg.printTotal = roundMoney(agg.printTotal + pj.totalCost)
+    perUser.set(period, agg)
+  }
+  for (const lj of laminationJobs) {
+    const period = toPeriod(lj.timestamp as any)
+    let perUser = jobsByUserByPeriod.get(lj.uid)
+    if (!perUser) {
+      perUser = new Map()
+      jobsByUserByPeriod.set(lj.uid, perUser)
+    }
+    const agg = perUser.get(period) || { printTotal: 0, laminationTotal: 0 }
+    agg.laminationTotal = roundMoney(agg.laminationTotal + lj.totalCost)
+    perUser.set(period, agg)
+  }
+
+  // Generate incomes and compute debts/bank
+  const incomeBatch = db.batch()
+  const userUpdateBatch = db.batch()
+  let incomesCreated = 0
+  let bankTotals: BankIncrements = { printBank: 0, laminationBank: 0 }
+
+  for (const user of users) {
+    const perPeriod = jobsByUserByPeriod.get(user.uid)
+    const incomesForUser: FirebaseIncome[] = []
+    if (perPeriod && perPeriod.size > 0) {
+      for (const [period, totals] of perPeriod.entries()) {
+        const [year, month] = period.split("-").map((n) => parseInt(n, 10))
+        const billingDate = new Date(year, month - 1, 1)
+        const totalDebtForPeriod = roundMoney((totals.printTotal || 0) + (totals.laminationTotal || 0))
+        if (totalDebtForPeriod <= 0) continue
+        const pattern = generateIncomePattern(user, totalDebtForPeriod, billingDate)
+        for (const inc of pattern) {
+          const incomeDoc: FirebaseIncome = {
+            incomeId: `income-${user.uid}-${period}-${inc.timestamp.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+            uid: user.uid,
+            username: user.username,
+            userDisplayName: user.displayName,
+            amount: roundMoney(inc.amount),
+            timestamp: ts(inc.timestamp),
+          }
+          incomesForUser.push(incomeDoc)
+        }
+      }
+    }
+
+    // Write incomes for this user
+    for (const inc of incomesForUser) {
+      const ref = db.collection(FIREBASE_COLLECTIONS.INCOME).doc(inc.incomeId)
+      incomeBatch.set(ref, inc)
+      incomesCreated++
+    }
+
+    // Compute debts and bank for this user using all events
+    const events: Array<{ kind: "print" | "lamination" | "income"; amount: number; timestamp: Date }> = []
+    for (const pj of printJobs.filter((j) => j.uid === user.uid)) {
+      events.push({ kind: "print", amount: pj.totalCost, timestamp: asDate(pj.timestamp as any) })
+    }
+    for (const lj of laminationJobs.filter((j) => j.uid === user.uid)) {
+      events.push({ kind: "lamination", amount: lj.totalCost, timestamp: asDate(lj.timestamp as any) })
+    }
+    for (const inc of incomesForUser) {
+      events.push({ kind: "income", amount: inc.amount, timestamp: asDate(inc.timestamp as any) })
+    }
+    const { debts, bank } = computeDebtsAndBankForUser(events)
+    bankTotals.printBank = roundMoney(bankTotals.printBank + bank.printBank)
+    bankTotals.laminationBank = roundMoney(bankTotals.laminationBank + bank.laminationBank)
+
+    // Update user document with derived debts
+    const userRef = db.collection(FIREBASE_COLLECTIONS.USERS).doc(user.uid)
+    userUpdateBatch.update(userRef, {
+      printDebt: debts.printDebt,
+      laminationDebt: debts.laminationDebt,
+      totalDebt: debts.totalDebt,
+    })
+  }
+
+  await incomeBatch.commit()
+  await userUpdateBatch.commit()
+  console.log(`Seeded ${incomesCreated} income records and updated user debts`)
+
+  // Write bank aggregate
+  const bankDoc: FirebaseBank = {
+    bankId: "main-bank",
+    printBank: bankTotals.printBank,
+    laminationBank: bankTotals.laminationBank,
+    timestamp: ts(new Date()),
+    lastUpdated: ts(new Date()),
+  }
+  await db.collection(FIREBASE_COLLECTIONS.BANK).doc(bankDoc.bankId).set(bankDoc)
+  console.log(`Bank totals saved (print: ${bankDoc.printBank}, lamination: ${bankDoc.laminationBank})`)
+}
+
 export async function main() {
   await seedPriceTables()
   await seedUsers()
   await seedJobs()
+  await seedIncomeAndDebts()
 }
 
 if (require.main === module) {

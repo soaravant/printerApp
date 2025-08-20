@@ -106,35 +106,38 @@ const PaginationEllipsis = ({
 )
 PaginationEllipsis.displayName = "PaginationEllipsis"
 
-// Simple pagination component for table usage
+// Simple pagination component (supports unknown total via hasMore)
 const SimplePagination = ({ 
   page, 
   total, 
   pageSize, 
-  onPageChange 
+  onPageChange,
+  hasMore
 }: { 
   page: number
   total: number
   pageSize: number
-  onPageChange: (p: number) => void 
+  onPageChange: (p: number) => void,
+  hasMore?: boolean
 }) => {
-  const totalPages = Math.ceil(total / pageSize)
-  if (totalPages <= 1) return null
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const canGoPrev = page > 1
+  const canGoNext = hasMore ?? (page < totalPages)
   
   return (
     <div className="flex gap-2 justify-end items-center mt-2">
       <button
         className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => onPageChange(page - 1)}
-        disabled={page === 1}
+        disabled={!canGoPrev}
       >
         &lt;
       </button>
-      <span className="text-xs">Σελίδα {page} από {totalPages}</span>
+      <span className="text-xs">Σελίδα {page} από {totalPages}{hasMore ? "+" : ""}</span>
       <button
         className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => onPageChange(page + 1)}
-        disabled={page === totalPages}
+        disabled={!canGoNext}
       >
         &gt;
       </button>

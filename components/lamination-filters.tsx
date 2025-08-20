@@ -33,6 +33,14 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
   setLaminationTypeFilter,
   clearFilters,
 }) => {
+  const [localSearch, setLocalSearch] = React.useState(searchTerm)
+  React.useEffect(() => {
+    setLocalSearch(searchTerm)
+  }, [searchTerm])
+  React.useEffect(() => {
+    const t = setTimeout(() => setSearchTerm(localSearch), 200)
+    return () => clearTimeout(t)
+  }, [localSearch, setSearchTerm])
   return (
     <div className="bg-white rounded-lg border border-green-200 shadow-sm overflow-hidden h-full flex flex-col">
       <div className="bg-green-100 px-6 py-4 border-b border-green-200 flex-shrink-0">
@@ -65,8 +73,8 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
               <Input
                 id="search"
                 placeholder="Αναζήτηση..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
                 className={`border-gray-200 focus:border-green-500 ${searchTerm ? "pr-10" : ""}`}
               />
               {searchTerm && (
@@ -75,7 +83,7 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
                   variant="ghost"
                   size="sm"
                   className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
-                  onClick={() => setSearchTerm("")}
+                  onClick={() => setLocalSearch("")}
                 >
                   <X className="h-3 w-3" />
                 </Button>

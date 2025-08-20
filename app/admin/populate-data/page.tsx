@@ -6,7 +6,7 @@ import { Navigation } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { dummyDB } from "@/lib/dummy-database"
+// import { dummyDB } from "@/lib/dummy-database"
 import type { User, PrintJob, LaminationJob } from "@/lib/dummy-database"
 
 export default function PopulateDataPage() {
@@ -78,7 +78,7 @@ export default function PopulateDataPage() {
           totalCost: 10.00,
           status: "completed",
         }
-        dummyDB.addPrintJob(job)
+        // Deprecated: client-side populate disabled for security
       })
 
       // Create demo lamination jobs
@@ -95,11 +95,11 @@ export default function PopulateDataPage() {
           timestamp: new Date(),
           status: "completed",
         }
-        dummyDB.addLaminationJob(job)
+        // Deprecated: client-side populate disabled for security
       })
 
       // Save users to dummy database
-      dummyDB.saveUsers(demoUsers)
+      // Deprecated: client-side populate disabled for security
 
       toast({
         title: "Επιτυχία",
@@ -121,7 +121,7 @@ export default function PopulateDataPage() {
     setIsLoading(true)
     try {
       // Clear all data by resetting the dummy database
-      dummyDB.reset()
+      // Deprecated: client-side populate disabled for security
 
       toast({
         title: "Επιτυχία",

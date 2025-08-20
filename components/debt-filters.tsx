@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Filter, RotateCcw } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { getDynamicFilterOptions } from "@/lib/utils"
+import { getDynamicFilterOptions, normalizeGreek } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
 interface DebtFiltersProps {
@@ -191,12 +191,13 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                     
                     // Apply search filter
                     if (debtSearchTerm) {
+                      const normSearch = normalizeGreek(debtSearchTerm)
                       const responsiblePerson = userData.userRole === "Άτομο" 
                         ? userData.displayName 
                         : userData.responsiblePerson || "-";
-                      const matchesSearch = userData.displayName.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
-                                           userData.userRole.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
-                                           responsiblePerson.toLowerCase().includes(debtSearchTerm.toLowerCase());
+                      const matchesSearch = normalizeGreek(userData.displayName).includes(normSearch) ||
+                                           normalizeGreek(userData.userRole).includes(normSearch) ||
+                                           normalizeGreek(responsiblePerson).includes(normSearch);
                       if (!matchesSearch) return false;
                     }
                     
@@ -311,12 +312,13 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                       
                       // Apply search filter
                       if (debtSearchTerm) {
+                        const normSearch = normalizeGreek(debtSearchTerm)
                         const responsiblePerson = userData.userRole === "Άτομο" 
                           ? userData.displayName 
                           : userData.responsiblePerson || "-";
-                        const matchesSearch = userData.displayName.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
-                                             userData.userRole.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
-                                             responsiblePerson.toLowerCase().includes(debtSearchTerm.toLowerCase());
+                        const matchesSearch = normalizeGreek(userData.displayName).includes(normSearch) ||
+                                             normalizeGreek(userData.userRole).includes(normSearch) ||
+                                             normalizeGreek(responsiblePerson).includes(normSearch);
                         if (!matchesSearch) return false;
                       }
                       
@@ -406,12 +408,13 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                     
                     // Apply search filter
                     if (debtSearchTerm) {
+                      const normSearch = normalizeGreek(debtSearchTerm)
                       const responsiblePerson = userData.userRole === "Άτομο" 
                         ? userData.displayName 
                         : userData.responsiblePerson || "-";
-                      const matchesSearch = userData.displayName.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
-                                           userData.userRole.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
-                                           responsiblePerson.toLowerCase().includes(debtSearchTerm.toLowerCase());
+                      const matchesSearch = normalizeGreek(userData.displayName).includes(normSearch) ||
+                                           normalizeGreek(userData.userRole).includes(normSearch) ||
+                                           normalizeGreek(responsiblePerson).includes(normSearch);
                       if (!matchesSearch) return false;
                     }
                     

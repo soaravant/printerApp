@@ -2,7 +2,10 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { dummyDB, type User } from "./dummy-database"
+import type { User } from "./dummy-database"
+import { fetchUserById, fetchUserByUsername } from "./firebase-queries"
+import { auth } from "./firebase-client"
+import { signInWithCustomToken, onAuthStateChanged, signOut } from "firebase/auth"
 
 interface AuthContextType {
   user: User | null
@@ -171,38 +174,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const useFirestore = process.env.NEXT_PUBLIC_USE_FIRESTORE === "true"
+
   useEffect(() => {
     // Check if user is logged in from cookies
     const savedUserId = getCookie("currentUserId")
-    if (savedUserId) {
-      const savedUser = dummyDB.getUserById(savedUserId)
-      if (savedUser) {
-        setUser(savedUser)
-      } else {
-        deleteCookie("currentUserId")
+    const load = async () => {
+      if (savedUserId) {
+        if (useFirestore) {
+          const u = await fetchUserById(savedUserId)
+          if (u) setUser(u as any)
+          else deleteCookie("currentUserId")
+        }
       }
     }
-    setLoading(false)
+    const unsub = useFirestore
+      ? onAuthStateChanged(auth, async (fbUser) => {
+          if (fbUser?.uid) {
+            const u = await fetchUserById(fbUser.uid)
+            if (u) setUser(u as any)
+          }
+          setLoading(false)
+        })
+      : (null as any)
+
+    load().finally(() => {
+      if (!useFirestore) setLoading(false)
+    })
+
+    return () => { if (unsub) unsub() }
   }, [])
 
   const signIn = async (username: string, password: string): Promise<boolean> => {
     const correctPassword = USER_PASSWORDS[username]
 
-    if (correctPassword && correctPassword === password) {
-      const user = dummyDB.getUserByUsername(username)
-      if (user) {
-        setUser(user)
-        setCookie("currentUserId", user.uid)
+    if (useFirestore) {
+      // Call our API to verify legacy credentials and receive a custom token
+      const res = await fetch("/api/auth/custom-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      })
+      if (!res.ok) return false
+      const { token, uid } = await res.json()
+      await signInWithCustomToken(auth, token)
+      const u = await fetchUserById(uid)
+      if (u) {
+        setUser(u as any)
+        setCookie("currentUserId", uid)
         return true
       }
+      return false
+    }
+
+    if (!useFirestore && correctPassword && correctPassword === password) {
+      // Legacy fallback removed; Firestore mode is required
+      return false
     }
 
     return false
   }
 
-  const logout = () => {
+  const logout = async () => {
     setUser(null)
     deleteCookie("currentUserId")
+    if (useFirestore) {
+      try { await signOut(auth) } catch {}
+    }
   }
 
   return <AuthContext.Provider value={{ user, loading, signIn, logout }}>{children}</AuthContext.Provider>

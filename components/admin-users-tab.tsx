@@ -17,7 +17,6 @@ interface AdminUsersTabProps {
   setTeamFilter: (v: string) => void;
   filteredUsers: any[];
   formatPrice: (n: number) => string;
-  dummyDB: any;
 }
 
 export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
@@ -30,7 +29,6 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
   setTeamFilter,
   filteredUsers,
   formatPrice,
-  dummyDB,
 }) => {
   const router = useRouter();
 
@@ -52,7 +50,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
 
   // Function to get responsible users for Άτομο users based on their team membership
   const getResponsibleUsers = (userData: any) => {
-    const allUsers = dummyDB.getUsers()
+    const allUsers = users
     const responsibleUsers: string[] = []
     
     // For Άτομο users with "Χρήστης" access level, find their team's responsible person
@@ -84,7 +82,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
 
   // Function to dynamically compute responsible persons for Ομάδα/Ναός/Τομέας
   const getDynamicResponsiblePersons = (userData: any) => {
-    const allUsers = dummyDB.getUsers()
+    const allUsers = users
     const responsibleUsers: string[] = []
     
     // Only compute for Ομάδα, Ναός, and Τομέας
