@@ -15,16 +15,19 @@ export async function POST(req: Request) {
     const db = getAdminDb()
     const auth = getAdminAuth()
 
-    // 1) Look up user by username in Firestore users collection
-    const snap = await db.collection(FIREBASE_COLLECTIONS.USERS).where("username", "==", String(username)).limit(1).get()
-    if (snap.empty) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
-    }
+    // Look up user by username
+    const snap = await db
+      .collection(FIREBASE_COLLECTIONS.USERS)
+      .where("username", "==", String(username))
+      .limit(1)
+      .get()
+
+    if (snap.empty) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+
     const userDoc = snap.docs[0]
     const userData = userDoc.data() as any
 
-    // 2) Verify password against legacy dummy scheme
-    // Map your dummy scheme: admin -> admin123, numeric -> itself
+    // Demo password check
     const expected = username === "admin" ? "admin123" : username
     if (String(password) !== expected) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
@@ -32,15 +35,7 @@ export async function POST(req: Request) {
 
     const uid = userData.uid || userDoc.id
 
-    // 3) Ensure there is a Firebase Auth user with this uid
-    let userRecord
-    try {
-      userRecord = await auth.getUser(uid)
-    } catch (e) {
-      userRecord = await auth.createUser({ uid, displayName: userData.displayName })
-    }
-
-    // 4) Create a custom token and return
+    // Create a custom token and return (no need to pre-create Auth user)
     const customToken = await auth.createCustomToken(uid, {
       role: userData.role || "user",
       accessLevel: userData.accessLevel || "Χρήστης",
@@ -49,14 +44,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ token: customToken, uid })
   } catch (err: any) {
     console.error("custom-login error", err)
-    // Handle common Firebase quota / permission errors explicitly for better UX
-    const message = String(err?.message || "")
-    if (message.includes("quota") || message.includes("exceeded")) {
-      return NextResponse.json({ error: "firestore_quota_exceeded" }, { status: 503 })
+    const message = String(err?.message || "").toLowerCase()
+    if (message.includes("quota") || message.includes("exceed") || message.includes("unavailable")) {
+      return NextResponse.json({ error: "service_unavailable" }, { status: 503 })
     }
-    if (message.includes("permission") || message.includes("PERMISSION_DENIED")) {
+    if (message.includes("permission") || message.includes("insufficient") || message.includes("denied")) {
       return NextResponse.json({ error: "permission_denied" }, { status: 403 })
     }
-    return NextResponse.json({ error: "Server error" }, { status: 500 })
+    return NextResponse.json({ error: "server_error" }, { status: 500 })
   }
 }
