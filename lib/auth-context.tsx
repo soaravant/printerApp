@@ -2,13 +2,13 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import type { User } from "./dummy-database"
+import type { FirebaseUser } from "./firebase-schema"
 import { fetchUserById, fetchUserByUsername } from "./firebase-queries"
 import { auth } from "./firebase-client"
 import { signInWithCustomToken, onAuthStateChanged, signOut } from "firebase/auth"
 
 interface AuthContextType {
-  user: User | null
+  user: FirebaseUser | null
   loading: boolean
   signIn: (username: string, password: string) => Promise<boolean>
   logout: () => void
@@ -171,10 +171,10 @@ const deleteCookie = (name: string) => {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<FirebaseUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const useFirestore = process.env.NEXT_PUBLIC_USE_FIRESTORE === "true"
+  const useFirestore = true
 
   useEffect(() => {
     // Check if user is logged in from cookies

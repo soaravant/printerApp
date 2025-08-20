@@ -5,7 +5,7 @@ import { SimplePagination } from "@/components/ui/pagination"
 import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
 import { useState, useEffect } from "react"
-import type { LaminationJob } from "@/lib/dummy-database"
+import type { FirebaseLaminationJob } from "@/lib/firebase-schema"
 
 // Shared column definition for consistent widths
 const LaminationJobsColGroup = ({ userRole }: { userRole: string }) => (
@@ -20,7 +20,7 @@ const LaminationJobsColGroup = ({ userRole }: { userRole: string }) => (
 )
 
 interface LaminationJobsTableProps {
-  data: LaminationJob[]
+  data: FirebaseLaminationJob[]
   page: number
   pageSize: number
   onPageChange: (page: number) => void
@@ -125,7 +125,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
                 </TableCell>
               </TableRow>
             ) : (
-              sortedData.slice((page-1)*pageSize, page*pageSize).map((job: LaminationJob) => {
+              sortedData.slice((page-1)*pageSize, page*pageSize).map((job: FirebaseLaminationJob) => {
                 // Determine machine type based on job type
                 const machine = ["A3", "A4", "A5", "cards"].includes(job.type) ? "laminator" : "binding"
                 

@@ -5,7 +5,7 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
 // import { dummyDB } from "@/lib/dummy-database"
-import type { PrintJob, LaminationJob, User, Income } from "@/lib/dummy-database"
+import type { FirebasePrintJob, FirebaseLaminationJob, FirebaseUser, FirebaseIncome } from "@/lib/firebase-schema"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -45,7 +45,7 @@ function ErrorBoundary({ children, fallback }: { children: React.ReactNode; fall
   )
 }
 
-const useFirestore = process.env.NEXT_PUBLIC_USE_FIRESTORE === "true"
+const useFirestore = true
 
 const PrintJobsTable = dynamic(() => import("@/components/print-jobs-table"), {
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση εκτυπώσεων...</div>,
@@ -80,10 +80,10 @@ function Pagination({ page, total, pageSize, onPageChange }: { page: number; tot
 export default function DashboardPage() {
   const { user } = useAuth()
   const { refreshTrigger, triggerRefresh, setLoading } = useRefresh()
-  const [printJobs, setPrintJobs] = useState<PrintJob[]>([])
-  const [laminationJobs, setLaminationJobs] = useState<LaminationJob[]>([])
-  const [allUsers, setAllUsers] = useState<User[]>([])
-  const [income, setIncome] = useState<Income[]>([])
+  const [printJobs, setPrintJobs] = useState<FirebasePrintJob[]>([])
+  const [laminationJobs, setLaminationJobs] = useState<FirebaseLaminationJob[]>([])
+  const [allUsers, setAllUsers] = useState<FirebaseUser[]>([])
+  const [income, setIncome] = useState<FirebaseIncome[]>([])
 
   // Unified filtering states
   const [searchTerm, setSearchTerm] = useState("")
@@ -120,9 +120,9 @@ export default function DashboardPage() {
   const [incomeResponsibleForFilter, setIncomeResponsibleForFilter] = useState("all")
 
   // Filtered data states
-  const [filteredPrintJobs, setFilteredPrintJobs] = useState<PrintJob[]>([])
-  const [filteredLaminationJobs, setFilteredLaminationJobs] = useState<LaminationJob[]>([])
-  const [filteredIncome, setFilteredIncome] = useState<Income[]>([])
+  const [filteredPrintJobs, setFilteredPrintJobs] = useState<FirebasePrintJob[]>([])
+  const [filteredLaminationJobs, setFilteredLaminationJobs] = useState<FirebaseLaminationJob[]>([])
+  const [filteredIncome, setFilteredIncome] = useState<FirebaseIncome[]>([])
 
   // Pagination state
   const [printJobsPage, setPrintJobsPage] = useState(1)

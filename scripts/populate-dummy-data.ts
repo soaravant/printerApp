@@ -1,7 +1,7 @@
 "use client"
 
 // Deprecated script: replaced by Firestore seed scripts.
-import type { User } from "@/lib/dummy-database"
+// Deprecated script; dummy database removed. Keeping file to avoid script errors.
 
 export function populateDummyData() {
   console.log("🚀 Starting dummy data population...")

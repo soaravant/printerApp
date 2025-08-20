@@ -5,10 +5,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { SimplePagination } from "@/components/ui/pagination"
 import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
-import type { Income } from "@/lib/dummy-database"
+import type { FirebaseIncome } from "@/lib/firebase-schema"
 
 interface IncomeTableProps {
-  data: Income[]
+  data: FirebaseIncome[]
   page: number
   pageSize: number
   onPageChange: (page: number) => void

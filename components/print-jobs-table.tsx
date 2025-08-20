@@ -6,7 +6,7 @@ import { Calendar } from "lucide-react"
 import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
 import { useState, useEffect } from "react"
-import type { PrintJob } from "@/lib/dummy-database"
+import type { FirebasePrintJob } from "@/lib/firebase-schema"
 
 // Shared column definition for consistent widths
 function PrintJobsColGroup({ userRole }: { userRole: string }) {
@@ -24,7 +24,7 @@ function PrintJobsColGroup({ userRole }: { userRole: string }) {
 }
 
 interface PrintJobsTableProps {
-  data: PrintJob[]
+  data: FirebasePrintJob[]
   page: number
   pageSize: number
   onPageChange: (page: number) => void
@@ -51,7 +51,7 @@ const getPrintTypeLabel = (type: string) => {
 }
 
 // Helper function to convert print job to display format
-const convertPrintJobToDisplay = (job: PrintJob) => {
+const convertPrintJobToDisplay = (job: FirebasePrintJob) => {
   return {
     ...job,
     printType: getPrintTypeLabel(job.type),

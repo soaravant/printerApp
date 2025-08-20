@@ -19,7 +19,7 @@ import { SearchableSelect } from "@/components/searchable-select"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { useState, useEffect } from "react"
 import { Plus, CreditCard, Users, Building, Printer, RotateCcw, Euro, Eye, EyeOff } from "lucide-react"
-import type { User, LaminationJob, Income, PrintJob } from "@/lib/dummy-database"
+import type { FirebaseUser, FirebaseLaminationJob, FirebaseIncome, FirebasePrintJob } from "@/lib/firebase-schema"
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import { TagInput } from "@/components/ui/tag-input"
 import { addPrintJobServer, addLaminationJobServer, addIncomeServer, addUserServer, usePriceTable, useUsers, useUsersMutations, useJobsMutations } from "@/lib/firebase-queries"
@@ -29,8 +29,8 @@ export default function AdminPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const { triggerRefresh, setLoading } = useRefresh()
-  const [users, setUsers] = useState<User[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
+  const [users, setUsers] = useState<FirebaseUser[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<FirebaseUser[]>([])
   const [usersTabSearchTerm, setUsersTabSearchTerm] = useState("")
 
   const [roleFilter, setRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Ναός, Τομέας
@@ -216,7 +216,7 @@ export default function AdminPage() {
       const totalCost = multiplyMoney(pricePerUnit, Number.parseInt(quantity))
 
       const selectedPrinterData = printerOptions.find(p => p.value === selectedPrinter)
-      const newJob: PrintJob = {
+      const newJob: FirebasePrintJob = {
         jobId: `print-job-${Date.now()}`,
         uid: selectedUser,
         username: selectedUserData.username,
@@ -290,7 +290,7 @@ export default function AdminPage() {
       const pricePerUnit = laminationPrices[laminationType] || 0
       const totalCost = multiplyMoney(pricePerUnit, Number.parseInt(quantity))
 
-      const newJob: LaminationJob = {
+      const newJob: FirebaseLaminationJob = {
         jobId: `lamination-job-${Date.now()}`,
         uid: selectedUser,
         username: selectedUserData.username,

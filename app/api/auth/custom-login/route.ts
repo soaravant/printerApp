@@ -49,6 +49,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ token: customToken, uid })
   } catch (err: any) {
     console.error("custom-login error", err)
+    // Handle common Firebase quota / permission errors explicitly for better UX
+    const message = String(err?.message || "")
+    if (message.includes("quota") || message.includes("exceeded")) {
+      return NextResponse.json({ error: "firestore_quota_exceeded" }, { status: 503 })
+    }
+    if (message.includes("permission") || message.includes("PERMISSION_DENIED")) {
+      return NextResponse.json({ error: "permission_denied" }, { status: 403 })
+    }
     return NextResponse.json({ error: "Server error" }, { status: 500 })
   }
 }

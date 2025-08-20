@@ -27,7 +27,6 @@ export default function PricesPage() {
     price: number
   }>>([])
 
-  const useFirestore = process.env.NEXT_PUBLIC_USE_FIRESTORE === "true"
   const { data: lamTable } = usePriceTable("lamination")
   const { data: printTable } = usePriceTable("printing")
   const laminationPrices = lamTable?.prices || {}

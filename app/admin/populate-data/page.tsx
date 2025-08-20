@@ -6,8 +6,7 @@ import { Navigation } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-// import { dummyDB } from "@/lib/dummy-database"
-import type { User, PrintJob, LaminationJob } from "@/lib/dummy-database"
+// Deprecated: page kept as a stub for future admin tools; dummy DB removed
 
 export default function PopulateDataPage() {
   const { toast } = useToast()
@@ -16,8 +15,8 @@ export default function PopulateDataPage() {
   const handlePopulateData = async () => {
     setIsLoading(true)
     try {
-      // Create demo users
-      const demoUsers: User[] = [
+      // Deprecated: this page no longer creates dummy users. Keep UI response only.
+      const demoUsers: any[] = [
         {
           uid: "user-1",
           username: "user1",

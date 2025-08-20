@@ -12,7 +12,7 @@ import { getFirestore, initializeFirestore, persistentLocalCache, persistentMult
 import { getAuth } from "firebase/auth"
 
 const isBrowser = typeof window !== "undefined"
-const shouldUseFirestore = process.env.NEXT_PUBLIC_USE_FIRESTORE === "true"
+const shouldUseFirestore = true
 
 let app: ReturnType<typeof initializeApp> | undefined
 if (isBrowser && shouldUseFirestore) {
