@@ -1,0 +1,4 @@
+﻿{
+    "printIngestUrl":  "https://printer-app-one.vercel.app/api/print-jobs/ingest",
+    "hmacSecret":  "Nf1CAoSTMjKn0yAeAOWmrXCbqfJ9xv+G1xeksJQp7lbA/29RN27vow++bYLWQ07AygJt2dbeLv0kL33VsVBHYQ=="
+}

@@ -27,11 +27,21 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const success = await signIn(username, password)
-      if (success) {
+      const result = await signIn(username, password)
+      if (result.ok) {
         router.push("/dashboard")
       } else {
-        setError("Λάθος κωδικός χρήστη ή κωδικός πρόσβασης")
+        const code = result.code
+        const messages: Record<string, string> = {
+          missing_credentials: "Συμπληρώστε χρήστη και κωδικό.",
+          user_not_found: "Ο χρήστης δεν βρέθηκε.",
+          invalid_password: "Λάθος κωδικός πρόσβασης.",
+          permission_denied: "Δεν έχετε δικαίωμα πρόσβασης.",
+          service_unavailable: "Η υπηρεσία είναι προσωρινά μη διαθέσιμη. Δοκιμάστε ξανά αργότερα.",
+          server_error: "Σφάλμα συστήματος. Προσπαθήστε ξανά.",
+          user_record_missing: "Δεν βρέθηκαν στοιχεία χρήστη.",
+        }
+        setError(messages[code] || "Αποτυχία σύνδεσης.")
       }
     } catch (error) {
       setError("Σφάλμα σύνδεσης")

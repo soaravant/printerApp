@@ -9,7 +9,10 @@ export async function POST(req: Request) {
   try {
     const { username, password } = await req.json()
     if (!username || !password) {
-      return NextResponse.json({ error: "Missing credentials" }, { status: 400 })
+      return NextResponse.json(
+        { error: "missing_credentials", message: "Missing credentials" },
+        { status: 400 }
+      )
     }
 
     const db = getAdminDb()
@@ -25,12 +28,18 @@ export async function POST(req: Request) {
         .get()
     } catch (e: any) {
       const msg = String(e?.message || "")
-      console.error("custom-login firestore query failed", e)
-      const payload: any = { error: "service_unavailable", stage: "firestore_get", message: msg.slice(0, 300) }
+      console.error("custom-login firestore query failed:", msg)
+      const payload: any = {
+        error: "service_unavailable",
+        stage: "firestore_get",
+        message: msg.slice(0, 300),
+      }
       return NextResponse.json(payload, { status: 503 })
     }
 
-    if (snap.empty) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+    if (snap.empty) {
+      return NextResponse.json({ error: "user_not_found" }, { status: 401 })
+    }
 
     const userDoc = snap.docs[0]
     const userData = userDoc.data() as any
@@ -38,7 +47,7 @@ export async function POST(req: Request) {
     // Demo password check
     const expected = username === "admin" ? "admin123" : username
     if (String(password) !== expected) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+      return NextResponse.json({ error: "invalid_password" }, { status: 401 })
     }
 
     const uid = userData.uid || userDoc.id
@@ -52,21 +61,34 @@ export async function POST(req: Request) {
       })
     } catch (e: any) {
       const msg = String(e?.message || "")
-      console.error("custom-login createCustomToken failed", e)
-      const payload: any = { error: "service_unavailable", stage: "create_custom_token", message: msg.slice(0, 300) }
+      console.error("custom-login createCustomToken failed:", msg)
+      const payload: any = {
+        error: "service_unavailable",
+        stage: "create_custom_token",
+        message: msg.slice(0, 300),
+      }
       return NextResponse.json(payload, { status: 503 })
     }
 
     return NextResponse.json({ token: customToken, uid })
   } catch (err: any) {
-    console.error("custom-login error", err)
     const message = String(err?.message || "").toLowerCase()
+    console.error("custom-login error:", message)
     if (message.includes("quota") || message.includes("exceed") || message.includes("unavailable")) {
-      return NextResponse.json({ error: "service_unavailable", message: message.slice(0, 300) }, { status: 503 })
+      return NextResponse.json(
+        { error: "service_unavailable", message: message.slice(0, 300) },
+        { status: 503 }
+      )
     }
     if (message.includes("permission") || message.includes("insufficient") || message.includes("denied")) {
-      return NextResponse.json({ error: "permission_denied", message: message.slice(0, 300) }, { status: 403 })
+      return NextResponse.json(
+        { error: "permission_denied", message: message.slice(0, 300) },
+        { status: 403 }
+      )
     }
-    return NextResponse.json({ error: "server_error", message: message.slice(0, 300) }, { status: 500 })
+    return NextResponse.json(
+      { error: "server_error", message: message.slice(0, 300) },
+      { status: 500 }
+    )
   }
 }

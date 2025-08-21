@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDynamicFilterOptions = void 0;
 exports.cn = cn;
+exports.normalizeGreek = normalizeGreek;
 exports.formatGreekDate = formatGreekDate;
 exports.formatGreekDateTime = formatGreekDateTime;
 exports.toLocalISOString = toLocalISOString;
@@ -16,6 +17,14 @@ const clsx_1 = require("clsx");
 const tailwind_merge_1 = require("tailwind-merge");
 function cn(...inputs) {
     return (0, tailwind_merge_1.twMerge)((0, clsx_1.clsx)(inputs));
+}
+// Normalize Greek text by removing diacritics (τόνοι) and lowercasing
+// Example: "Άγγελος" -> "αγγελος"
+function normalizeGreek(input) {
+    return input
+        .normalize("NFD")
+        .replace(/\p{Diacritic}+/gu, "")
+        .toLowerCase();
 }
 /**
  * Formats a date in Greek locale (el-GR)

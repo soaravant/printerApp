@@ -30,7 +30,7 @@ The Printer Billing Application is a comprehensive web-based system for managing
 ## Architecture
 
 ### Technology Stack
-- **Frontend**: Next.js 15.2.4 with React 19 and TypeScript
+- **Frontend**: Next.js 15.4.3 with React 19 and TypeScript
 - **Styling**: Tailwind CSS with shadcn/ui component library
 - **Backend**: Firebase Authentication and Firestore database
 - **Data Collection**: Python service with Google Cloud Run deployment
@@ -86,12 +86,12 @@ Real-time Updates: Live data synchronization
 ## Tech Stack Details
 
 ### Core Technologies
-- **Next.js**: 15.2.4 for React framework with App Router and server-side rendering
+- **Next.js**: 15.4.3 for React framework with App Router and server-side rendering
 - **React**: 19 for modern component-based UI development
 - **TypeScript**: 5.x for type-safe development and better developer experience
 - **Tailwind CSS**: 3.3.0 for utility-first CSS framework
 - **shadcn/ui**: Modern UI component library built on Radix UI
-- **Firebase**: 10.8.0 for authentication and NoSQL database
+- **Firebase**: 10.14.1 for authentication and NoSQL database
 
 ### Frontend Libraries
 - **Recharts**: Data visualization library for charts and graphs
@@ -179,7 +179,7 @@ Real-time Updates: Live data synchronization
 ## Current Implementation Status
 
 ### ✅ Completed Features
-- **Core Application**: Next.js 15.2.4 web application with TypeScript
+- **Core Application**: Next.js 15.4.3 web application with TypeScript
 - **Authentication**: Firebase Authentication with role-based access control
 - **User Interface**: Modern responsive design with shadcn/ui components
 - **Dashboard**: Personal statistics and activity tracking

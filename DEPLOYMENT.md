@@ -94,9 +94,9 @@ cp env.example .env.local
 nano .env.local
 ```
 
-### Firebase Setup (Optional)
+### Firebase Setup (Required)
 
-If you want to use Firebase instead of the dummy database:
+Firebase is required for authentication and data storage:
 
 1. **Create Firebase Project**
    - Go to [Firebase Console](https://console.firebase.google.com)
@@ -237,4 +237,4 @@ npx tsc --noEmit
 
 ---
 
-**Note**: This application is ready for Vercel deployment. The dummy database will work for demonstration purposes, but for production use, configure Firebase integration following the instructions above. 
+**Note**: This application uses Firebase Firestore and Authentication. Dummy data scripts are provided for local seeding/testing only. 

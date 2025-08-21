@@ -7,7 +7,7 @@ A comprehensive printer billing and management system built with Next.js, Fireba
 ### Prerequisites
 - Node.js 18.x or higher
 - pnpm package manager
-- Firebase project (optional for full functionality)
+- Firebase project (required)
 
 ### Local Development
 ```bash
@@ -45,7 +45,7 @@ pnpm dev
    - Go to your Vercel project dashboard
    - Navigate to Settings > Environment Variables
    - Add the variables from `env.example`
-   - For Firebase integration, add your Firebase configuration
+   - Add your Firebase configuration values (public config and service account key)
 
 4. **Automatic Deployments**
    - Connect your GitHub repository to Vercel
@@ -71,7 +71,7 @@ printerApp/
 Create a `.env.local` file with the following variables:
 
 ```bash
-# Firebase Configuration (optional for full functionality)
+# Firebase Configuration
 NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
@@ -83,11 +83,11 @@ NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
 FIREBASE_SERVICE_ACCOUNT_KEY=your_base64_encoded_service_account_key
 ```
 
-### Firebase Setup (Optional)
+### Firebase Setup (Required)
 1. Create a Firebase project
 2. Enable Authentication and Firestore
 3. Add your Firebase configuration to environment variables
-4. Update the authentication context to use Firebase
+4. No code changes are needed—Firebase is already wired in the app
 
 ## 🚀 Features
 
@@ -123,8 +123,8 @@ pnpm lint         # Run ESLint
 ### Tech Stack
 - **Frontend**: Next.js 15.4.3, React 19, TypeScript
 - **Styling**: Tailwind CSS, shadcn/ui components
-- **Authentication**: Firebase Authentication (optional)
-- **Database**: Firebase Firestore (optional)
+- **Authentication**: Firebase Authentication
+- **Database**: Firebase Firestore
 - **Deployment**: Vercel
 
 ## 📊 Data Collection
@@ -173,4 +173,4 @@ For support and questions:
 
 ---
 
-**Note**: This application currently uses a dummy database for demonstration purposes. For production use, configure Firebase integration by following the setup instructions above.
+**Note**: This application uses Firebase Firestore and Authentication. The dummy data utilities are available only for seeding/testing via the scripts in `/scripts`.

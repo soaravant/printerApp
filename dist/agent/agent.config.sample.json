@@ -1,0 +1,21 @@
+{
+  "printIngestUrl": "https://your-domain/api/print-jobs/ingest",
+  "hmacSecret": "change_me",
+  "printerMap": {
+    "Canon Color": "A4Color",
+    "Canon B/W": "A4BW"
+  },
+  "usernameMap": {
+    "SOTIRIS": "401"
+  },
+  "ipToDeviceName": {
+    "192.168.3.41": "Canon B/W",
+    "192.168.3.42": "Canon Color",
+    "192.168.3.43": "Brother",
+    "192.168.6.41": "Κυδωνιών",
+    "default": "Canon Color"
+  },
+  "localNotifyPort": 57981,
+  "localNotifyToken": ""
+}
+

@@ -9,7 +9,10 @@
     "start": "next start",
     "build:scripts": "tsc -p tsconfig.scripts.json",
     "seed:firestore": "npm run build:scripts && node .scripts-dist/scripts/seed-firestore.js",
-    "clear:firestore": "npm run build:scripts && node .scripts-dist/scripts/clear-firestore.js"
+    "clear:firestore": "npm run build:scripts && node .scripts-dist/scripts/clear-firestore.js",
+    "backfill:device-ip": "npm run build:scripts && node .scripts-dist/scripts/backfill-device-ip.js",
+    "build:agent": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-agent.ps1",
+    "build:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-installer.ps1"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.11",

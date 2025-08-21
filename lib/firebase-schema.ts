@@ -78,6 +78,9 @@ export interface FirebasePrintJob {
   deviceName: string
   timestamp: Timestamp
   status: "completed" | "pending" | "failed"
+  // Optional printer account credentials used at device (username/password)
+  printerAccountUsername?: string
+  printerAccountPasswordHash?: string
 }
 
 // Lamination job

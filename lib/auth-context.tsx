@@ -14,7 +14,7 @@ type FirebaseAuthUser = {
 interface AuthContextType {
   user: FirebaseUser | null
   loading: boolean
-  signIn: (username: string, password: string) => Promise<boolean>
+  signIn: (username: string, password: string) => Promise<{ ok: true } | { ok: false; code: string; httpStatus?: number }>
   logout: () => void
 }
 
@@ -174,7 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { if (unsub) unsub() }
   }, [])
 
-  const signIn = async (username: string, password: string): Promise<boolean> => {
+  const signIn = async (username: string, password: string): Promise<{ ok: true } | { ok: false; code: string; httpStatus?: number }> => {
     // Call our API to verify legacy credentials and receive a custom token
     const res = await fetch("/api/auth/custom-login", {
       method: "POST",
@@ -184,15 +184,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let payload: any = null
     try { payload = await res.json() } catch {}
     if (!res.ok) {
+      const code = String(payload?.error || "server_error")
       console.error("/api/auth/custom-login failed", res.status, payload)
-      return false
+      return { ok: false, code, httpStatus: res.status }
     }
     const { token, uid } = payload || {}
     const { signInWithCustomToken } = await import("./firebase-auth")
     await signInWithCustomToken(auth, token)
     const u = await fetchUserById(uid)
-    if (u) { setUser(u as any); return true }
-    return false
+    if (u) { setUser(u as any); return { ok: true } }
+    return { ok: false, code: "user_record_missing" }
   }
 
   const logout = async () => {

@@ -5200,7 +5200,7 @@ This fix ensures that all monetary calculations throughout the application are p
 - **Quick Deployment Guide**: Step-by-step instructions for Vercel dashboard deployment
 - **CLI Deployment**: Alternative deployment method using Vercel CLI
 - **Environment Setup**: Detailed instructions for configuring environment variables
-- **Firebase Integration**: Optional Firebase setup instructions
+- **Firebase Integration**: Required Firebase setup instructions
 - **Troubleshooting**: Common issues and solutions
 - **Performance Optimization**: Vercel-specific optimizations
 - **Security Guidelines**: Best practices for secure deployment

@@ -44,12 +44,19 @@ app/
 │   └── page.tsx                # Login page with Firebase authentication
 ├── dashboard/                  # User dashboard
 │   └── page.tsx                # User dashboard with statistics and charts
-├── printing/                   # Print-related pages
-│   └── page.tsx                # Print history and job management
-├── lamination/                 # Lamination pages
-│   └── page.tsx                # Lamination history and management
+├── prices/                     # Price lists and calculator
+│   └── page.tsx                # Prices page
+├── api/                        # API routes (App Router)
+│   ├── auth/
+│   │   └── custom-login/route.ts
+│   ├── income/route.ts
+│   ├── lamination-jobs/route.ts
+│   ├── print-jobs/route.ts
+│   └── users/
+│       ├── route.ts
+│       └── [uid]/route.ts
 ├── profile/                    # User profile pages
-│   └── page.tsx                # User profile management
+│   └── [uid]/page.tsx          # User profile management (dynamic route)
 └── admin/                      # Admin interface pages
     ├── page.tsx                # Admin dashboard
     ├── loading.tsx             # Loading state for admin pages
@@ -116,10 +123,13 @@ components/
 ├── protected-route.tsx         # Route protection component
 ├── role-badge.tsx              # User role badge component
 ├── searchable-select.tsx       # Searchable select component
-├── print-jobs-table.tsx        # Print job table component (updated for new structure)
+├── print-jobs-table.tsx        # Print job table component
 ├── lamination-jobs-table.tsx   # Lamination job table component
-├── debt-income-filters.tsx     # Debt and income filtering component (renamed from billing-filters)
-├── combined-debt-table.tsx     # Combined debt display table
+├── print-filters.tsx           # Print filtering controls
+├── lamination-filters.tsx      # Lamination filtering controls
+├── debt-filters.tsx            # Debt filtering controls
+├── debt-table.tsx              # Consolidated debt display table
+├── income-filters.tsx          # Income filtering controls
 ├── income-table.tsx            # Income history table
 ├── usage-chart.tsx             # Usage chart component
 └── admin-users-tab.tsx         # Admin user management tab component
@@ -129,11 +139,17 @@ components/
 ```
 lib/
 ├── auth-context.tsx            # Firebase authentication context
-├── data-store.ts               # Data store and state management (dummy/local)
-├── dummy-database.ts           # Dummy data for development
-├── firebase-schema.ts          # Single source of truth for Firestore collections & document shapes
-├── refresh-context.tsx         # Global refresh context for data synchronization
+├── firebase-client.ts          # Firebase client initialization
+├── firebase-auth.ts            # Auth helpers (client)
+├── firebase-admin.ts           # Firebase Admin initialization (server/scripts)
+├── firebase-queries.ts         # Data fetching & mutations with react-query
+├── react-query.tsx             # React Query provider setup
+├── data-store.ts               # Legacy/dummy data store helpers
+├── dummy-database.ts           # Dummy data for development/testing
+├── firebase-schema.ts          # Firestore collections & document shapes
+├── refresh-context.tsx         # Global refresh context
 ├── sort-utils.ts               # Table sorting utilities
+├── server/debt.ts              # Server utilities for debt calculations
 └── utils.ts                    # Utility functions and helpers
 ```
 
@@ -255,7 +271,7 @@ public/
 ## Dependencies
 
 ### Frontend Dependencies
-- **next**: 15.2.4 - React framework with App Router
+- **next**: 15.4.3 - React framework with App Router
 - **react**: ^19 - React library
 - **react-dom**: ^19 - React DOM rendering
 - **typescript**: ^5 - TypeScript language
@@ -305,4 +321,4 @@ public/
 - **Environment Configuration**: Flexible configuration for different deployment environments
 - **Error Resilience**: Comprehensive error handling with graceful fallbacks
 
-This streamlined structure focuses on the core printing management functionality while maintaining clean architecture and modern development practices. The cleanup removed 15 unused components, reducing the components directory from 25 files to 10 files while preserving all functionality. 
+This structure focuses on the core printing management functionality while maintaining clean architecture and modern development practices.
