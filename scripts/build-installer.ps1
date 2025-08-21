@@ -5,8 +5,32 @@ param(
 Write-Host "Building Windows installer..."
 $ErrorActionPreference = "Stop"
 
-# 1) Build the agent EXE first
-& powershell -NoProfile -ExecutionPolicy Bypass -File "$(Resolve-Path ./scripts/build-agent.ps1)"
+# 1) Build the agent EXE first (best-effort). The agent config will still be generated even if Python is missing.
+try {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File "$(Resolve-Path ./scripts/build-agent.ps1)"
+} catch {
+  Write-Host "build-agent.ps1 failed (likely missing Python). Proceeding with existing dist/agent artifacts."
+}
+
+# 1b) Ensure start-agent bootstrap script exists in dist/agent
+$distAgent = Join-Path (Resolve-Path .) "dist/agent"
+New-Item -ItemType Directory -Force -Path $distAgent | Out-Null
+$startAgentPath = Join-Path $distAgent "start-agent.ps1"
+$startScript = @'
+$ErrorActionPreference = "Stop"
+$dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$cfgPath = Join-Path $dir 'agent.config.json'
+try {
+  $cfgText = Get-Content -Raw -Encoding UTF8 $cfgPath
+} catch {
+  $cfgText = Get-Content -Raw -Encoding UTF8 (Join-Path $dir 'agent.config.sample.json')
+}
+try { $cfg = $cfgText | ConvertFrom-Json } catch { $cfg = $null }
+if ($cfg -and $cfg.hmacSecret) { $env:PRINT_INGEST_HMAC_SECRET = [string]$cfg.hmacSecret }
+Start-Process -FilePath (Join-Path $dir 'printer-agent.exe') -WindowStyle Hidden
+'@
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($startAgentPath, $startScript, $utf8NoBom)
 
 # 2) Locate ISCC (Inno Setup command line compiler)
 function Find-ISCC {

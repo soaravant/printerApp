@@ -41,7 +41,8 @@ def _load_config_file() -> Dict[str, Any]:
     path = os.environ.get("AGENT_CONFIG_PATH", DEFAULT_CONFIG_PATH)
     try:
         if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
+            # Use utf-8-sig to tolerate BOMs from various editors/PowerShell
+            with open(path, "r", encoding="utf-8-sig") as f:
                 return json.load(f)
     except Exception as e:
         print(f"config load error: {e}")
@@ -335,7 +336,7 @@ def _consume_events(event_queue: "queue.Queue[str]") -> None:
 
 def main() -> None:
     if not HMAC_SECRET:
-        print("Missing PRINT_INGEST_HMAC_SECRET")
+        print("Missing hmacSecret (env PRINT_INGEST_HMAC_SECRET or agent.config.json)")
         return
 
     # We use wevtutil to subscribe to Microsoft-Windows-PrintService/Operational EventLog

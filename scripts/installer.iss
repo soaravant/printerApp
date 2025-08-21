@@ -26,15 +26,17 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Source: "..\dist\agent\printer-agent.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\agent\agent.config.sample.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
 Source: "..\dist\agent\agent.config.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
+Source: "..\dist\agent\start-agent.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Start agent now"; Flags: nowait postinstall skipifsilent
 Filename: "wevtutil"; Parameters: "sl Microsoft-Windows-PrintService/Operational /e:true"; Flags: runhidden; StatusMsg: "Enabling Windows PrintService log..."
-; Use triple quotes around the quoted path inside /TR
-; Use escaped quotes for both TN and TR
-Filename: "schtasks"; Parameters: "/Create /TN ""PrinterAgent"" /SC ONLOGON /RL HIGHEST /TR ""{app}\{#MyAppExeName}"" /F"; Flags: runhidden; StatusMsg: "Creating scheduled task..."
+; Create a SYSTEM scheduled task that starts at boot
+; Use a bootstrap script that reads hmacSecret from agent.config.json and sets env var before launching the EXE
+Filename: "schtasks"; Parameters: "/Create /TN ""PrinterAgent"" /SC ONSTART /RL HIGHEST /RU SYSTEM /TR """"powershell.exe"" -NoProfile -ExecutionPolicy Bypass -File """"""{app}\start-agent.ps1"""""""" /F"; Flags: runhidden; StatusMsg: "Creating startup scheduled task..."
+; Start it immediately after install
+Filename: "schtasks"; Parameters: "/Run /TN ""PrinterAgent"""; Flags: runhidden; StatusMsg: "Starting agent..."
 
 [UninstallRun]
-Filename: "schtasks"; Parameters: "/Delete /TN ""PrinterAgent"" /F"; Flags: runhidden
+Filename: "schtasks"; Parameters: "/Delete /TN ""PrinterAgent"" /F"; Flags: runhidden; RunOnceId: PrinterAgent
 
 
