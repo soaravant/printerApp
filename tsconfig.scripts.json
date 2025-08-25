@@ -16,6 +16,7 @@
     "scripts/clear-firestore.ts",
     "scripts/backfill-device-ip.ts",
     "scripts/report-device-names.ts",
+    "scripts/export-snapshots.ts",
     "scripts/utils/firebase-admin.ts",
     "lib/firebase-schema.ts",
     "lib/utils.ts"

@@ -3,6 +3,7 @@ import { collection, doc, getDoc, getDocs, orderBy, query, where, limit, startAf
 import { useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query"
 import { FIREBASE_COLLECTIONS, FirebasePrintJob, FirebaseLaminationJob, FirebaseUser, FirebaseIncome, FirebaseBank, FirebasePriceTable } from "./firebase-schema"
 import { auth } from "./firebase-client"
+import { getAdminDb } from "./firebase-admin"
 
 export async function fetchAllUsers(): Promise<FirebaseUser[]> {
   const snap = await getDocs(collection(db, FIREBASE_COLLECTIONS.USERS))
@@ -103,7 +104,7 @@ export function useUsersMutations() {
 }
 
 // Infinite queries for jobs/income with strong caching to persist across route switches
-export function usePrintJobsInfinite(uid?: string, bigBatchPageSize: number = 1000) {
+export function usePrintJobsInfinite(uid?: string, bigBatchPageSize: number = 1000, options?: { enabled?: boolean }) {
   return useInfiniteQuery({
     queryKey: ["printJobs", uid ?? "all"],
     queryFn: ({ pageParam }) => {
@@ -114,10 +115,11 @@ export function usePrintJobsInfinite(uid?: string, bigBatchPageSize: number = 10
     getNextPageParam: (last) => last.nextCursor,
     staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
+    enabled: options?.enabled ?? true,
   })
 }
 
-export function useLaminationJobsInfinite(uid?: string, bigBatchPageSize: number = 1000) {
+export function useLaminationJobsInfinite(uid?: string, bigBatchPageSize: number = 1000, options?: { enabled?: boolean }) {
   return useInfiniteQuery({
     queryKey: ["laminationJobs", uid ?? "all"],
     queryFn: ({ pageParam }) => {
@@ -128,10 +130,11 @@ export function useLaminationJobsInfinite(uid?: string, bigBatchPageSize: number
     getNextPageParam: (last) => last.nextCursor,
     staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
+    enabled: options?.enabled ?? true,
   })
 }
 
-export function useIncomeInfinite(uid?: string, bigBatchPageSize: number = 1000) {
+export function useIncomeInfinite(uid?: string, bigBatchPageSize: number = 1000, options?: { enabled?: boolean }) {
   return useInfiniteQuery({
     queryKey: ["income", uid ?? "all"],
     queryFn: ({ pageParam }) => {
@@ -142,6 +145,7 @@ export function useIncomeInfinite(uid?: string, bigBatchPageSize: number = 1000)
     getNextPageParam: (last) => last.nextCursor,
     staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -258,4 +262,47 @@ export async function fetchIncomePage(params: { uid?: string; pageSize: number; 
   const last = snap.docs[snap.docs.length - 1]
   const nextCursor = hasMore && last ? last.get("timestamp") : undefined
   return { items, nextCursor }
+}
+
+// Delta helpers: fetch documents with timestamp strictly greater than `since`.
+export async function fetchPrintJobsSince(params: { uid?: string; since: Date; cap?: number }): Promise<FirebasePrintJob[]> {
+  const col = collection(db, FIREBASE_COLLECTIONS.PRINT_JOBS)
+  const base = params.uid
+    ? query(col, where("uid", "==", params.uid), where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
+    : query(col, where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
+  const q = params.cap ? query(base, limit(params.cap)) : base
+  const snap = await getDocs(q)
+  return snap.docs.map(d => {
+    const data = d.data() as any
+    if (data && data.timestamp) data.timestamp = toJsDate(data.timestamp)
+    return data as FirebasePrintJob
+  })
+}
+
+export async function fetchLaminationJobsSince(params: { uid?: string; since: Date; cap?: number }): Promise<FirebaseLaminationJob[]> {
+  const col = collection(db, FIREBASE_COLLECTIONS.LAMINATION_JOBS)
+  const base = params.uid
+    ? query(col, where("uid", "==", params.uid), where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
+    : query(col, where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
+  const q = params.cap ? query(base, limit(params.cap)) : base
+  const snap = await getDocs(q)
+  return snap.docs.map(d => {
+    const data = d.data() as any
+    if (data && data.timestamp) data.timestamp = toJsDate(data.timestamp)
+    return data as FirebaseLaminationJob
+  })
+}
+
+export async function fetchIncomeSince(params: { uid?: string; since: Date; cap?: number }): Promise<FirebaseIncome[]> {
+  const col = collection(db, FIREBASE_COLLECTIONS.INCOME)
+  const base = params.uid
+    ? query(col, where("uid", "==", params.uid), where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
+    : query(col, where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
+  const q = params.cap ? query(base, limit(params.cap)) : base
+  const snap = await getDocs(q)
+  return snap.docs.map(d => {
+    const data = d.data() as any
+    if (data && data.timestamp) data.timestamp = toJsDate(data.timestamp)
+    return data as FirebaseIncome
+  })
 }

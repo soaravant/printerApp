@@ -1,0 +1,22 @@
+{
+	"name": "projects/printerapp-891b7/locations/europe-west1/jobs/refresh-snapshots",
+	"description": "Rebuild snapshot JSONs daily",
+	"schedule": "0 2 * * *",
+	"timeZone": "Europe/Athens",
+	"httpTarget": {
+	  "uri": "https://printer-app-one.vercel.app/api/snapshots/rebuild",
+	  "httpMethod": "POST",
+	  "headers": {
+		"Content-Type": "application/json",
+		"x-cron-secret": "phYSoHdbtPzCiLtv69HcMcxFKs4WFzy/3LQoXqlLDvQ="
+	  },
+	  "body": "e30="
+	},
+	"retryConfig": {
+	  "retryCount": 3,
+	  "maxRetryDuration": "600s",
+	  "minBackoffDuration": "5s",
+	  "maxBackoffDuration": "60s",
+	  "maxDoublings": 3
+	}
+  }

@@ -19,7 +19,7 @@ import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import dynamic from "next/dynamic"
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, useDeferredValue, useTransition } from "react"
 import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download, RotateCcw, Filter, FileText, BarChart3 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 // Note: Load XLSX only on demand to avoid adding it to the main bundle
@@ -32,9 +32,11 @@ import { DebtFilters } from "@/components/debt-filters"
 import { IncomeFilters } from "@/components/income-filters"
 
 // Firestore
-import { fetchBankTotals, fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite } from "@/lib/firebase-queries"
+import { fetchBankTotals, fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite, fetchPrintJobsSince, fetchLaminationJobsSince, fetchIncomeSince } from "@/lib/firebase-queries"
 import { FIREBASE_COLLECTIONS } from "@/lib/firebase-schema"
 import { normalizeGreek } from "@/lib/utils"
+import { getSnapshot, saveSnapshot, makeScopeKey, mergeById, sortByTimestampDesc } from "@/lib/snapshot-store"
+import { loadRemoteSnapshot } from "@/lib/remote-snapshot"
 
 // Error boundary component for dynamic imports
 function ErrorBoundary({ children, fallback }: { children: React.ReactNode; fallback: React.ReactNode }) {
@@ -46,6 +48,7 @@ function ErrorBoundary({ children, fallback }: { children: React.ReactNode; fall
 }
 
 const useFirestore = true
+const allowRemoteSnapshotUpdate = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_ENABLE_REMOTE_SNAPSHOT_UPDATE === "true"
 
 const PrintJobsTable = dynamic(() => import("@/components/print-jobs-table"), {
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση εκτυπώσεων...</div>,
@@ -118,6 +121,18 @@ export default function DashboardPage() {
   const [incomeAmountRange, setIncomeAmountRange] = useState<[number, number]>([0, 100])
   const [incomeAmountInputs, setIncomeAmountInputs] = useState<[string, string]>(["0", "100"])
   const [incomeResponsibleForFilter, setIncomeResponsibleForFilter] = useState("all")
+  const deferredSearchTerm = useDeferredValue(searchTerm)
+  const deferredIncomeSearchTerm = useDeferredValue(incomeSearchTerm)
+  const [isFilteringPending, startFilteringTransition] = useTransition()
+  const normalizeCacheRef = useRef<Map<string, string>>(new Map())
+  const normalizeCached = (input: string) => {
+    const key = input || ""
+    const cached = normalizeCacheRef.current.get(key)
+    if (cached !== undefined) return cached
+    const norm = normalizeGreek(key)
+    normalizeCacheRef.current.set(key, norm)
+    return norm
+  }
 
   // Filtered data states
   const [filteredPrintJobs, setFilteredPrintJobs] = useState<FirebasePrintJob[]>([])
@@ -130,11 +145,127 @@ export default function DashboardPage() {
   const [incomePage, setIncomePage] = useState(1)
   const [debtPage, setDebtPage] = useState(1)
   const PAGE_SIZE = 10
-  const FETCH_BATCH_SIZE = 100
+  const FETCH_BATCH_SIZE = Number(process.env.NEXT_PUBLIC_FETCH_BATCH_SIZE ?? 250)
   const BACKGROUND_CHUNK_SIZE = 100
   const printPrefetchTokenRef = useRef(0)
   const lamPrefetchTokenRef = useRef(0)
   const incomePrefetchTokenRef = useRef(0)
+  const [prefetchEnabled, setPrefetchEnabled] = useState(false)
+  const [snapshotsLoaded, setSnapshotsLoaded] = useState(false)
+  const MAX_INITIAL_PAGES = Number(process.env.NEXT_PUBLIC_MAX_INITIAL_PAGES ?? 1)
+  
+  const handleManualRefresh = async () => {
+    if (!user) return
+    try {
+      setLoading(true)
+      const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
+      const [pjLocal, ljLocal, incLocal] = await Promise.all([
+        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS)),
+        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS)),
+        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.INCOME)),
+      ])
+      // Try remote static snapshot if local missing
+      const [pjRemote, ljRemote, incRemote] = await Promise.all([
+        pjLocal ? Promise.resolve(null) : loadRemoteSnapshot<any>(FIREBASE_COLLECTIONS.PRINT_JOBS, uidFilter),
+        ljLocal ? Promise.resolve(null) : loadRemoteSnapshot<any>(FIREBASE_COLLECTIONS.LAMINATION_JOBS, uidFilter),
+        incLocal ? Promise.resolve(null) : loadRemoteSnapshot<any>(FIREBASE_COLLECTIONS.INCOME, uidFilter),
+      ])
+      const pjSnap = pjLocal || pjRemote
+      const ljSnap = ljLocal || ljRemote
+      const incSnap = incLocal || incRemote
+      // Persist remote snapshots locally for subsequent visits
+      if (pjRemote) await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), pjRemote)
+      if (ljRemote) await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), ljRemote)
+      if (incRemote) await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), incRemote)
+      let hadAnySnapshot = Boolean((pjSnap && pjSnap.items?.length) || (ljSnap && ljSnap.items?.length) || (incSnap && incSnap.items?.length))
+      if (hadAnySnapshot) {
+        const pjSince = pjSnap?.lastUpdated ? new Date(pjSnap.lastUpdated) : (pjSnap?.items?.[0]?.timestamp ? new Date(pjSnap.items[0].timestamp) : null)
+        const ljSince = ljSnap?.lastUpdated ? new Date(ljSnap.lastUpdated) : (ljSnap?.items?.[0]?.timestamp ? new Date(ljSnap.items[0].timestamp) : null)
+        const incSince = incSnap?.lastUpdated ? new Date(incSnap.lastUpdated) : (incSnap?.items?.[0]?.timestamp ? new Date(incSnap.items[0].timestamp) : null)
+        const [pjDelta, ljDelta, incDelta] = await Promise.all([
+          pjSince ? fetchPrintJobsSince({ uid: uidFilter, since: pjSince }) : Promise.resolve([]),
+          ljSince ? fetchLaminationJobsSince({ uid: uidFilter, since: ljSince }) : Promise.resolve([]),
+          incSince ? fetchIncomeSince({ uid: uidFilter, since: incSince }) : Promise.resolve([]),
+        ])
+        if (pjDelta.length) {
+          const merged = sortByTimestampDesc(mergeById(pjSnap?.items || [], pjDelta, ["jobId"]))
+          setPrintJobs(merged as any)
+          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: merged as any })
+          // Attempt to update remote snapshot (best-effort)
+          try {
+            if (allowRemoteSnapshotUpdate) {
+              const token = await (await import("@/lib/firebase-client")).auth.currentUser?.getIdToken()
+              if (token && process.env.NEXT_PUBLIC_SNAPSHOT_BASE_URL) {
+                const payload = { collection: "printJobs", uid: uidFilter || null, delta: pjDelta }
+                const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } as any
+                let attempt = 0
+                let delay = 250
+                while (attempt < 5) {
+                  const res = await fetch("/api/snapshots/update", { method: "POST", headers, body: JSON.stringify(payload) })
+                  if (res.ok) break
+                  attempt++
+                  await new Promise(r => setTimeout(r, delay))
+                  delay = Math.min(delay * 2, 4000)
+                }
+              }
+            }
+          } catch {}
+        }
+        if (ljDelta.length) {
+          const merged = sortByTimestampDesc(mergeById(ljSnap?.items || [], ljDelta, ["jobId"]))
+          setLaminationJobs(merged as any)
+          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: merged as any })
+          try {
+            if (allowRemoteSnapshotUpdate) {
+              const token = await (await import("@/lib/firebase-client")).auth.currentUser?.getIdToken()
+              if (token && process.env.NEXT_PUBLIC_SNAPSHOT_BASE_URL) {
+                const payload = { collection: "laminationJobs", uid: uidFilter || null, delta: ljDelta }
+                const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } as any
+                let attempt = 0
+                let delay = 250
+                while (attempt < 5) {
+                  const res = await fetch("/api/snapshots/update", { method: "POST", headers, body: JSON.stringify(payload) })
+                  if (res.ok) break
+                  attempt++
+                  await new Promise(r => setTimeout(r, delay))
+                  delay = Math.min(delay * 2, 4000)
+                }
+              }
+            }
+          } catch {}
+        }
+        if (incDelta.length) {
+          const merged = sortByTimestampDesc(mergeById(incSnap?.items || [], incDelta, ["incomeId"]))
+          setIncome(merged as any)
+          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: merged as any })
+          try {
+            if (allowRemoteSnapshotUpdate) {
+              const token = await (await import("@/lib/firebase-client")).auth.currentUser?.getIdToken()
+              if (token && process.env.NEXT_PUBLIC_SNAPSHOT_BASE_URL) {
+                const payload = { collection: "income", uid: uidFilter || null, delta: incDelta }
+                const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } as any
+                let attempt = 0
+                let delay = 250
+                while (attempt < 5) {
+                  const res = await fetch("/api/snapshots/update", { method: "POST", headers, body: JSON.stringify(payload) })
+                  if (res.ok) break
+                  attempt++
+                  await new Promise(r => setTimeout(r, delay))
+                  delay = Math.min(delay * 2, 4000)
+                }
+              }
+            }
+          } catch {}
+        }
+        setLoading(false)
+      } else {
+        // No snapshot exists yet, fallback to full prefetch
+        setPrefetchEnabled(true)
+      }
+    } catch (e) {
+      setLoading(false)
+    }
+  }
 
   // Initialize debt range once based on visible users
   const initializedDebtRangeRef = useRef(false)
@@ -159,14 +290,82 @@ export default function DashboardPage() {
 
   // Use react-query infinite caches to avoid reloads when switching routes
   const uidFilter = (user?.accessLevel === "Χρήστης") ? user.uid : undefined
-  const printInf = usePrintJobsInfinite(uidFilter, FETCH_BATCH_SIZE)
-  const lamInf = useLaminationJobsInfinite(uidFilter, FETCH_BATCH_SIZE)
-  const incInf = useIncomeInfinite(uidFilter, FETCH_BATCH_SIZE)
+  const printInf = usePrintJobsInfinite(uidFilter, FETCH_BATCH_SIZE, { enabled: prefetchEnabled })
+  const lamInf = useLaminationJobsInfinite(uidFilter, FETCH_BATCH_SIZE, { enabled: prefetchEnabled })
+  const incInf = useIncomeInfinite(uidFilter, FETCH_BATCH_SIZE, { enabled: prefetchEnabled })
+
+  // Ensure users are always loaded into local state regardless of prefetch path
+  useEffect(() => {
+    if (cachedUsers && cachedUsers.length) {
+      setAllUsers(cachedUsers as any)
+    }
+  }, [cachedUsers])
+
+  // Load snapshots first, then optionally enable prefetch if no snapshot exists
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!user) return
+      const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
+      const [pjSnap, ljSnap, incSnap] = await Promise.all([
+        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS)),
+        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS)),
+        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.INCOME)),
+      ])
+      if (cancelled) return
+      let hadAnySnapshot = false
+      if (pjSnap && pjSnap.items?.length) {
+        setPrintJobs(sortByTimestampDesc(pjSnap.items as any))
+        hadAnySnapshot = true
+      }
+      if (ljSnap && ljSnap.items?.length) {
+        setLaminationJobs(sortByTimestampDesc(ljSnap.items as any))
+        hadAnySnapshot = true
+      }
+      if (incSnap && incSnap.items?.length) {
+        setIncome(sortByTimestampDesc(incSnap.items as any))
+        hadAnySnapshot = true
+      }
+      setSnapshotsLoaded(true)
+      // If we have at least one snapshot, do delta fetches only; otherwise enable full prefetch
+      if (hadAnySnapshot) {
+        // Compute since per collection from snapshot metadata or top timestamp
+        const pjSince = pjSnap?.lastUpdated ? new Date(pjSnap.lastUpdated) : (pjSnap?.items?.[0]?.timestamp ? new Date(pjSnap.items[0].timestamp) : null)
+        const ljSince = ljSnap?.lastUpdated ? new Date(ljSnap.lastUpdated) : (ljSnap?.items?.[0]?.timestamp ? new Date(ljSnap.items[0].timestamp) : null)
+        const incSince = incSnap?.lastUpdated ? new Date(incSnap.lastUpdated) : (incSnap?.items?.[0]?.timestamp ? new Date(incSnap.items[0].timestamp) : null)
+        const [pjDelta, ljDelta, incDelta] = await Promise.all([
+          pjSince ? fetchPrintJobsSince({ uid: uidFilter, since: pjSince }) : Promise.resolve([]),
+          ljSince ? fetchLaminationJobsSince({ uid: uidFilter, since: ljSince }) : Promise.resolve([]),
+          incSince ? fetchIncomeSince({ uid: uidFilter, since: incSince }) : Promise.resolve([]),
+        ])
+        if (cancelled) return
+        if (pjDelta.length) {
+          const merged = sortByTimestampDesc(mergeById(pjSnap?.items || [], pjDelta, ["jobId"]))
+          setPrintJobs(merged as any)
+          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: merged as any })
+        }
+        if (ljDelta.length) {
+          const merged = sortByTimestampDesc(mergeById(ljSnap?.items || [], ljDelta, ["jobId"]))
+          setLaminationJobs(merged as any)
+          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: merged as any })
+        }
+        if (incDelta.length) {
+          const merged = sortByTimestampDesc(mergeById(incSnap?.items || [], incDelta, ["incomeId"]))
+          setIncome(merged as any)
+          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: merged as any })
+        }
+        setPrefetchEnabled(false)
+      } else {
+        setPrefetchEnabled(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [user, uidFilter])
 
   useEffect(() => {
     if (!user) return
     // If nothing cached yet, kick off fetching first page in background
-    if (useFirestore) {
+    if (useFirestore && prefetchEnabled) {
       // Start/continue background prefetch loops to completion
       printPrefetchTokenRef.current += 1
       lamPrefetchTokenRef.current += 1
@@ -179,43 +378,63 @@ export default function DashboardPage() {
         // Ensure at least first page
         if (!printInf.data && !printInf.isFetching) await printInf.fetchNextPage()
         // Fetch remaining pages
+        let pagesFetchedInLoop = 0
         while (true) {
           if (printPrefetchTokenRef.current !== pTok) break
           const lastCursor = (printInf.data?.pages.slice(-1)[0]?.nextCursor)
           if (!lastCursor) break
           if (printInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
           await printInf.fetchNextPage()
+          pagesFetchedInLoop += 1
+          if (pagesFetchedInLoop >= MAX_INITIAL_PAGES) break
         }
       })()
 
       ;(async () => {
         if (!lamInf.data && !lamInf.isFetching) await lamInf.fetchNextPage()
+        let pagesFetchedInLoop = 0
         while (true) {
           if (lamPrefetchTokenRef.current !== lTok) break
           const lastCursor = (lamInf.data?.pages.slice(-1)[0]?.nextCursor)
           if (!lastCursor) break
           if (lamInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
           await lamInf.fetchNextPage()
+          pagesFetchedInLoop += 1
+          if (pagesFetchedInLoop >= MAX_INITIAL_PAGES) break
         }
       })()
 
       ;(async () => {
         if (!incInf.data && !incInf.isFetching) await incInf.fetchNextPage()
+        let pagesFetchedInLoop = 0
         while (true) {
           if (incomePrefetchTokenRef.current !== iTok) break
           const lastCursor = (incInf.data?.pages.slice(-1)[0]?.nextCursor)
           if (!lastCursor) break
           if (incInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
           await incInf.fetchNextPage()
+          pagesFetchedInLoop += 1
+          if (pagesFetchedInLoop >= MAX_INITIAL_PAGES) break
         }
       })()
 
       const pj = (printInf.data?.pages.flatMap(p => p.items) ?? []) as any
       const lj = (lamInf.data?.pages.flatMap(p => p.items) ?? []) as any
       const inc = (incInf.data?.pages.flatMap(p => p.items) ?? []) as any
-      setPrintJobs(pj)
-      setLaminationJobs(lj)
-      setIncome(inc)
+      if (prefetchEnabled) {
+        setPrintJobs(pj)
+        setLaminationJobs(lj)
+        setIncome(inc)
+        // Save partial snapshots to speed up subsequent visits
+        const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
+        ;(async () => {
+          await Promise.all([
+            saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: pj }),
+            saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: lj }),
+            saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: inc }),
+          ])
+        })()
+      }
       setHasMorePrint(Boolean(printInf.data?.pages.slice(-1)[0]?.nextCursor))
       setHasMoreLam(Boolean(lamInf.data?.pages.slice(-1)[0]?.nextCursor))
       setHasMoreIncome(Boolean(incInf.data?.pages.slice(-1)[0]?.nextCursor))
@@ -245,13 +464,37 @@ export default function DashboardPage() {
         }
       }
     }
-  }, [user, useFirestore, printInf.data, lamInf.data, incInf.data, cachedUsers, printInf.isFetching, lamInf.isFetching, incInf.isFetching])
+  }, [user, useFirestore, prefetchEnabled, printInf.data, lamInf.data, incInf.data, cachedUsers, printInf.isFetching, lamInf.isFetching, incInf.isFetching])
+
+  // Persist snapshots after full prefetch completion
+  useEffect(() => {
+    if (!user || !prefetchEnabled) return
+    const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
+    const pjDone = Boolean(printInf.data && !printInf.data.pages.slice(-1)[0]?.nextCursor)
+    const ljDone = Boolean(lamInf.data && !lamInf.data.pages.slice(-1)[0]?.nextCursor)
+    const incDone = Boolean(incInf.data && !incInf.data.pages.slice(-1)[0]?.nextCursor)
+    const saveAll = async () => {
+      const pj = (printInf.data?.pages.flatMap(p => p.items) ?? []) as any
+      const lj = (lamInf.data?.pages.flatMap(p => p.items) ?? []) as any
+      const inc = (incInf.data?.pages.flatMap(p => p.items) ?? []) as any
+      await Promise.all([
+        saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: pj }),
+        saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: lj }),
+        saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: inc }),
+      ])
+      setPrefetchEnabled(false)
+      setLoading(false)
+    }
+    if (pjDone && ljDone && incDone) {
+      saveAll()
+    }
+  }, [user, uidFilter, prefetchEnabled, printInf.data, lamInf.data, incInf.data])
 
   // Handlers to change page using server pagination (forward only)
   const handlePrintPageChange = async (newPage: number) => {
     if (!user) return
     if (newPage < 1) return
-    if (newPage > printJobsPage) {
+    if (newPage > printJobsPage && prefetchEnabled) {
       await printInf.fetchNextPage()
       const pj = (printInf.data?.pages.flatMap(p => p.items) ?? []) as any
       setPrintJobs(pj)
@@ -262,7 +505,7 @@ export default function DashboardPage() {
   const handleLamPageChange = async (newPage: number) => {
     if (!user) return
     if (newPage < 1) return
-    if (newPage > laminationJobsPage) {
+    if (newPage > laminationJobsPage && prefetchEnabled) {
       await lamInf.fetchNextPage()
       const lj = (lamInf.data?.pages.flatMap(p => p.items) ?? []) as any
       setLaminationJobs(lj)
@@ -273,7 +516,7 @@ export default function DashboardPage() {
   const handleIncomePageChange = async (newPage: number) => {
     if (!user) return
     if (newPage < 1) return
-    if (newPage > incomePage) {
+    if (newPage > incomePage && prefetchEnabled) {
       await incInf.fetchNextPage()
       const inc = (incInf.data?.pages.flatMap(p => p.items) ?? []) as any
       setIncome(inc)
@@ -284,10 +527,10 @@ export default function DashboardPage() {
   // Apply unified filters
   // Re-apply filters as data streams in (debounced for keystrokes)
   useEffect(() => {
-    const t = setTimeout(() => applyFilters(), 120)
+    const t = setTimeout(() => applyFilters(), 200)
     return () => clearTimeout(t)
   }, [
-    searchTerm,
+    deferredSearchTerm,
     dateFrom,
     dateTo,
     statusFilter,
@@ -303,7 +546,7 @@ export default function DashboardPage() {
     machineFilter,
     laminationTypeFilter,
     // Income filters
-    incomeSearchTerm,
+    deferredIncomeSearchTerm,
     incomeRoleFilter,
     incomeDateFrom,
     incomeDateTo,
@@ -322,15 +565,16 @@ export default function DashboardPage() {
   // ... rest of file remains unchanged
 
   const applyFilters = () => {
+    startFilteringTransition(() => {
     // Filter Print Jobs with tab-specific filters
     let filteredPJ = [...printJobs]
-    if (searchTerm) {
-      const normSearch = normalizeGreek(searchTerm)
+    if (deferredSearchTerm) {
+      const normSearch = normalizeCached(deferredSearchTerm)
       filteredPJ = filteredPJ.filter(
         (item) =>
-          normalizeGreek(item.deviceName || "").includes(normSearch) ||
-          normalizeGreek(item.deviceIP || "").includes(normSearch) ||
-          normalizeGreek(item.userDisplayName || "").includes(normSearch),
+          normalizeCached(item.deviceName || "").includes(normSearch) ||
+          normalizeCached(item.deviceIP || "").includes(normSearch) ||
+          normalizeCached(item.userDisplayName || "").includes(normSearch),
       )
     }
     if (dateFrom || dateTo) {
@@ -384,13 +628,13 @@ export default function DashboardPage() {
 
     // Filter Lamination Jobs with tab-specific filters
     let filteredLJ = [...laminationJobs]
-    if (searchTerm) {
-      const normSearch = normalizeGreek(searchTerm)
+    if (deferredSearchTerm) {
+      const normSearch = normalizeCached(deferredSearchTerm)
       filteredLJ = filteredLJ.filter(
         (item) =>
-          normalizeGreek(item.type || "").includes(normSearch) ||
-          normalizeGreek(item.notes || "").includes(normSearch) ||
-          normalizeGreek(item.userDisplayName || "").includes(normSearch),
+          normalizeCached(item.type || "").includes(normSearch) ||
+          normalizeCached(item.notes || "").includes(normSearch) ||
+          normalizeCached(item.userDisplayName || "").includes(normSearch),
       )
     }
     if (dateFrom || dateTo) {
@@ -439,12 +683,12 @@ export default function DashboardPage() {
     let filteredInc = [...income]
     
     // Apply income search filter
-    if (incomeSearchTerm) {
-      const normIncomeSearch = normalizeGreek(incomeSearchTerm)
+    if (deferredIncomeSearchTerm) {
+      const normIncomeSearch = normalizeCached(deferredIncomeSearchTerm)
       filteredInc = filteredInc.filter(
         (item) =>
-          normalizeGreek(item.userDisplayName || "").includes(normIncomeSearch) ||
-          normalizeGreek(item.username || "").includes(normIncomeSearch)
+          normalizeCached(item.userDisplayName || "").includes(normIncomeSearch) ||
+          normalizeCached(item.username || "").includes(normIncomeSearch)
       )
     }
     
@@ -496,6 +740,7 @@ export default function DashboardPage() {
     }
     
     setFilteredIncome(filteredInc)
+    })
   }
 
   const clearFilters = () => {
@@ -1201,6 +1446,20 @@ export default function DashboardPage() {
                   {user.accessLevel === "Διαχειριστής" && " - Προβολή όλων των δεδομένων"}
                 </p>
               </div>
+            </div>
+
+            {/* Add Refresh Data Button */}
+            <div className="mb-6 flex justify-end">
+              <Button
+                onClick={handleManualRefresh}
+                variant="outline"
+                size="sm"
+                className="bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                title="Ανανέωση δεδομένων"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Ανανέωση δεδομένων
+              </Button>
             </div>
 
             {/* Summary Cards */}
