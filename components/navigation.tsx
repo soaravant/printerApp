@@ -6,17 +6,24 @@ import { useRouter, usePathname } from "next/navigation"
 import { Printer, Settings, LogOut, UserIcon, Euro } from "lucide-react"
 import Link from "next/link"
 import { RoleBadge } from "@/components/role-badge"
+import { useRefresh } from "@/lib/refresh-context"
 
 export function Navigation() {
   const { user, logout } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
+  const { setLoading, setLoadingLabel } = useRefresh()
 
   if (!user) return null
 
   const handleLogout = () => {
+    // Show global overlay to indicate navigation in progress
+    setLoadingLabel("Αποσύνδεση...")
+    setLoading(true)
     logout()
-    router.push("/login")
+    requestAnimationFrame(() => {
+      router.push("/login")
+    })
   }
 
   const navItems = [
@@ -77,6 +84,12 @@ export function Navigation() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => {
+                    if (item.href !== pathname) {
+                      setLoadingLabel("Μετάβαση στη σελίδα...")
+                      setLoading(true)
+                    }
+                  }}
                   className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                     isActive ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                   }`}

@@ -1,6 +1,7 @@
 import React from "react"
 import { normalizeGreek } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
+import { ClearableInput } from "@/components/ui/clearable-input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Filter, RotateCcw } from "lucide-react"
@@ -77,11 +78,12 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
           {/* Search */}
           <div>
             <Label htmlFor="incomeSearch" className="text-gray-700">Αναζήτηση</Label>
-            <Input
+            <ClearableInput
               id="incomeSearch"
               placeholder="Αναζήτηση..."
               value={incomeSearchTerm}
               onChange={(e) => setIncomeSearchTerm(e.target.value)}
+              onClear={() => setIncomeSearchTerm("")}
               className="border-gray-200 focus:border-yellow-500"
             />
           </div>

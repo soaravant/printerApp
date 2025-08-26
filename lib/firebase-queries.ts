@@ -295,8 +295,8 @@ export async function fetchIncomePage(params: { uid?: string; pageSize: number; 
 export async function fetchPrintJobsSince(params: { uid?: string; since: Date; cap?: number }): Promise<FirebasePrintJob[]> {
   const col = collection(db, FIREBASE_COLLECTIONS.PRINT_JOBS)
   const base = params.uid
-    ? query(col, where("uid", "==", params.uid), where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
-    : query(col, where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
+    ? query(col, where("uid", "==", params.uid), where("createdAt", ">", params.since), orderBy("createdAt", "desc"))
+    : query(col, where("createdAt", ">", params.since), orderBy("createdAt", "desc"))
   const q = params.cap ? query(base, limit(params.cap)) : base
   const snap = await getDocs(q)
   return snap.docs.map(d => {
@@ -309,8 +309,8 @@ export async function fetchPrintJobsSince(params: { uid?: string; since: Date; c
 export async function fetchLaminationJobsSince(params: { uid?: string; since: Date; cap?: number }): Promise<FirebaseLaminationJob[]> {
   const col = collection(db, FIREBASE_COLLECTIONS.LAMINATION_JOBS)
   const base = params.uid
-    ? query(col, where("uid", "==", params.uid), where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
-    : query(col, where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
+    ? query(col, where("uid", "==", params.uid), where("createdAt", ">", params.since), orderBy("createdAt", "desc"))
+    : query(col, where("createdAt", ">", params.since), orderBy("createdAt", "desc"))
   const q = params.cap ? query(base, limit(params.cap)) : base
   const snap = await getDocs(q)
   return snap.docs.map(d => {

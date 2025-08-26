@@ -1,8 +1,8 @@
 import React from "react"
 import { Input } from "@/components/ui/input"
+import { ClearableInput } from "@/components/ui/clearable-input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
 import { Filter, RotateCcw } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -84,11 +84,12 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
           {/* Search */}
           <div>
             <Label htmlFor="debtSearch" className="text-gray-700">Αναζήτηση</Label>
-            <Input
+            <ClearableInput
               id="debtSearch"
               placeholder="Αναζήτηση..."
               value={debtSearchTerm}
               onChange={(e) => setDebtSearchTerm(e.target.value)}
+              onClear={() => setDebtSearchTerm("")}
               className="border-gray-200 focus:border-yellow-500"
             />
           </div>

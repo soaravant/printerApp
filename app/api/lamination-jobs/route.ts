@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       const newTotalDebt = roundMoney(prevPrintDebt + newLaminationDebt - newCredit)
 
       const jobRef = db.collection(FIREBASE_COLLECTIONS.LAMINATION_JOBS).doc(body.jobId)
-      tx.set(jobRef, { ...body, timestamp: new Date(body.timestamp as any) })
+      tx.set(jobRef, { ...body, timestamp: new Date(body.timestamp as any), createdAt: new Date() })
       tx.update(userRef, { laminationDebt: newLaminationDebt, totalDebt: newTotalDebt })
     })
     // Read back updated user to return to client for local merge

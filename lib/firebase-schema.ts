@@ -83,6 +83,8 @@ export interface FirebasePrintJob {
   // Optional printer account credentials used at device (username/password)
   printerAccountUsername?: string
   printerAccountPasswordHash?: string
+  // Server-side creation time used for reliable delta syncs
+  createdAt?: Timestamp
 }
 
 // Lamination job
@@ -98,6 +100,8 @@ export interface FirebaseLaminationJob {
   timestamp: Timestamp
   status: "completed" | "pending" | "failed"
   notes?: string
+  // Server-side creation time used for reliable delta syncs
+  createdAt?: Timestamp
 }
 
 // Income (payments)

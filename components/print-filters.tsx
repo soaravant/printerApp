@@ -1,5 +1,6 @@
 import React from "react"
 import { Input } from "@/components/ui/input"
+import { ClearableInput } from "@/components/ui/clearable-input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
@@ -71,26 +72,15 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
           {/* Row 1: Search */}
           <div>
             <Label htmlFor="search" className="text-gray-700">Αναζήτηση</Label>
-            <div className="relative">
-              <Input
-                id="search"
-                placeholder="Αναζήτηση..."
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                className={`border-gray-200 focus:border-blue-500 ${searchTerm ? "pr-10" : ""}`}
-              />
-              {searchTerm && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
-                  onClick={() => setLocalSearch("")}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
+            <ClearableInput
+              id="search"
+              placeholder="Αναζήτηση..."
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              onClear={() => setLocalSearch("")}
+              className={`border-gray-200 focus:border-blue-500`}
+              hasValue={Boolean(localSearch)}
+            />
           </div>
           
           {/* Row 2: Date From */}

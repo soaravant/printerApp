@@ -103,6 +103,10 @@ export async function POST(req: Request) {
         const iso = toIso(item.timestamp)
         if (iso) item.timestamp = iso
       }
+      if (item.createdAt) {
+        const iso2 = toIso(item.createdAt)
+        if (iso2) item.createdAt = iso2
+      }
       const key = String(item[idKey] || "")
       const pos = index.get(key)
       if (pos !== undefined) {
@@ -112,11 +116,11 @@ export async function POST(req: Request) {
         merged.push(item)
       }
     }
-    // Update lastUpdated
+    // Update lastUpdated (prefer createdAt when available)
     let maxMs = existing.lastUpdated || 0
     for (const d of body.delta) {
-      const ts = d?.timestamp
-      const ms = typeof ts === "string" ? Date.parse(ts) : new Date(ts as any).getTime()
+      const t = (d as any)?.createdAt ?? (d as any)?.timestamp
+      const ms = typeof t === "string" ? Date.parse(t) : new Date(t as any).getTime()
       if (Number.isFinite(ms) && ms > maxMs) maxMs = ms
     }
 

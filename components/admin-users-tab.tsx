@@ -1,5 +1,6 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
+import { ClearableInput } from "@/components/ui/clearable-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -118,10 +119,11 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
           <div className="flex-1 flex items-center">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
+              <ClearableInput
                 placeholder="Αναζήτηση χρηστών..."
                 value={usersTabSearchTerm}
                 onChange={(e) => setUsersTabSearchTerm(e.target.value)}
+                onClear={() => setUsersTabSearchTerm("")}
                 className="pl-10 !focus:outline-none !focus:ring-0 !focus:border-gray-300 !focus-visible:ring-0 !focus-visible:ring-offset-0"
               />
             </div>

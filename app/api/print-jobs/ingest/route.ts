@@ -140,6 +140,7 @@ export async function POST(req: Request) {
         deviceName: payload.deviceName || "",
         timestamp: tsDate as any,
         status: "completed",
+        createdAt: now as any,
       }
       if (payload.accountUsername) {
         (jobDoc as any).printerAccountUsername = String(payload.accountUsername)
