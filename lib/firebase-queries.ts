@@ -322,9 +322,10 @@ export async function fetchLaminationJobsSince(params: { uid?: string; since: Da
 
 export async function fetchIncomeSince(params: { uid?: string; since: Date; cap?: number }): Promise<FirebaseIncome[]> {
   const col = collection(db, FIREBASE_COLLECTIONS.INCOME)
+  // Use createdAt for delta detection so backdated payments (older timestamp) still appear
   const base = params.uid
-    ? query(col, where("uid", "==", params.uid), where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
-    : query(col, where("timestamp", ">", params.since), orderBy("timestamp", "desc"))
+    ? query(col, where("uid", "==", params.uid), where("createdAt", ">", params.since), orderBy("createdAt", "desc"))
+    : query(col, where("createdAt", ">", params.since), orderBy("createdAt", "desc"))
   const q = params.cap ? query(base, limit(params.cap)) : base
   const snap = await getDocs(q)
   return snap.docs.map(d => {

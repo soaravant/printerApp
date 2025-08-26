@@ -1,0 +1,36 @@
+{
+  "localHttpPort": 57991,
+  "localProxyToken": "",
+  "agentNotifyPort": 57981,
+  "agentNotifyToken": "",
+
+  "listeners": {
+    "9100": {
+      "deviceName": "Printer 192.168.3.41",
+      "targetIP": "192.168.3.41",
+      "targetPort": 9100
+    },
+    "9101": {
+      "deviceName": "Printer 192.168.3.42",
+      "targetIP": "192.168.3.42",
+      "targetPort": 9100
+    },
+    "9102": {
+      "deviceName": "Printer 192.168.3.43",
+      "targetIP": "192.168.3.43",
+      "targetPort": 9100
+    }
+  },
+
+  "printerProfiles": {
+    "default": { "injector": "none" },
+    "192.168.3.41": { "injector": "none" },
+    "192.168.3.42": { "injector": "none" },
+    "192.168.3.43": { "injector": "none" }
+  },
+
+  "pendingTtlSeconds": 300,
+  "maxJobBytes": 52428800
+}
+
+

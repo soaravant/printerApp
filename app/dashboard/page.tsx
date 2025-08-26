@@ -32,7 +32,7 @@ import { DebtFilters } from "@/components/debt-filters"
 import { IncomeFilters } from "@/components/income-filters"
 
 // Firestore
-import { fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite, fetchPrintJobsSince, fetchLaminationJobsSince, fetchIncomeSince, useBankTotals } from "@/lib/firebase-queries"
+import { fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite, fetchPrintJobsSince, fetchLaminationJobsSince, fetchIncomeSince, useBankTotals, fetchUsers } from "@/lib/firebase-queries"
 import { FIREBASE_COLLECTIONS } from "@/lib/firebase-schema"
 import { normalizeGreek } from "@/lib/utils"
 import { getSnapshot, saveSnapshot, makeScopeKey, mergeById, sortByTimestampDesc } from "@/lib/snapshot-store"
@@ -82,7 +82,7 @@ function Pagination({ page, total, pageSize, onPageChange }: { page: number; tot
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { refreshTrigger, triggerRefresh, setLoading } = useRefresh()
+  const { refreshTrigger, triggerRefresh, setLoading, setLoadingLabel } = useRefresh()
   const [printJobs, setPrintJobs] = useState<FirebasePrintJob[]>([])
   const [laminationJobs, setLaminationJobs] = useState<FirebaseLaminationJob[]>([])
   const [allUsers, setAllUsers] = useState<FirebaseUser[]>([])
@@ -157,111 +157,28 @@ export default function DashboardPage() {
   const handleManualRefresh = async () => {
     if (!user) return
     try {
+      setLoadingLabel("Ανανέωση δεδομένων...")
       setLoading(true)
+      // Force a hard refetch from Firestore for all three datasets and users
+      const [pjFresh, ljFresh, incFresh, usersFresh] = await Promise.all([
+        fetchPrintJobsFor(uidFilter),
+        fetchLaminationJobsFor(uidFilter),
+        fetchIncomeFor(uidFilter),
+        fetchUsers(),
+      ])
+      setPrintJobs(pjFresh as any)
+      setLaminationJobs(ljFresh as any)
+      setIncome(incFresh as any)
+      setAllUsers(usersFresh as any)
+
+      // Overwrite local snapshots so next visit is up to date
       const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
-      const [pjLocal, ljLocal, incLocal] = await Promise.all([
-        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS)),
-        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS)),
-        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.INCOME)),
+      await Promise.all([
+        saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: pjFresh as any }),
+        saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: ljFresh as any }),
+        saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: incFresh as any }),
       ])
-      // Try remote static snapshot if local missing
-      const [pjRemote, ljRemote, incRemote] = await Promise.all([
-        pjLocal ? Promise.resolve(null) : loadRemoteSnapshot<any>(FIREBASE_COLLECTIONS.PRINT_JOBS, uidFilter),
-        ljLocal ? Promise.resolve(null) : loadRemoteSnapshot<any>(FIREBASE_COLLECTIONS.LAMINATION_JOBS, uidFilter),
-        incLocal ? Promise.resolve(null) : loadRemoteSnapshot<any>(FIREBASE_COLLECTIONS.INCOME, uidFilter),
-      ])
-      const pjSnap = pjLocal || pjRemote
-      const ljSnap = ljLocal || ljRemote
-      const incSnap = incLocal || incRemote
-      // Persist remote snapshots locally for subsequent visits
-      if (pjRemote) await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), pjRemote)
-      if (ljRemote) await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), ljRemote)
-      if (incRemote) await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), incRemote)
-      let hadAnySnapshot = Boolean((pjSnap && pjSnap.items?.length) || (ljSnap && ljSnap.items?.length) || (incSnap && incSnap.items?.length))
-      if (hadAnySnapshot) {
-        const pjSince = pjSnap?.lastUpdated ? new Date(pjSnap.lastUpdated) : (pjSnap?.items?.[0]?.timestamp ? new Date(pjSnap.items[0].timestamp) : null)
-        const ljSince = ljSnap?.lastUpdated ? new Date(ljSnap.lastUpdated) : (ljSnap?.items?.[0]?.timestamp ? new Date(ljSnap.items[0].timestamp) : null)
-        const incSince = incSnap?.lastUpdated ? new Date(incSnap.lastUpdated) : (incSnap?.items?.[0]?.timestamp ? new Date(incSnap.items[0].timestamp) : null)
-        const [pjDelta, ljDelta, incDelta] = await Promise.all([
-          pjSince ? fetchPrintJobsSince({ uid: uidFilter, since: pjSince }) : Promise.resolve([]),
-          ljSince ? fetchLaminationJobsSince({ uid: uidFilter, since: ljSince }) : Promise.resolve([]),
-          incSince ? fetchIncomeSince({ uid: uidFilter, since: incSince }) : Promise.resolve([]),
-        ])
-        if (pjDelta.length) {
-          const merged = sortByTimestampDesc(mergeById(pjSnap?.items || [], pjDelta, ["jobId"]))
-          setPrintJobs(merged as any)
-          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: merged as any })
-          // Attempt to update remote snapshot (best-effort)
-          try {
-            if (allowRemoteSnapshotUpdate) {
-              const token = await (await import("@/lib/firebase-client")).auth.currentUser?.getIdToken()
-              if (token && process.env.NEXT_PUBLIC_SNAPSHOT_BASE_URL) {
-                const payload = { collection: "printJobs", uid: uidFilter || null, delta: pjDelta }
-                const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } as any
-                let attempt = 0
-                let delay = 250
-                while (attempt < 5) {
-                  const res = await fetch("/api/snapshots/update", { method: "POST", headers, body: JSON.stringify(payload) })
-                  if (res.ok) break
-                  attempt++
-                  await new Promise(r => setTimeout(r, delay))
-                  delay = Math.min(delay * 2, 4000)
-                }
-              }
-            }
-          } catch {}
-        }
-        if (ljDelta.length) {
-          const merged = sortByTimestampDesc(mergeById(ljSnap?.items || [], ljDelta, ["jobId"]))
-          setLaminationJobs(merged as any)
-          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: merged as any })
-          try {
-            if (allowRemoteSnapshotUpdate) {
-              const token = await (await import("@/lib/firebase-client")).auth.currentUser?.getIdToken()
-              if (token && process.env.NEXT_PUBLIC_SNAPSHOT_BASE_URL) {
-                const payload = { collection: "laminationJobs", uid: uidFilter || null, delta: ljDelta }
-                const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } as any
-                let attempt = 0
-                let delay = 250
-                while (attempt < 5) {
-                  const res = await fetch("/api/snapshots/update", { method: "POST", headers, body: JSON.stringify(payload) })
-                  if (res.ok) break
-                  attempt++
-                  await new Promise(r => setTimeout(r, delay))
-                  delay = Math.min(delay * 2, 4000)
-                }
-              }
-            }
-          } catch {}
-        }
-        if (incDelta.length) {
-          const merged = sortByTimestampDesc(mergeById(incSnap?.items || [], incDelta, ["incomeId"]))
-          setIncome(merged as any)
-          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: merged as any })
-          try {
-            if (allowRemoteSnapshotUpdate) {
-              const token = await (await import("@/lib/firebase-client")).auth.currentUser?.getIdToken()
-              if (token && process.env.NEXT_PUBLIC_SNAPSHOT_BASE_URL) {
-                const payload = { collection: "income", uid: uidFilter || null, delta: incDelta }
-                const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } as any
-                let attempt = 0
-                let delay = 250
-                while (attempt < 5) {
-                  const res = await fetch("/api/snapshots/update", { method: "POST", headers, body: JSON.stringify(payload) })
-                  if (res.ok) break
-                  attempt++
-                  await new Promise(r => setTimeout(r, delay))
-                  delay = Math.min(delay * 2, 4000)
-                }
-              }
-            }
-          } catch {}
-        }
-        setLoading(false)
-      } else {
-        // No snapshot exists yet, fallback to full prefetch
-        setPrefetchEnabled(true)
-      }
+      setLoading(false)
     } catch (e) {
       setLoading(false)
     }
@@ -269,6 +186,8 @@ export default function DashboardPage() {
 
   // Initialize debt range once based on visible users
   const initializedDebtRangeRef = useRef(false)
+  // Initialize income range once based on loaded income
+  const initializedIncomeRangeRef = useRef(false)
   // Server pagination cursors
   const [printCursor, setPrintCursor] = useState<any | undefined>(undefined)
   const [lamCursor, setLamCursor] = useState<any | undefined>(undefined)
@@ -294,6 +213,12 @@ export default function DashboardPage() {
   const lamInf = useLaminationJobsInfinite(uidFilter, FETCH_BATCH_SIZE, { enabled: prefetchEnabled })
   const incInf = useIncomeInfinite(uidFilter, FETCH_BATCH_SIZE, { enabled: prefetchEnabled })
 
+  // Persist a flag to resume background prefetch if user exits early
+  const prefetchResumeKey = React.useMemo(() => {
+    const scope = uidFilter ? `uid:${uidFilter}` : "all"
+    return `dashboard:prefetch-incomplete:${scope}`
+  }, [uidFilter])
+
   // Ensure users are always loaded into local state regardless of prefetch path
   useEffect(() => {
     if (cachedUsers && cachedUsers.length) {
@@ -301,12 +226,13 @@ export default function DashboardPage() {
     }
   }, [cachedUsers])
 
-  // Load snapshots first, then optionally enable prefetch if no snapshot exists
+  // Load snapshots first, then optionally enable/resume prefetch
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       if (!user) return
       const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
+      const resumeWanted = (typeof window !== "undefined") && Boolean(localStorage.getItem(prefetchResumeKey))
       const [pjSnap, ljSnap, incSnap] = await Promise.all([
         getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS)),
         getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS)),
@@ -327,7 +253,7 @@ export default function DashboardPage() {
         hadAnySnapshot = true
       }
       setSnapshotsLoaded(true)
-      // If we have at least one snapshot, do delta fetches only; otherwise enable full prefetch
+      // If we have at least one snapshot, do delta fetches; resume full prefetch if it was incomplete
       if (hadAnySnapshot) {
         // Compute since per collection from snapshot metadata or top timestamp
         const pjSince = pjSnap?.lastUpdated ? new Date(pjSnap.lastUpdated) : (pjSnap?.items?.[0]?.timestamp ? new Date(pjSnap.items[0].timestamp) : null)
@@ -354,7 +280,8 @@ export default function DashboardPage() {
           setIncome(merged as any)
           await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: merged as any })
         }
-        setPrefetchEnabled(false)
+        // If user had exited early previously, resume background prefetch to complete it
+        setPrefetchEnabled(resumeWanted)
         // Ensure overlay stays until initial filter pass completes
         setLoading(false)
       } else {
@@ -362,7 +289,7 @@ export default function DashboardPage() {
       }
     })()
     return () => { cancelled = true }
-  }, [user, uidFilter])
+  }, [user, uidFilter, prefetchResumeKey, refreshTrigger])
 
   useEffect(() => {
     if (!user) return
@@ -424,9 +351,10 @@ export default function DashboardPage() {
       const lj = (lamInf.data?.pages.flatMap(p => p.items) ?? []) as any
       const inc = (incInf.data?.pages.flatMap(p => p.items) ?? []) as any
       if (prefetchEnabled) {
-        setPrintJobs(pj)
-        setLaminationJobs(lj)
-        setIncome(inc)
+        // Avoid replacing larger snapshot data with smaller partial prefetch pages
+        if (pj.length >= printJobs.length) setPrintJobs(pj)
+        if (lj.length >= laminationJobs.length) setLaminationJobs(lj)
+        if (inc.length >= income.length) setIncome(inc)
         // Save partial snapshots to speed up subsequent visits
         const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
         ;(async () => {
@@ -466,7 +394,48 @@ export default function DashboardPage() {
         }
       }
     }
-  }, [user, useFirestore, prefetchEnabled, printInf.data, lamInf.data, incInf.data, cachedUsers, printInf.isFetching, lamInf.isFetching, incInf.isFetching])
+  }, [user, useFirestore, prefetchEnabled, printInf.data, lamInf.data, incInf.data, cachedUsers, printInf.isFetching, lamInf.isFetching, incInf.isFetching, printJobs.length, laminationJobs.length, income.length])
+
+  // Fallback: initialize debt range when users load even without prefetch loop
+  useEffect(() => {
+    if (!user) return
+    if (initializedDebtRangeRef.current) return
+    if (!allUsers || !allUsers.length) return
+    const visibleUsers = (user.accessLevel === "Διαχειριστής")
+      ? allUsers
+      : (user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0)
+        ? allUsers.filter(u => {
+            if (u.userRole === "Άτομο") {
+              return u.memberOf?.some((g: string) => user.responsibleFor?.includes(g))
+            }
+            return user.responsibleFor?.includes(u.displayName)
+          })
+        : allUsers.filter(u => u.uid === user.uid)
+    const amounts = visibleUsers
+      .filter(u => u.accessLevel !== "Διαχειριστής")
+      .map(u => typeof u.totalDebt === "number" ? u.totalDebt : (u.printDebt || 0) + (u.laminationDebt || 0))
+    if (amounts.length > 0) {
+      const minDebt = Math.floor(Math.min(...amounts))
+      const maxDebt = Math.ceil(Math.max(...amounts))
+      setPriceRange([minDebt, maxDebt])
+      setPriceRangeInputs([minDebt.toString(), maxDebt.toString()])
+      initializedDebtRangeRef.current = true
+    }
+  }, [user, allUsers])
+
+  // Initialize income range once when income data becomes available
+  useEffect(() => {
+    if (initializedIncomeRangeRef.current) return
+    if (!income || !income.length) return
+    const amounts = income.map(i => i.amount || 0)
+    if (amounts.length > 0) {
+      const minIncome = Math.floor(Math.min(...amounts))
+      const maxIncome = Math.ceil(Math.max(...amounts))
+      setIncomeAmountRange([minIncome, maxIncome])
+      setIncomeAmountInputs([minIncome.toString(), maxIncome.toString()])
+      initializedIncomeRangeRef.current = true
+    }
+  }, [income])
 
   // Persist snapshots after full prefetch completion
   useEffect(() => {
@@ -491,6 +460,16 @@ export default function DashboardPage() {
       saveAll()
     }
   }, [user, uidFilter, prefetchEnabled, printInf.data, lamInf.data, incInf.data])
+
+  // Keep a persistent resume flag while prefetch is in progress; clear when done
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (prefetchEnabled) {
+      try { localStorage.setItem(prefetchResumeKey, "1") } catch {}
+    } else {
+      try { localStorage.removeItem(prefetchResumeKey) } catch {}
+    }
+  }, [prefetchEnabled, prefetchResumeKey])
 
   // Handlers to change page using server pagination (forward only)
   const handlePrintPageChange = async (newPage: number) => {
@@ -1690,6 +1669,7 @@ export default function DashboardPage() {
                     users={allUsers}
                     clearFilters={clearFilters}
                     combinedDebtData={combinedDebtData}
+                    resetDebtPage={() => setDebtPage(1)}
                   />
                 </div>
               </div>
@@ -1782,6 +1762,7 @@ export default function DashboardPage() {
                     incomeData={income}
                     users={allUsers}
                     clearIncomeFilters={clearIncomeFilters}
+                    resetIncomePage={() => setIncomePage(1)}
                   />
                 </div>
               </div>

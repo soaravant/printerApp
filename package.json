@@ -13,8 +13,11 @@
     "backfill:device-ip": "npm run build:scripts && node .scripts-dist/scripts/backfill-device-ip.js",
     "build:agent": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-agent.ps1",
     "build:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-installer.ps1",
+    "build:proxy": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-proxy.ps1",
+    "build:proxy-installer": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-proxy-installer.ps1",
     "export:snapshots": "npm run build:scripts && node .scripts-dist/scripts/export-snapshots.js",
-    "backfill:last-income": "npm run build:scripts && node .scripts-dist/scripts/backfill-last-income.js"
+    "backfill:last-income": "npm run build:scripts && node .scripts-dist/scripts/backfill-last-income.js",
+    "fix:income-future": "npm run build:scripts && node .scripts-dist/scripts/backfill-income-future-to-last-month.js"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.11",

@@ -22,7 +22,8 @@ export default function IncomeTable({
   onPageChange, 
   userRole 
 }: IncomeTableProps) {
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
+  // Default: sort by timestamp descending (newest first)
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'timestamp', direction: 'desc' })
   const [sortedData, setSortedData] = useState(data)
 
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function IncomeTable({
               currentSort={sortConfig}
               onSort={handleSort}
               className="text-center w-1/4"
+              variant="yellow"
             >
               Χρήστης
             </SortableTableHeader>
@@ -61,6 +63,7 @@ export default function IncomeTable({
               currentSort={sortConfig}
               onSort={handleSort}
               className="text-center w-1/4"
+              variant="yellow"
             >
               Όνομα
             </SortableTableHeader>
@@ -69,6 +72,7 @@ export default function IncomeTable({
               currentSort={sortConfig}
               onSort={handleSort}
               className="text-center w-1/4"
+              variant="yellow"
             >
               Ποσό
             </SortableTableHeader>
@@ -77,6 +81,7 @@ export default function IncomeTable({
               currentSort={sortConfig}
               onSort={handleSort}
               className="text-center w-1/4"
+              variant="yellow"
             >
               Ημερομηνία
             </SortableTableHeader>

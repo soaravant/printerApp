@@ -26,6 +26,7 @@ interface IncomeFiltersProps {
   incomeData: any[]
   users: any[]
   clearIncomeFilters: () => void
+  resetIncomePage: () => void
 }
 
 export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
@@ -46,6 +47,7 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
   incomeData,
   users,
   clearIncomeFilters,
+  resetIncomePage,
 }) => {
   const { user } = useAuth()
 
@@ -447,8 +449,8 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
                      ];
                      
                      const intervals = rawIntervals.map(([start, end], i) => [
-                       Math.round(i === 0 ? start : start + 0.01),
-                       Math.round(end)
+                       Math.floor(i === 0 ? start : start + 0.01),
+                       Math.ceil(end)
                      ]);
                      
                      const intervalLabels = intervals.map(([start, end], i) => {
@@ -492,6 +494,8 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
                              end.toFixed(2).replace('.', ',')
                            ]);
                          }
+                         // Always reset pagination to first page when a radio is pressed
+                         resetIncomePage();
                        };
                        
                        return (

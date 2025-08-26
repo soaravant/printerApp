@@ -118,6 +118,7 @@ pnpm dev          # Start development server
 pnpm build        # Build for production
 pnpm start        # Start production server
 pnpm lint         # Run ESLint
+pnpm ts-node -P tsconfig.scripts.json scripts/backfill-income-createdAt-and-ids.ts  # Backfill income createdAt and IDs
 ```
 
 ### Tech Stack

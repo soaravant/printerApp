@@ -20,6 +20,8 @@ import { GreekDatePicker } from "@/components/ui/greek-date-picker"
 import { useState, useEffect } from "react"
 import { Plus, CreditCard, Users, Building, Printer, RotateCcw, Euro, Eye, EyeOff } from "lucide-react"
 import type { FirebaseUser, FirebaseLaminationJob, FirebaseIncome, FirebasePrintJob } from "@/lib/firebase-schema"
+import { FIREBASE_COLLECTIONS } from "@/lib/firebase-schema"
+import { getSnapshot, saveSnapshot, makeScopeKey, mergeById, sortByTimestampDesc } from "@/lib/snapshot-store"
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import { TagInput } from "@/components/ui/tag-input"
 import { addPrintJobServer, addLaminationJobServer, addIncomeServer, addUserServer, usePriceTable, useUsers, useUsersMutations, useJobsMutations } from "@/lib/firebase-queries"
@@ -28,7 +30,7 @@ import { normalizeGreek } from "@/lib/utils"
 export default function AdminPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const { triggerRefresh, setLoading } = useRefresh()
+  const { triggerRefresh, setLoading, setLoadingLabel } = useRefresh()
   const [users, setUsers] = useState<FirebaseUser[]>([])
   const [filteredUsers, setFilteredUsers] = useState<FirebaseUser[]>([])
   const [usersTabSearchTerm, setUsersTabSearchTerm] = useState("")
@@ -205,6 +207,7 @@ export default function AdminPage() {
     }
 
     setLocalLoading(true)
+    setLoadingLabel("Καταχώρηση στη βάση...")
     setLoading(true)
     try {
       const selectedUserData = users.find((u) => u.uid === selectedUser)
@@ -280,6 +283,7 @@ export default function AdminPage() {
     }
 
     setLocalLoading(true)
+    setLoadingLabel("Καταχώρηση στη βάση...")
     setLoading(true)
     try {
       const selectedUserData = users.find((u) => u.uid === selectedUser)
@@ -370,6 +374,7 @@ export default function AdminPage() {
     }
 
     setDebtReductionLoading(true)
+    setLoadingLabel("Καταχώρηση στη βάση...")
     setLoading(true)
     try {
       const selectedUserData = users.find((u) => u.uid === debtReductionUser)
@@ -378,7 +383,7 @@ export default function AdminPage() {
       }
 
       const newIncome: Income = {
-        incomeId: `income-${Date.now()}`,
+        incomeId: "temp",
         uid: debtReductionUser,
         username: selectedUserData.username,
         userDisplayName: selectedUserData.displayName,

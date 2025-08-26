@@ -16,6 +16,8 @@
     "scripts/clear-firestore.ts",
     "scripts/backfill-device-ip.ts",
     "scripts/backfill-last-income.ts",
+    "scripts/backfill-income-createdAt-and-ids.ts",
+    "scripts/backfill-income-future-to-last-month.ts",
     "scripts/report-device-names.ts",
     "scripts/export-snapshots.ts",
     "scripts/utils/firebase-admin.ts",

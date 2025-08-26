@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     }
 
     const body = (await req.json()) as FirebaseIncome
-    if (!body || !body.uid || !body.incomeId) {
+    if (!body || !body.uid) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
     }
     const db = getAdminDb()
@@ -46,8 +46,18 @@ export async function POST(req: Request) {
       tx.set(bankRef, { bankId: "main-bank", printBank: newPrintBank, laminationBank: newLaminationBank, lastUpdated: new Date() }, { merge: true })
 
       // 4) Write income
-      const incomeRef = db.collection(FIREBASE_COLLECTIONS.INCOME).doc(body.incomeId)
-      tx.set(incomeRef, { ...body, timestamp: new Date(body.timestamp as any) })
+      const tsDate = new Date(body.timestamp as any)
+      const slugUsername = String((user.username || body.username || "")).toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+      const y = tsDate.getFullYear()
+      const m = String(tsDate.getMonth() + 1).padStart(2, "0")
+      const d = String(tsDate.getDate()).padStart(2, "0")
+      const datePart = `${d}-${m}-${y}`
+      const amt = Number(body.amount || 0)
+      const amountPart = amt.toFixed(2)
+      const rand = Math.random().toString(36).slice(2, 8)
+      const incomeId = `${slugUsername}-${datePart}-${amountPart}-${rand}`
+      const incomeRef = db.collection(FIREBASE_COLLECTIONS.INCOME).doc(incomeId)
+      tx.set(incomeRef, { ...body, incomeId, username: user.username || body.username, userDisplayName: user.displayName || body.userDisplayName, timestamp: tsDate, createdAt: new Date() })
 
       // 5) Update user's lastPayment (max existing vs new income timestamp)
       const toDate = (v: any) => (v && typeof v.toDate === "function") ? v.toDate() : new Date(v)

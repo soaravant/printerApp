@@ -89,7 +89,7 @@ const filterRowsByType = (rows: any[], printTypeFilter: string) => {
 }
 
 export default function PrintJobsTable({ data, page, pageSize, onPageChange, userRole, onRowHover, printTypeFilter, hasMore }: PrintJobsTableProps) {
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'timestamp', direction: 'desc' })
   const [sortedData, setSortedData] = useState<any[]>([])
 
   useEffect(() => {
@@ -120,6 +120,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
               sortKey="timestamp"
               currentSort={sortConfig}
               onSort={handleSort}
+              variant="blue"
             >
               Ημερομηνία/Ώρα
             </SortableTableHeader>
@@ -128,6 +129,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
                 sortKey="username"
                 currentSort={sortConfig}
                 onSort={handleSort}
+                variant="blue"
               >
                 Χρήστης
               </SortableTableHeader>
@@ -137,6 +139,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
                 sortKey="userDisplayName"
                 currentSort={sortConfig}
                 onSort={handleSort}
+                variant="blue"
               >
                 Όνομα
               </SortableTableHeader>
@@ -145,6 +148,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
               sortKey="deviceName"
               currentSort={sortConfig}
               onSort={handleSort}
+              variant="blue"
             >
               Εκτυπωτής
             </SortableTableHeader>
@@ -152,6 +156,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
               sortKey="printType"
               currentSort={sortConfig}
               onSort={handleSort}
+              variant="blue"
             >
               Είδος Εκτύπωσης
             </SortableTableHeader>
@@ -159,6 +164,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
               sortKey="quantity"
               currentSort={sortConfig}
               onSort={handleSort}
+              variant="blue"
             >
               Ποσότητα
             </SortableTableHeader>
@@ -166,6 +172,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
               sortKey="cost"
               currentSort={sortConfig}
               onSort={handleSort}
+              variant="blue"
             >
               Κόστος
             </SortableTableHeader>

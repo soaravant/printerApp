@@ -30,6 +30,7 @@ interface DebtFiltersProps {
   users: any[]
   clearFilters: () => void
   combinedDebtData: any[]
+  resetDebtPage: () => void
 }
 
 export const DebtFilters: React.FC<DebtFiltersProps> = ({
@@ -53,6 +54,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
   users,
   clearFilters,
   combinedDebtData,
+  resetDebtPage,
 }) => {
   const { user } = useAuth()
 
@@ -556,8 +558,8 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                     ];
                     
                     const intervals = rawIntervals.map(([start, end], i) => [
-                      Math.round(i === 0 ? start : start + 0.01),
-                      Math.round(end)
+                      Math.floor(i === 0 ? start : start + 0.01),
+                      Math.ceil(end)
                     ]);
                     
                     const intervalLabels = intervals.map(([start, end], i) => {
@@ -603,6 +605,8 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                             end.toFixed(2).replace('.', ',')
                           ]);
                         }
+                        // Always reset pagination to first page when a radio is pressed
+                        resetDebtPage();
                       };
                       
                       return (

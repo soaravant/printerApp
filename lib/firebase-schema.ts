@@ -108,6 +108,8 @@ export interface FirebaseIncome {
   userDisplayName: string
   amount: number
   timestamp: Timestamp
+  // Server-side creation time used for reliable delta syncs
+  createdAt?: Timestamp
 }
 
 // Bank aggregates

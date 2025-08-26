@@ -30,7 +30,7 @@ interface LaminationJobsTableProps {
 }
 
 export default function LaminationJobsTable({ data, page, pageSize, onPageChange, userRole, onRowHover, hasMore }: LaminationJobsTableProps) {
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'timestamp', direction: 'desc' })
   const [sortedData, setSortedData] = useState(data)
 
   useEffect(() => {
@@ -67,6 +67,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
               sortKey="timestamp"
               currentSort={sortConfig}
               onSort={handleSort}
+              variant="green"
             >
               Ημερομηνία
             </SortableTableHeader>
@@ -75,6 +76,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
                 sortKey="username"
                 currentSort={sortConfig}
                 onSort={handleSort}
+                variant="green"
               >
                 Χρήστης
               </SortableTableHeader>
@@ -84,6 +86,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
                 sortKey="userDisplayName"
                 currentSort={sortConfig}
                 onSort={handleSort}
+                variant="green"
               >
                 Όνομα
               </SortableTableHeader>
@@ -92,6 +95,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
               sortKey="type"
               currentSort={sortConfig}
               onSort={handleSort}
+              variant="green"
             >
               Είδος
             </SortableTableHeader>
@@ -99,6 +103,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
               sortKey="quantity"
               currentSort={sortConfig}
               onSort={handleSort}
+              variant="green"
             >
               Ποσότητα
             </SortableTableHeader>
@@ -106,6 +111,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
               sortKey="totalCost"
               currentSort={sortConfig}
               onSort={handleSort}
+              variant="green"
             >
               Κόστος
             </SortableTableHeader>

@@ -39,7 +39,8 @@ interface DebtTableProps {
 }
 
 export default function DebtTable({ data, page, pageSize, onPageChange, userRole, onRowHover }: DebtTableProps) {
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
+  // Default: sort by totalDebt descending (highest to lowest)
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'totalDebt', direction: 'desc' })
   const [sortedData, setSortedData] = useState(data)
 
   useEffect(() => {
@@ -115,6 +116,7 @@ export default function DebtTable({ data, page, pageSize, onPageChange, userRole
               currentSort={sortConfig}
               onSort={handleSort}
               className="font-medium text-center"
+              variant="yellow"
             >
               Ρόλος
             </SortableTableHeader>
@@ -123,6 +125,7 @@ export default function DebtTable({ data, page, pageSize, onPageChange, userRole
               currentSort={sortConfig}
               onSort={handleSort}
               className="text-center"
+              variant="yellow"
             >
               Όνομα
             </SortableTableHeader>
@@ -131,6 +134,7 @@ export default function DebtTable({ data, page, pageSize, onPageChange, userRole
               currentSort={sortConfig}
               onSort={handleSort}
               className="text-center"
+              variant="yellow"
             >
               Υπεύθυνος
             </SortableTableHeader>
@@ -138,6 +142,7 @@ export default function DebtTable({ data, page, pageSize, onPageChange, userRole
               sortKey="totalDebt"
               currentSort={sortConfig}
               onSort={handleSort}
+              variant="yellow"
             >
               <div className="text-center">
                 <div>Τρέχον Χρέος</div>
@@ -148,6 +153,7 @@ export default function DebtTable({ data, page, pageSize, onPageChange, userRole
               currentSort={sortConfig}
               onSort={handleSort}
               className="whitespace-nowrap text-center"
+              variant="yellow"
             >
               Τελευταία Πληρωμή
             </SortableTableHeader>
