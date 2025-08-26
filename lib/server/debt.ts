@@ -88,10 +88,18 @@ export async function recomputeUserDebts(uid: string): Promise<void> {
   const { debts, bank } = computeDebtsAndBankForUser(events)
 
   // Update user doc
+  // Compute last payment timestamp from incomes
+  const lastPayment: Date | null = incomes.length
+    ? incomes
+        .map(inc => toDate((inc as any).timestamp))
+        .reduce((latest, current) => (current > latest ? current : latest))
+    : null
+
   await db.collection(FIREBASE_COLLECTIONS.USERS).doc(uid).update({
     printDebt: debts.printDebt,
     laminationDebt: debts.laminationDebt,
     totalDebt: debts.totalDebt,
+    lastPayment: lastPayment || null,
   })
 
   // Update bank document incrementally by reading current bank and applying this user's latest income

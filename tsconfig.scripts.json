@@ -15,6 +15,7 @@
     "scripts/seed-firestore.ts",
     "scripts/clear-firestore.ts",
     "scripts/backfill-device-ip.ts",
+    "scripts/backfill-last-income.ts",
     "scripts/report-device-names.ts",
     "scripts/export-snapshots.ts",
     "scripts/utils/firebase-admin.ts",

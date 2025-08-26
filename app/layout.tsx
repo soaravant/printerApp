@@ -2,12 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { AuthProvider } from "@/lib/auth-context"
-import { RefreshProvider } from "@/lib/refresh-context"
-import { Toaster } from "@/components/ui/toaster"
-import { ReactQueryProvider } from "@/lib/react-query"
-import { GlobalErrorHandler } from "@/components/global-error-handler"
-import { LoaderOverlayBridge } from "@/components/loader-overlay-bridge"
+import { ProvidersGuard } from "@/components/providers-guard"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -25,17 +20,9 @@ export default function RootLayout({
   return (
     <html lang="el" suppressHydrationWarning>
       <body className={inter.className}>
-        <AuthProvider>
-          <ReactQueryProvider>
-            <RefreshProvider>
-              <GlobalErrorHandler />
-              <LoaderOverlayBridge>
-                {children}
-              </LoaderOverlayBridge>
-              <Toaster />
-            </RefreshProvider>
-          </ReactQueryProvider>
-        </AuthProvider>
+        <ProvidersGuard>
+          {children}
+        </ProvidersGuard>
       </body>
     </html>
   )

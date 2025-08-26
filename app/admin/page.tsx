@@ -118,7 +118,7 @@ export default function AdminPage() {
 
   const { data: cachedUsers } = useUsers()
   const { invalidate: invalidateUsers } = useUsersMutations()
-  const { invalidatePrint, invalidateLam, invalidateInc } = useJobsMutations()
+  const { invalidatePrint, invalidateLam, invalidateInc, invalidateBank } = useJobsMutations()
   useEffect(() => {
     if (cachedUsers) {
       setUsers(cachedUsers as any)
@@ -406,6 +406,7 @@ export default function AdminPage() {
         await invalidateUsers()
         await invalidateInc()
         await invalidateInc(debtReductionUser)
+        await invalidateBank()
       }
       triggerRefresh()
 

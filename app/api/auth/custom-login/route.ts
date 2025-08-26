@@ -70,7 +70,24 @@ export async function POST(req: Request) {
       return NextResponse.json(payload, { status: 503 })
     }
 
-    return NextResponse.json({ token: customToken, uid })
+    // Return trimmed user payload so client can skip an extra Firestore read
+    const userPayload = {
+      uid,
+      username: userData.username,
+      displayName: userData.displayName,
+      createdAt: userData.createdAt,
+      userRole: userData.userRole,
+      memberOf: userData.memberOf || [],
+      responsibleFor: userData.responsibleFor || [],
+      accessLevel: userData.accessLevel || "Χρήστης",
+      team: userData.team,
+      role: userData.role || "user",
+      printDebt: userData.printDebt || 0,
+      laminationDebt: userData.laminationDebt || 0,
+      totalDebt: userData.totalDebt || 0,
+      lastPayment: userData.lastPayment || null,
+    }
+    return NextResponse.json({ token: customToken, uid, user: userPayload })
   } catch (err: any) {
     const message = String(err?.message || "").toLowerCase()
     console.error("custom-login error:", message)

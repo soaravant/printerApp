@@ -43,6 +43,8 @@ export interface FirebaseUser {
   printDebt?: number
   laminationDebt?: number
   totalDebt?: number
+  // Last payment timestamp for quick UI access
+  lastPayment?: Timestamp | null
 }
 
 // Price tables (current app uses 2: printing, lamination)

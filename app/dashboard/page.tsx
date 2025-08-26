@@ -32,7 +32,7 @@ import { DebtFilters } from "@/components/debt-filters"
 import { IncomeFilters } from "@/components/income-filters"
 
 // Firestore
-import { fetchBankTotals, fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite, fetchPrintJobsSince, fetchLaminationJobsSince, fetchIncomeSince } from "@/lib/firebase-queries"
+import { fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite, fetchPrintJobsSince, fetchLaminationJobsSince, fetchIncomeSince, useBankTotals } from "@/lib/firebase-queries"
 import { FIREBASE_COLLECTIONS } from "@/lib/firebase-schema"
 import { normalizeGreek } from "@/lib/utils"
 import { getSnapshot, saveSnapshot, makeScopeKey, mergeById, sortByTimestampDesc } from "@/lib/snapshot-store"
@@ -355,6 +355,8 @@ export default function DashboardPage() {
           await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: merged as any })
         }
         setPrefetchEnabled(false)
+        // Ensure overlay stays until initial filter pass completes
+        setLoading(false)
       } else {
         setPrefetchEnabled(true)
       }
@@ -527,7 +529,9 @@ export default function DashboardPage() {
   // Apply unified filters
   // Re-apply filters as data streams in (debounced for keystrokes)
   useEffect(() => {
-    const t = setTimeout(() => applyFilters(), 200)
+    const t = setTimeout(() => {
+      applyFilters()
+    }, 200)
     return () => clearTimeout(t)
   }, [
     deferredSearchTerm,
@@ -554,13 +558,18 @@ export default function DashboardPage() {
     incomeResponsibleForFilter,
   ])
 
+  // Clear global loading overlay as soon as the first stable render with filtered data is ready
+  useEffect(() => {
+    // Heuristic: if any of the primary datasets are present (even from snapshots), hide the overlay
+    const hasAnyData = (printJobs.length + laminationJobs.length + income.length) > 0
+    if (hasAnyData) {
+      setLoading(false)
+    }
+  }, [printJobs.length, laminationJobs.length, income.length, setLoading])
+
   // Bank amounts
   const bankAmounts = undefined
-  const [firestoreBank, setFirestoreBank] = useState<{ printBank: number; laminationBank: number } | null>(null)
-  useEffect(() => {
-    if (!useFirestore) return
-    fetchBankTotals().then(setFirestoreBank)
-  }, [])
+  const { data: bankTotals } = useBankTotals()
 
   // ... rest of file remains unchanged
 
@@ -1003,8 +1012,8 @@ export default function DashboardPage() {
   const currentMonthLaminationCost = currentMonthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
   
   // Bank values for cards
-  const printBank: number = useFirestore ? (firestoreBank?.printBank ?? 0) : 0
-  const laminationBank: number = useFirestore ? (firestoreBank?.laminationBank ?? 0) : 0
+  const printBank: number = useFirestore ? (bankTotals?.printBank ?? 0) : 0
+  const laminationBank: number = useFirestore ? (bankTotals?.laminationBank ?? 0) : 0
   const totalBank = printBank + laminationBank
 
   const getLaminationTypeLabel = (type: string) => {
@@ -1405,13 +1414,8 @@ export default function DashboardPage() {
         }
       }
       
-      // Find the latest income date for this user
-      const userIncome = income.filter(inc => inc.uid === userData.uid)
-      const latestUserIncome = userIncome.length > 0 
-        ? userIncome.reduce((latest, current) => 
-            current.timestamp > latest.timestamp ? current : latest
-          ).timestamp
-        : null
+      // Use precomputed lastPayment on user when available to avoid recomputing per visit
+      const latestUserIncome = (userData as any).lastPayment ? new Date((userData as any).lastPayment) : null
 
       // Add user to the map
       userDebtMap.set(userData.uid, {

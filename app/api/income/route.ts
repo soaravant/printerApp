@@ -48,6 +48,13 @@ export async function POST(req: Request) {
       // 4) Write income
       const incomeRef = db.collection(FIREBASE_COLLECTIONS.INCOME).doc(body.incomeId)
       tx.set(incomeRef, { ...body, timestamp: new Date(body.timestamp as any) })
+
+      // 5) Update user's lastPayment (max existing vs new income timestamp)
+      const toDate = (v: any) => (v && typeof v.toDate === "function") ? v.toDate() : new Date(v)
+      const incomeDate = new Date(body.timestamp as any)
+      const currentLast = user.lastPayment ? toDate(user.lastPayment) : null
+      const nextLast = currentLast && currentLast > incomeDate ? currentLast : incomeDate
+      tx.set(userRef, { lastPayment: nextLast }, { merge: true })
     })
     await recomputeUserDebts(body.uid)
     // Read back updated user to return to client for local merge
@@ -62,6 +69,7 @@ export async function POST(req: Request) {
       printDebt: Number(u.printDebt || 0),
       laminationDebt: Number(u.laminationDebt || 0),
       totalDebt: typeof u.totalDebt === 'number' ? Number(u.totalDebt) : Number(u.printDebt || 0) + Number(u.laminationDebt || 0),
+      lastPayment: u.lastPayment || null,
     }
     return NextResponse.json({ ok: true, user: responseUser })
   } catch (e) {

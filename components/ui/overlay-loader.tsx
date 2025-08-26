@@ -1,7 +1,7 @@
 "use client"
 import React from "react"
 
-export function OverlayLoader({ show, label = "Φόρτωση..." }: { show: boolean; label?: string }) {
+export function OverlayLoader({ show, label = "Μετάβαση στη σελίδα..." }: { show: boolean; label?: string }) {
   if (!show) return null
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/30">

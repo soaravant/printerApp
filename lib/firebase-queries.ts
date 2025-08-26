@@ -84,7 +84,19 @@ export function usePriceTable(id: string) {
 
 export async function fetchUsers(): Promise<FirebaseUser[]> {
   const snap = await getDocs(collection(db, FIREBASE_COLLECTIONS.USERS))
-  return snap.docs.map(d => d.data() as FirebaseUser)
+  return snap.docs.map(d => {
+    const data = d.data() as any
+    const toJsDate = (v: any): Date | null => {
+      if (!v) return null
+      return (v && typeof v.toDate === "function") ? v.toDate() : new Date(v)
+    }
+    if (data && data.lastPayment) {
+      data.lastPayment = toJsDate(data.lastPayment)
+    } else {
+      data.lastPayment = null
+    }
+    return data as FirebaseUser
+  })
 }
 
 export function useUsers() {
@@ -92,6 +104,18 @@ export function useUsers() {
     queryKey: ["users"],
     queryFn: () => fetchUsers(),
     staleTime: 60 * 1000,
+  })
+}
+
+// Bank totals with long-lived cache
+export function useBankTotals() {
+  return useQuery({
+    queryKey: ["bankTotals"],
+    queryFn: () => fetchBankTotals(),
+    staleTime: Infinity,
+    gcTime: 30 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -160,7 +184,10 @@ export function useJobsMutations() {
   const invalidateInc = (uid?: string) => {
     qc.invalidateQueries({ queryKey: ["income", uid ?? "all"] })
   }
-  return { invalidatePrint, invalidateLam, invalidateInc }
+  const invalidateBank = () => {
+    qc.invalidateQueries({ queryKey: ["bankTotals"] })
+  }
+  return { invalidatePrint, invalidateLam, invalidateInc, invalidateBank }
 }
 
 // Server write helpers (call secure API routes)

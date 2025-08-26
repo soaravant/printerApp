@@ -4,7 +4,8 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { FirebaseUser } from "./firebase-schema"
 import { fetchUserById } from "./firebase-queries"
-import { auth } from "./firebase-client"
+import { auth } from "./firebase-app"
+import { onAuthStateChanged, signInWithCustomToken, signOut } from "./firebase-auth"
 // Lazy-load firebase/auth to keep client bundle light and avoid SSR type issues
 // We will dynamically import needed functions at runtime
 type FirebaseAuthUser = {
@@ -151,26 +152,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let unsub: (() => void) | undefined
-    ;(async () => {
-      const { onAuthStateChanged } = await import("./firebase-auth")
-      unsub = onAuthStateChanged(auth, async (fbUser: FirebaseAuthUser) => {
-        try {
-          if (fbUser?.uid) {
-            const u = await fetchUserById(fbUser.uid)
-            if (u) setUser(u as any)
-            else setUser(null)
-          } else {
-            setUser(null)
-          }
-        } catch (e) {
-          console.error(e)
-        } finally {
-          setLoading(false)
+    const unsub = onAuthStateChanged(auth, async (fbUser: FirebaseAuthUser) => {
+      try {
+        if (fbUser?.uid) {
+          const u = await fetchUserById(fbUser.uid)
+          if (u) setUser(u as any)
+          else setUser(null)
+        } else {
+          setUser(null)
         }
-      })
-    })()
-
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    })
     return () => { if (unsub) unsub() }
   }, [])
 
@@ -188,9 +184,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("/api/auth/custom-login failed", res.status, payload)
       return { ok: false, code, httpStatus: res.status }
     }
-    const { token, uid } = payload || {}
-    const { signInWithCustomToken } = await import("./firebase-auth")
+    const { token, uid, user: userPayload } = payload || {}
     await signInWithCustomToken(auth, token)
+    // Prefer user payload from server to avoid extra Firestore read
+    if (userPayload) {
+      setUser(userPayload as any)
+      return { ok: true }
+    }
     const u = await fetchUserById(uid)
     if (u) { setUser(u as any); return { ok: true } }
     return { ok: false, code: "user_record_missing" }
