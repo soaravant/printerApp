@@ -1,4 +1,8 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs"
+import { config } from "dotenv"
+// Load env when running via Node so admin credentials are available
+if (existsSync('.env.local')) config({ path: '.env.local' })
+else config()
 import path from "path"
 import getAdminDb from "./utils/firebase-admin"
 
@@ -72,5 +76,4 @@ main().catch((e) => {
   console.error("export-snapshots failed", e)
   process.exit(1)
 })
-
 
