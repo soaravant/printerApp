@@ -4,6 +4,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
+const dotenv_1 = require("dotenv");
+// Load env when running via Node so admin credentials are available
+if ((0, fs_1.existsSync)('.env.local'))
+    (0, dotenv_1.config)({ path: '.env.local' });
+else
+    (0, dotenv_1.config)();
 const path_1 = __importDefault(require("path"));
 const firebase_admin_1 = __importDefault(require("./utils/firebase-admin"));
 const OUTPUT_DIR = path_1.default.resolve(process.cwd(), "public", "snapshots");
