@@ -160,8 +160,8 @@ export const getDynamicFilterOptions = (users: any[]) => {
       teams.add(user.team)
     }
     
-    // Extract ναοί from user data (users with userRole "Ναός")
-    if (user.userRole === "Ναός") {
+    // Extract τμήματα from user data (users with userRole "Τμήμα")
+    if (user.userRole === "Τμήμα") {
       naoi.add(user.displayName)
     }
     
@@ -173,12 +173,12 @@ export const getDynamicFilterOptions = (users: any[]) => {
     // Also extract from memberOf arrays for individual users
     if (user.memberOf && Array.isArray(user.memberOf)) {
       user.memberOf.forEach((member: string) => {
-        if (member.includes("Ναός")) {
+        if (member.includes("Ναός") || member.includes("Τμήμα")) {
           naoi.add(member)
         } else if (member.includes("Τομέας")) {
           tomeis.add(member)
         } else {
-          // Assume it's a team if it doesn't contain "Ναός" or "Τομέας"
+          // Assume it's a team if it doesn't contain "Ναός"/"Τμήμα" or "Τομέας"
           teams.add(member)
         }
       })
@@ -187,14 +187,14 @@ export const getDynamicFilterOptions = (users: any[]) => {
 
   // Define the specific order for teams
   const teamOrder = [
-    "Ενωμένοι",
-    "Σποριάδες", 
-    "Καρποφόροι",
-    "Ολόφωτοι",
-    "Νικητές",
-    "Νικηφόροι",
-    "Φλόγα",
-    "Σύμψυχοι"
+    "Ομάδα 1",
+    "Ομάδα 2",
+    "Ομάδα 3",
+    "Ομάδα 4",
+    "Ομάδα 5",
+    "Ομάδα 6",
+    "Ομάδα 7",
+    "Ομάδα 8",
   ]
 
   // Sort teams according to the predefined order, with any additional teams at the end

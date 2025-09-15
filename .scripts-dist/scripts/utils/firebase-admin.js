@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAdminDb = void 0;
+exports.getAdminDb = getAdminDb;
 const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
 const fs_1 = require("fs");
@@ -25,5 +25,4 @@ function getAdminDb() {
     }
     return (0, firestore_1.getFirestore)();
 }
-exports.getAdminDb = getAdminDb;
 exports.default = getAdminDb;

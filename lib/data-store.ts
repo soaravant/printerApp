@@ -6,7 +6,7 @@ export interface User {
   username: string
   accessLevel: "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος"
   displayName: string
-  userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας"
+  userRole: "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας"
   responsiblePerson?: string
   team?: string
   members?: string[]

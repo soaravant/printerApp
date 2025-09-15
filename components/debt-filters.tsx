@@ -110,7 +110,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                 <SelectItem value="Άτομο">Άτομο</SelectItem>
                 <SelectItem value="Ομάδα">Ομάδα</SelectItem>
                 <SelectItem value="Τομέας">Τομέας</SelectItem>
-                <SelectItem value="Ναός">Ναός</SelectItem>
+                <SelectItem value="Τμήμα">Τμήμα</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -119,8 +119,8 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
             <div>
               <Label htmlFor="debtTeam" className="text-gray-700">Ομάδα</Label>
               <Select value={teamFilter} onValueChange={(value) => {
-                // Reset role filter to "all" if current role is "Ναός" or "Τομέας" and a specific team is selected
-                if ((roleFilter === "Ναός" || roleFilter === "Τομέας") && value !== "all") {
+                // Reset role filter to "all" if current role is "Τμήμα" or "Τομέας" and a specific team is selected
+                if ((roleFilter === "Τμήμα" || roleFilter === "Τομέας") && value !== "all") {
                   setRoleFilter("all");
                 }
                 setTeamFilter(value);
@@ -135,14 +135,12 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                     }
                   `}</style>
                   <SelectItem value="all">Όλες</SelectItem>
-                  <SelectItem value="Ενωμένοι">Ενωμένοι</SelectItem>
-                  <SelectItem value="Σποριάδες">Σποριάδες</SelectItem>
-                  <SelectItem value="Καρποφόροι">Καρποφόροι</SelectItem>
-                  <SelectItem value="Ολόφωτοι">Ολόφωτοι</SelectItem>
-                  <SelectItem value="Νικητές">Νικητές</SelectItem>
-                  <SelectItem value="Νικηφόροι">Νικηφόροι</SelectItem>
-                  <SelectItem value="Φλόγα">Φλόγα</SelectItem>
-                  <SelectItem value="Σύμψυχοι">Σύμψυχοι</SelectItem>
+                  {(() => {
+                    const { teams } = getDynamicFilterOptions(users as any[])
+                    return teams.map((team) => (
+                      <SelectItem key={team} value={team}>{team}</SelectItem>
+                    ))
+                  })()}
                 </SelectContent>
               </Select>
             </div>

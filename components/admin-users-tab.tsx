@@ -40,7 +40,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
         return <User className="h-4 w-4" />;
       case "Ομάδα":
         return <Users className="h-4 w-4" />;
-      case "Ναός":
+      case "Τμήμα":
         return <Church className="h-4 w-4" />;
       case "Τομέας":
         return <MapPin className="h-4 w-4" />;
@@ -81,13 +81,13 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
     return responsibleUsers
   }
 
-  // Function to dynamically compute responsible persons for Ομάδα/Ναός/Τομέας
+  // Function to dynamically compute responsible persons for Ομάδα/Τμήμα/Τομέας
   const getDynamicResponsiblePersons = (userData: any) => {
     const allUsers = users
     const responsibleUsers: string[] = []
     
-    // Only compute for Ομάδα, Ναός, and Τομέας
-    if (userData.userRole === "Ομάδα" || userData.userRole === "Ναός" || userData.userRole === "Τομέας") {
+    // Only compute for Ομάδα, Τμήμα, and Τομέας
+    if (userData.userRole === "Ομάδα" || userData.userRole === "Τμήμα" || userData.userRole === "Τομέας") {
       const ypefthynoiUsers = allUsers.filter((user: any) => user.accessLevel === "Υπεύθυνος")
       
       ypefthynoiUsers.forEach((ypefthynos: any) => {
@@ -130,8 +130,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
           </div>
           <div className="w-full md:w-60 flex items-center">
             <Select value={teamFilter} onValueChange={(value) => {
-              // Reset role filter to "all" if current role is "Ναός" or "Τομέας" and a specific team is selected
-              if ((roleFilter === "Ναός" || roleFilter === "Τομέας") && value !== "all") {
+              // Reset role filter to "all" if current role is "Τμήμα" or "Τομέας" and a specific team is selected
+              if ((roleFilter === "Τμήμα" || roleFilter === "Τομέας") && value !== "all") {
                 setRoleFilter("all");
               }
               setTeamFilter(value);
@@ -167,7 +167,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 <SelectItem value="all">Όλοι οι ρόλοι</SelectItem>
                 <SelectItem value="Άτομο">Άτομο</SelectItem>
                 <SelectItem value="Ομάδα">Ομάδα</SelectItem>
-                <SelectItem value="Ναός">Ναός</SelectItem>
+                <SelectItem value="Τμήμα">Τμήμα</SelectItem>
                 <SelectItem value="Τομέας">Τομέας</SelectItem>
               </SelectContent>
             </Select>
@@ -251,7 +251,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 )}
 
                 {/* Dynamic responsible persons display for Ομάδα/Ναός/Τομέας */}
-                {(userData.userRole === "Ομάδα" || userData.userRole === "Ναός" || userData.userRole === "Τομέας") && (() => {
+                {(userData.userRole === "Ομάδα" || userData.userRole === "Τμήμα" || userData.userRole === "Τομέας") && (() => {
                   const dynamicResponsiblePersons = getDynamicResponsiblePersons(userData)
                   return (
                     <div className="space-y-2">

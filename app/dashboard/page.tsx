@@ -1292,7 +1292,7 @@ export default function DashboardPage() {
       const getDynamicResponsiblePersons = (userData: any) => {
         const responsibleUsers: string[] = []
         
-        if (userData.userRole === "Ομάδα" || userData.userRole === "Ναός" || userData.userRole === "Τομέας") {
+        if (userData.userRole === "Ομάδα" || userData.userRole === "Τμήμα" || userData.userRole === "Τομέας") {
           const ypefthynoiUsers = allUsersData.filter((user: any) => user.accessLevel === "Υπεύθυνος")
           
           ypefthynoiUsers.forEach((ypefthynos: any) => {
@@ -1348,7 +1348,7 @@ export default function DashboardPage() {
       } else if (userData.userRole === "Άτομο") {
         const responsibleUsers = getResponsibleUsers(userData)
         responsiblePerson = responsibleUsers.length > 0 ? responsibleUsers.join(", ") : "Δεν έχει ανατεθεί Υπεύθυνος"
-      } else if (userData.userRole === "Ομάδα" || userData.userRole === "Ναός" || userData.userRole === "Τομέας") {
+      } else if (userData.userRole === "Ομάδα" || userData.userRole === "Τμήμα" || userData.userRole === "Τομέας") {
         const responsibleUsers = getDynamicResponsiblePersons(userData)
         responsiblePerson = responsibleUsers.length > 0 ? responsibleUsers.join(", ") : "Δεν έχει ανατεθεί Υπεύθυνος"
       } else {

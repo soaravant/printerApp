@@ -1,12 +1,23 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getDynamicFilterOptions = exports.calculatePrintCost = exports.calculatePrintJobTotal = exports.formatMoney = exports.subtractMoney = exports.multiplyMoney = exports.addMoney = exports.roundMoney = exports.toLocalISOString = exports.formatGreekDateTime = exports.formatGreekDate = exports.normalizeGreek = exports.cn = void 0;
+exports.getDynamicFilterOptions = void 0;
+exports.cn = cn;
+exports.normalizeGreek = normalizeGreek;
+exports.formatGreekDate = formatGreekDate;
+exports.formatGreekDateTime = formatGreekDateTime;
+exports.toLocalISOString = toLocalISOString;
+exports.roundMoney = roundMoney;
+exports.addMoney = addMoney;
+exports.multiplyMoney = multiplyMoney;
+exports.subtractMoney = subtractMoney;
+exports.formatMoney = formatMoney;
+exports.calculatePrintJobTotal = calculatePrintJobTotal;
+exports.calculatePrintCost = calculatePrintCost;
 const clsx_1 = require("clsx");
 const tailwind_merge_1 = require("tailwind-merge");
 function cn(...inputs) {
     return (0, tailwind_merge_1.twMerge)((0, clsx_1.clsx)(inputs));
 }
-exports.cn = cn;
 // Normalize Greek text by removing diacritics (τόνοι) and lowercasing
 // Example: "Άγγελος" -> "αγγελος"
 function normalizeGreek(input) {
@@ -15,7 +26,6 @@ function normalizeGreek(input) {
         .replace(/\p{Diacritic}+/gu, "")
         .toLowerCase();
 }
-exports.normalizeGreek = normalizeGreek;
 /**
  * Formats a date in Greek locale (el-GR)
  * @param date - Date to format
@@ -26,7 +36,6 @@ function formatGreekDate(date, options) {
     const dateObj = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
     return dateObj.toLocaleDateString("el-GR", options);
 }
-exports.formatGreekDate = formatGreekDate;
 /**
  * Formats a date in Greek locale with time
  * @param date - Date to format
@@ -37,7 +46,6 @@ function formatGreekDateTime(date, options) {
     const dateObj = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
     return dateObj.toLocaleString("el-GR", options);
 }
-exports.formatGreekDateTime = formatGreekDateTime;
 /**
  * Converts a date to ISO date string (YYYY-MM-DD) without timezone issues
  * @param date - Date to convert
@@ -49,7 +57,6 @@ function toLocalISOString(date) {
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
-exports.toLocalISOString = toLocalISOString;
 /**
  * Money calculation utilities to prevent floating-point precision errors
  * and ensure consistent 2-decimal place rounding for currency values.
@@ -64,7 +71,6 @@ exports.toLocalISOString = toLocalISOString;
 function roundMoney(value) {
     return Math.round((value + Number.EPSILON) * 100) / 100;
 }
-exports.roundMoney = roundMoney;
 /**
  * Adds multiple money values together with proper rounding to prevent precision errors.
  *
@@ -75,7 +81,6 @@ function addMoney(...values) {
     const sum = values.reduce((acc, val) => acc + val, 0);
     return roundMoney(sum);
 }
-exports.addMoney = addMoney;
 /**
  * Multiplies a money value by a quantity with proper rounding.
  *
@@ -86,7 +91,6 @@ exports.addMoney = addMoney;
 function multiplyMoney(price, quantity) {
     return roundMoney(price * quantity);
 }
-exports.multiplyMoney = multiplyMoney;
 /**
  * Subtracts one money value from another with proper rounding.
  *
@@ -97,7 +101,6 @@ exports.multiplyMoney = multiplyMoney;
 function subtractMoney(total, paid) {
     return roundMoney(total - paid);
 }
-exports.subtractMoney = subtractMoney;
 /**
  * Formats a money value for display with proper Greek formatting.
  *
@@ -107,7 +110,6 @@ exports.subtractMoney = subtractMoney;
 function formatMoney(value) {
     return `€${roundMoney(value).toFixed(2).replace('.', ',')}`;
 }
-exports.formatMoney = formatMoney;
 /**
  * Calculates the total cost for a print job with proper rounding.
  *
@@ -117,7 +119,6 @@ exports.formatMoney = formatMoney;
 function calculatePrintJobTotal(costs) {
     return addMoney(costs.costA4BW, costs.costA4Color, costs.costA3BW, costs.costA3Color, costs.costRizochartoA3, costs.costRizochartoA4, costs.costChartoniA3, costs.costChartoniA4, costs.costAutokollito);
 }
-exports.calculatePrintJobTotal = calculatePrintJobTotal;
 /**
  * Calculates individual costs for print job components with proper rounding.
  *
@@ -128,7 +129,6 @@ exports.calculatePrintJobTotal = calculatePrintJobTotal;
 function calculatePrintCost(pages, pricePerPage) {
     return multiplyMoney(pricePerPage, pages);
 }
-exports.calculatePrintCost = calculatePrintCost;
 // Utility functions for dynamic filter options
 const getDynamicFilterOptions = (users) => {
     const teams = new Set();
@@ -139,8 +139,8 @@ const getDynamicFilterOptions = (users) => {
         if (user.team) {
             teams.add(user.team);
         }
-        // Extract ναοί from user data (users with userRole "Ναός")
-        if (user.userRole === "Ναός") {
+        // Extract τμήματα from user data (users with userRole "Τμήμα")
+        if (user.userRole === "Τμήμα") {
             naoi.add(user.displayName);
         }
         // Extract τομείς from user data (users with userRole "Τομέας")
@@ -150,14 +150,14 @@ const getDynamicFilterOptions = (users) => {
         // Also extract from memberOf arrays for individual users
         if (user.memberOf && Array.isArray(user.memberOf)) {
             user.memberOf.forEach((member) => {
-                if (member.includes("Ναός")) {
+                if (member.includes("Ναός") || member.includes("Τμήμα")) {
                     naoi.add(member);
                 }
                 else if (member.includes("Τομέας")) {
                     tomeis.add(member);
                 }
                 else {
-                    // Assume it's a team if it doesn't contain "Ναός" or "Τομέας"
+                    // Assume it's a team if it doesn't contain "Ναός"/"Τμήμα" or "Τομέας"
                     teams.add(member);
                 }
             });
@@ -165,14 +165,14 @@ const getDynamicFilterOptions = (users) => {
     });
     // Define the specific order for teams
     const teamOrder = [
-        "Ενωμένοι",
-        "Σποριάδες",
-        "Καρποφόροι",
-        "Ολόφωτοι",
-        "Νικητές",
-        "Νικηφόροι",
-        "Φλόγα",
-        "Σύμψυχοι"
+        "Ομάδα 1",
+        "Ομάδα 2",
+        "Ομάδα 3",
+        "Ομάδα 4",
+        "Ομάδα 5",
+        "Ομάδα 6",
+        "Ομάδα 7",
+        "Ομάδα 8",
     ];
     // Sort teams according to the predefined order, with any additional teams at the end
     const sortedTeams = Array.from(teams).sort((a, b) => {

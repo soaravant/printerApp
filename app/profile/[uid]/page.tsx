@@ -159,7 +159,7 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
         return <User className="h-4 w-4" />;
       case "Ομάδα":
         return <Users className="h-4 w-4" />;
-      case "Ναός":
+      case "Τμήμα":
         return <Church className="h-4 w-4" />;
       case "Τομέας":
         return <MapPin className="h-4 w-4" />;
@@ -322,7 +322,7 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
                         <SelectContent>
                           <SelectItem value="Άτομο">Άτομο</SelectItem>
                           <SelectItem value="Ομάδα">Ομάδα</SelectItem>
-                          <SelectItem value="Ναός">Ναός</SelectItem>
+                          <SelectItem value="Τμήμα">Τμήμα</SelectItem>
                           <SelectItem value="Τομέας">Τομέας</SelectItem>
                         </SelectContent>
                       </Select>

@@ -32,7 +32,7 @@ export interface FirebaseUser {
   username: string
   displayName: string
   createdAt: Timestamp
-  userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας"
+  userRole: "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας"
   memberOf?: string[]
   responsibleFor?: string[]
   accessLevel: "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος"

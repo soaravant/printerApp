@@ -149,6 +149,32 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Demo credentials helper below the login card */}
+        <div className="text-center text-sm text-gray-600 px-4">
+          <p className="font-medium">Παραδείγματα σύνδεσης</p>
+          <div className="mt-2 space-y-1">
+            <p>
+              <span className="font-medium">Διαχειριστής:</span>
+              <span className="ml-1">Χρήστης</span>
+              <span className="mx-1 font-mono bg-gray-100 px-1 rounded">admin</span>
+              <span>Κωδικός</span>
+              <span className="ml-1 font-mono bg-gray-100 px-1 rounded">admin123</span>
+            </p>
+            <p>
+              <span className="font-medium">Υπεύθυνος:</span>
+              <span className="ml-1 font-mono bg-gray-100 px-1 rounded">401</span>
+              <span>/</span>
+              <span className="ml-1 font-mono bg-gray-100 px-1 rounded">401</span>
+            </p>
+            <p>
+              <span className="font-medium">Χρήστης:</span>
+              <span className="ml-1 font-mono bg-gray-100 px-1 rounded">501</span>
+              <span>/</span>
+              <span className="ml-1 font-mono bg-gray-100 px-1 rounded">501</span>
+            </p>
+          </div>
+        </div>
       </div>
       {/* Global overlay shows after spinner ends and until dashboard is ready */}
     </div>

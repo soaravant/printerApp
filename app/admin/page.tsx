@@ -35,7 +35,7 @@ export default function AdminPage() {
   const [filteredUsers, setFilteredUsers] = useState<FirebaseUser[]>([])
   const [usersTabSearchTerm, setUsersTabSearchTerm] = useState("")
 
-  const [roleFilter, setRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Ναός, Τομέας
+  const [roleFilter, setRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Τμήμα, Τομέας
   const [teamFilter, setTeamFilter] = useState("all") // all, Ενωμένοι, Σποριάδες, etc.
   const [selectedUser, setSelectedUser] = useState("")
   const [selectedPrinter, setSelectedPrinter] = useState("Canon Color")
@@ -49,7 +49,7 @@ export default function AdminPage() {
     password: "",
     displayName: "",
     accessLevel: "Χρήστης" as "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος",
-    userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας",
+    userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας",
     memberOf: [] as string[],
     responsibleFor: [] as string[],
   })
@@ -168,8 +168,8 @@ export default function AdminPage() {
         return aLevel - bLevel
       }
       
-      // If same access level, sort by role: Ομάδα, Τομέας, Ναός, Άτομο
-      const roleOrder = { Ομάδα: 0, Τομέας: 1, Ναός: 2, Άτομο: 3 }
+      // If same access level, sort by role: Ομάδα, Τομέας, Τμήμα, Άτομο
+      const roleOrder = { Ομάδα: 0, Τομέας: 1, Τμήμα: 2, Άτομο: 3 }
       const aRole = roleOrder[a.userRole as keyof typeof roleOrder] ?? 4
       const bRole = roleOrder[b.userRole as keyof typeof roleOrder] ?? 4
       
@@ -433,7 +433,7 @@ export default function AdminPage() {
 
   // Function to validate that all Τομείς and Ναοί have Υπεύθυνοι
   const validateResponsiblePersons = (userRole: string, responsiblePersons: string[]) => {
-    if ((userRole === "Τομέας" || userRole === "Ναός") && responsiblePersons.length === 0) {
+    if ((userRole === "Τομέας" || userRole === "Τμήμα") && responsiblePersons.length === 0) {
       return {
         isValid: false,
         message: `Οι ${userRole === "Τομέας" ? "Τομείς" : "Ναοί"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο`
@@ -449,12 +449,12 @@ export default function AdminPage() {
       .map(u => u.displayName)
   }
 
-  // Function to dynamically compute responsible persons for Ομάδα/Ναός/Τομέας
+// Function to dynamically compute responsible persons for Ομάδα/Τμήμα/Τομέας
   const getDynamicResponsiblePersons = (userData: any) => {
     const responsibleUsers: string[] = []
     
-    // Only compute for Ομάδα, Ναός, and Τομέας
-    if (userData.userRole === "Ομάδα" || userData.userRole === "Ναός" || userData.userRole === "Τομέας") {
+    // Only compute for Ομάδα, Τμήμα, and Τομέας
+    if (userData.userRole === "Ομάδα" || userData.userRole === "Τμήμα" || userData.userRole === "Τομέας") {
       const ypefthynoiUsers = users.filter((user: any) => user.accessLevel === "Υπεύθυνος")
       
       ypefthynoiUsers.forEach((ypefthynos: any) => {
@@ -479,7 +479,7 @@ export default function AdminPage() {
       u.userRole === "Τομέας" && getDynamicResponsiblePersons(u).length === 0
     )
     const naoiWithoutYpefthynos = users.filter(u => 
-      u.userRole === "Ναός" && getDynamicResponsiblePersons(u).length === 0
+      u.userRole === "Τμήμα" && getDynamicResponsiblePersons(u).length === 0
     )
     
     return {
@@ -720,7 +720,7 @@ export default function AdminPage() {
       password: "",
       displayName: "",
       accessLevel: "Χρήστης" as "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος",
-      userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας",
+    userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας",
       memberOf: [] as string[],
       responsibleFor: [] as string[],
     })
@@ -1218,7 +1218,7 @@ export default function AdminPage() {
                       )}
                       {compliance.naoiWithoutYpefthynos.length > 0 && (
                         <div>
-                          <strong>Ναοί χωρίς Υπεύθυνο:</strong>
+                          <strong>Τμήματα χωρίς Υπεύθυνο:</strong>
                           <ul className="ml-4 mt-1">
                             {compliance.naoiWithoutYpefthynos.map(user => (
                               <li key={user.uid}>• {user.displayName}</li>
@@ -1373,7 +1373,7 @@ export default function AdminPage() {
                         <Label htmlFor="userRole">Ρόλος</Label>
                         <Select 
                           value={newUser.userRole} 
-                          onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" })}
+                          onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας" })}
                           disabled={newUser.accessLevel === "Διαχειριστής" || newUser.accessLevel === "Υπεύθυνος"}
                         >
                           <SelectTrigger className={newUser.accessLevel === "Διαχειριστής" || newUser.accessLevel === "Υπεύθυνος" ? "bg-gray-100 text-gray-500" : ""}>
@@ -1382,7 +1382,7 @@ export default function AdminPage() {
                           <SelectContent>
                             <SelectItem value="Άτομο">Άτομο</SelectItem>
                             <SelectItem value="Ομάδα">Ομάδα</SelectItem>
-                            <SelectItem value="Ναός">Ναός</SelectItem>
+                            <SelectItem value="Τμήμα">Τμήμα</SelectItem>
                             <SelectItem value="Τομέας">Τομέας</SelectItem>
                           </SelectContent>
                         </Select>
@@ -1395,7 +1395,7 @@ export default function AdminPage() {
 
                       {newUser.userRole === "Άτομο" && newUser.accessLevel !== "Διαχειριστής" && (
                         <div>
-                          <Label>Μέλος (Ομάδα/Ναός/Τομέας)</Label>
+                          <Label>Μέλος (Ομάδα/Τμήμα/Τομέας)</Label>
                           <TagInput
                             tags={newUser.memberOf}
                             onTagsChange={(memberOf) => setNewUser({ ...newUser, memberOf })}
@@ -1420,15 +1420,15 @@ export default function AdminPage() {
                       )}
                     </div>
                     
-                    {(newUser.userRole === "Τομέας" || newUser.userRole === "Ναός" || newUser.userRole === "Ομάδα") && (
+                    {(newUser.userRole === "Τομέας" || newUser.userRole === "Τμήμα" || newUser.userRole === "Ομάδα") && (
                       <div>
                         <Label className="flex items-center gap-2">
                           Υπεύθυνοι
                           <span className="text-red-500">*</span>
                         </Label>
                         <div className="text-xs text-gray-500 mt-1 space-y-1">
-                          <div>1) Οι {newUser.userRole === "Τομέας" ? "Τομείς" : newUser.userRole === "Ναός" ? "Ναοί" : "Ομάδες"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο.</div>
-                          <div>2) Οι Υπεύθυνοι πρέπει να έχουν αυτόν τον {newUser.userRole === "Τομέας" ? "Τομέα" : newUser.userRole === "Ναός" ? "Ναό" : "Ομάδα"} στη λίστα "Υπεύθυνος για".</div>
+                          <div>1) Οι {newUser.userRole === "Τομέας" ? "Τομείς" : newUser.userRole === "Τμήμα" ? "Τμήματα" : "Ομάδες"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο.</div>
+                          <div>2) Οι Υπεύθυνοι πρέπει να έχουν αυτό το {newUser.userRole === "Τομέας" ? "Τομέα" : newUser.userRole === "Τμήμα" ? "Τμήμα" : "Ομάδα"} στη λίστα "Υπεύθυνος για".</div>
                         </div>
                       </div>
                     )}

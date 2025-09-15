@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.main = void 0;
+exports.main = main;
 /* eslint-disable no-console */
 const dotenv_1 = require("dotenv");
 const fs_1 = require("fs");
@@ -67,14 +67,14 @@ async function seedPriceTables() {
 async function seedUsers() {
     const db = (0, firebase_admin_1.default)();
     const teams = [
-        "Ενωμένοι",
-        "Σποριάδες",
-        "Καρποφόροι",
-        "Ολόφωτοι",
-        "Νικητές",
-        "Νικηφόροι",
-        "Φλόγα",
-        "Σύμψυχοι",
+        "Ομάδα 1",
+        "Ομάδα 2",
+        "Ομάδα 3",
+        "Ομάδα 4",
+        "Ομάδα 5",
+        "Ομάδα 6",
+        "Ομάδα 7",
+        "Ομάδα 8",
     ];
     const users = [];
     // Admin
@@ -85,7 +85,7 @@ async function seedUsers() {
         displayName: "Διαχειριστής",
         createdAt: ts(new Date("2024-01-01")),
         userRole: "Άτομο",
-        team: "Ενωμένοι",
+        team: "Ομάδα 1",
         role: "admin",
     });
     // Create Υπεύθυνος + 2 users for each team
@@ -108,8 +108,8 @@ async function seedUsers() {
             createdAt: ts(now()),
             userRole: "Άτομο",
             team,
-            memberOf: [team, `Ναός ${responsible - 400}`, `Τομέας ${responsible - 400}`],
-            responsibleFor: [team, `Ναός ${responsible - 400}`, `Τομέας ${responsible - 400}`],
+            memberOf: [team, `Τμήμα ${responsible - 400}`, `Τομέας ${responsible - 400}`],
+            responsibleFor: [team, `Τμήμα ${responsible - 400}`, `Τομέας ${responsible - 400}`],
             role: "user",
         });
         users.push({
@@ -120,7 +120,7 @@ async function seedUsers() {
             createdAt: ts(now()),
             userRole: "Άτομο",
             team,
-            memberOf: [team, `Ναός ${responsible - 400}`, `Τομέας ${responsible - 400}`],
+            memberOf: [team, `Τμήμα ${responsible - 400}`, `Τομέας ${responsible - 400}`],
             role: "user",
         });
         users.push({
@@ -131,28 +131,28 @@ async function seedUsers() {
             createdAt: ts(now()),
             userRole: "Άτομο",
             team,
-            memberOf: [team, `Ναός ${responsible - 400}`, `Τομέας ${responsible - 400}`],
+            memberOf: [team, `Τμήμα ${responsible - 400}`, `Τομέας ${responsible - 400}`],
             role: "user",
         });
     }
-    // Add group accounts (Ομάδα), Ναός, Τομέας similar to dummy data
+    // Add group accounts (Ομάδα), Ναός (titled as Τμήμα), Τομέας similar to dummy data
     const groupDefs = [
-        ["team-enwmenoi", 600, "Ενωμένοι", "Ομάδα"],
-        ["team-sporiades", 601, "Σποριάδες", "Ομάδα"],
-        ["team-karpoforoi", 602, "Καρποφόροι", "Ομάδα"],
-        ["team-olofwtoi", 603, "Ολόφωτοι", "Ομάδα"],
-        ["team-nikhtes", 604, "Νικητές", "Ομάδα"],
-        ["team-nikhforoi", 605, "Νικηφόροι", "Ομάδα"],
-        ["team-floga", 606, "Φλόγα", "Ομάδα"],
-        ["team-sympsyxoi", 607, "Σύμψυχοι", "Ομάδα"],
-        ["naos-1", 700, "Ναός 1", "Ναός"],
-        ["naos-2", 701, "Ναός 2", "Ναός"],
-        ["naos-3", 703, "Ναός 3", "Ναός"],
-        ["naos-4", 704, "Ναός 4", "Ναός"],
-        ["naos-5", 705, "Ναός 5", "Ναός"],
-        ["naos-6", 706, "Ναός 6", "Ναός"],
-        ["naos-7", 707, "Ναός 7", "Ναός"],
-        ["naos-8", 708, "Ναός 8", "Ναός"],
+        ["team-enwmenoi", 600, "Ομάδα 1", "Ομάδα"],
+        ["team-sporiades", 601, "Ομάδα 2", "Ομάδα"],
+        ["team-karpoforoi", 602, "Ομάδα 3", "Ομάδα"],
+        ["team-olofwtoi", 603, "Ομάδα 4", "Ομάδα"],
+        ["team-nikhtes", 604, "Ομάδα 5", "Ομάδα"],
+        ["team-nikhforoi", 605, "Ομάδα 6", "Ομάδα"],
+        ["team-floga", 606, "Ομάδα 7", "Ομάδα"],
+        ["team-sympsyxoi", 607, "Ομάδα 8", "Ομάδα"],
+        ["naos-1", 700, "Τμήμα 1", "Τμήμα"],
+        ["naos-2", 701, "Τμήμα 2", "Τμήμα"],
+        ["naos-3", 703, "Τμήμα 3", "Τμήμα"],
+        ["naos-4", 704, "Τμήμα 4", "Τμήμα"],
+        ["naos-5", 705, "Τμήμα 5", "Τμήμα"],
+        ["naos-6", 706, "Τμήμα 6", "Τμήμα"],
+        ["naos-7", 707, "Τμήμα 7", "Τμήμα"],
+        ["naos-8", 708, "Τμήμα 8", "Τμήμα"],
         ["tomeas-1", 800, "Τομέας 1", "Τομέας"],
         ["tomeas-2", 801, "Τομέας 2", "Τομέας"],
         ["tomeas-3", 802, "Τομέας 3", "Τομέας"],
@@ -328,7 +328,7 @@ function generateIncomePattern(user, totalDebt, billingDate) {
             incomeProbability = 0.7;
             incomeDelay = 20;
             break;
-        case "Ναός":
+        case "Τμήμα":
             incomeProbability = 0.6;
             incomeDelay = 25;
             break;
@@ -547,7 +547,6 @@ async function main() {
     await seedJobs();
     await seedIncomeAndDebts();
 }
-exports.main = main;
 if (require.main === module) {
     main()
         .then(() => {

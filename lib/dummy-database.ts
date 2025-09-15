@@ -7,7 +7,7 @@ export interface User {
   accessLevel: "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος" // Greek labels for access levels
   displayName: string
   createdAt: Date
-  userRole: "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας" // New field for the role selection
+  userRole: "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας" // New field for the role selection
   team?: string // New field for team selection (now dynamic)
   memberOf?: string[] // New field for Άτομο users to show which Ομάδα/Ναός/Τομέας they belong to
   responsibleFor?: string[] // New field for Υπεύθυνος users to show which Ομάδα/Ναός/Τομέας they are responsible for
@@ -96,7 +96,16 @@ class DummyDatabase {
 
   private initializeData() {
     // Initialize 24 users (8 teams × 3 members each)
-    const teams: ("Ενωμένοι" | "Σποριάδες" | "Καρποφόροι" | "Ολόφωτοι" | "Νικητές" | "Νικηφόροι" | "Φλόγα" | "Σύμψυχοι")[] = ["Ενωμένοι", "Σποριάδες", "Καρποφόροι", "Ολόφωτοι", "Νικητές", "Νικηφόροι", "Φλόγα", "Σύμψυχοι"];
+    const teams: ("Ομάδα 1" | "Ομάδα 2" | "Ομάδα 3" | "Ομάδα 4" | "Ομάδα 5" | "Ομάδα 6" | "Ομάδα 7" | "Ομάδα 8")[] = [
+      "Ομάδα 1",
+      "Ομάδα 2",
+      "Ομάδα 3",
+      "Ομάδα 4",
+      "Ομάδα 5",
+      "Ομάδα 6",
+      "Ομάδα 7",
+      "Ομάδα 8",
+    ];
     
     this.users = [
       // Admin user
@@ -107,10 +116,10 @@ class DummyDatabase {
         displayName: "Διαχειριστής",
         createdAt: new Date("2024-01-01"),
         userRole: "Άτομο",
-        team: "Ενωμένοι",
+        team: "Ομάδα 1",
       },
       
-      // Team 1: Ενωμένοι (3 members)
+      // Team 1: Ομάδα 1 (3 members)
       {
         uid: "user-401",
         username: "401",
@@ -118,9 +127,9 @@ class DummyDatabase {
         displayName: "Υπεύθυνος 401",
         createdAt: new Date("2024-01-01"),
         userRole: "Άτομο",
-        team: "Ενωμένοι",
-        memberOf: ["Ενωμένοι", "Ναός 1", "Τομέας 1"],
-        responsibleFor: ["Ενωμένοι", "Ναός 1", "Τομέας 1"],
+        team: "Ομάδα 1",
+        memberOf: ["Ομάδα 1", "Τμήμα 1", "Τομέας 1"],
+        responsibleFor: ["Ομάδα 1", "Τμήμα 1", "Τομέας 1"],
       },
       {
         uid: "user-501",
@@ -129,8 +138,8 @@ class DummyDatabase {
         displayName: "Χρήστης 501",
         createdAt: new Date("2024-01-02"),
         userRole: "Άτομο",
-        team: "Ενωμένοι",
-        memberOf: ["Ενωμένοι", "Ναός 1", "Τομέας 1"],
+        team: "Ομάδα 1",
+        memberOf: ["Ομάδα 1", "Τμήμα 1", "Τομέας 1"],
       },
       {
         uid: "user-502",
@@ -139,11 +148,11 @@ class DummyDatabase {
         displayName: "Χρήστης 502",
         createdAt: new Date("2024-01-03"),
         userRole: "Άτομο",
-        team: "Ενωμένοι",
-        memberOf: ["Ενωμένοι", "Ναός 1", "Τομέας 1"],
+        team: "Ομάδα 1",
+        memberOf: ["Ομάδα 1", "Τμήμα 1", "Τομέας 1"],
       },
 
-      // Team 2: Σποριάδες (3 members)
+      // Team 2: Ομάδα 2 (3 members)
       {
         uid: "user-402",
         username: "402",
@@ -151,9 +160,9 @@ class DummyDatabase {
         displayName: "Υπεύθυνος 402",
         createdAt: new Date("2024-01-04"),
         userRole: "Άτομο",
-        team: "Σποριάδες",
-        memberOf: ["Σποριάδες", "Ναός 2", "Τομέας 2"],
-        responsibleFor: ["Σποριάδες", "Ναός 2", "Τομέας 2"],
+        team: "Ομάδα 2",
+        memberOf: ["Ομάδα 2", "Τμήμα 2", "Τομέας 2"],
+        responsibleFor: ["Ομάδα 2", "Τμήμα 2", "Τομέας 2"],
       },
       {
         uid: "user-503",
@@ -162,8 +171,8 @@ class DummyDatabase {
         displayName: "Χρήστης 503",
         createdAt: new Date("2024-01-05"),
         userRole: "Άτομο",
-        team: "Σποριάδες",
-        memberOf: ["Σποριάδες", "Ναός 2", "Τομέας 2"],
+        team: "Ομάδα 2",
+        memberOf: ["Ομάδα 2", "Τμήμα 2", "Τομέας 2"],
       },
       {
         uid: "user-504",
@@ -172,11 +181,11 @@ class DummyDatabase {
         displayName: "Χρήστης 504",
         createdAt: new Date("2024-01-06"),
         userRole: "Άτομο",
-        team: "Σποριάδες",
-        memberOf: ["Σποριάδες", "Ναός 2", "Τομέας 2"],
+        team: "Ομάδα 2",
+        memberOf: ["Ομάδα 2", "Τμήμα 2", "Τομέας 2"],
       },
 
-      // Team 3: Καρποφόροι (3 members)
+      // Team 3: Ομάδα 3 (3 members)
       {
         uid: "user-403",
         username: "403",
@@ -184,9 +193,9 @@ class DummyDatabase {
         displayName: "Υπεύθυνος 403",
         createdAt: new Date("2024-01-07"),
         userRole: "Άτομο",
-        team: "Καρποφόροι",
-        memberOf: ["Καρποφόροι", "Ναός 3", "Τομέας 3"],
-        responsibleFor: ["Καρποφόροι", "Ναός 3", "Τομέας 3"],
+        team: "Ομάδα 3",
+        memberOf: ["Ομάδα 3", "Τμήμα 3", "Τομέας 3"],
+        responsibleFor: ["Ομάδα 3", "Τμήμα 3", "Τομέας 3"],
       },
       {
         uid: "user-505",
@@ -195,8 +204,8 @@ class DummyDatabase {
         displayName: "Χρήστης 505",
         createdAt: new Date("2024-01-08"),
         userRole: "Άτομο",
-        team: "Καρποφόροι",
-        memberOf: ["Καρποφόροι", "Ναός 3", "Τομέας 3"],
+        team: "Ομάδα 3",
+        memberOf: ["Ομάδα 3", "Τμήμα 3", "Τομέας 3"],
       },
       {
         uid: "user-506",
@@ -205,11 +214,11 @@ class DummyDatabase {
         displayName: "Χρήστης 506",
         createdAt: new Date("2024-01-09"),
         userRole: "Άτομο",
-        team: "Καρποφόροι",
-        memberOf: ["Καρποφόροι", "Ναός 3", "Τομέας 3"],
+        team: "Ομάδα 3",
+        memberOf: ["Ομάδα 3", "Τμήμα 3", "Τομέας 3"],
       },
 
-      // Team 4: Ολόφωτοι (3 members)
+      // Team 4: Ομάδα 4 (3 members)
       {
         uid: "user-404",
         username: "404",
@@ -217,9 +226,9 @@ class DummyDatabase {
         displayName: "Υπεύθυνος 404",
         createdAt: new Date("2024-01-10"),
         userRole: "Άτομο",
-        team: "Ολόφωτοι",
-        memberOf: ["Ολόφωτοι", "Ναός 4", "Τομέας 4"],
-        responsibleFor: ["Ολόφωτοι", "Ναός 4", "Τομέας 4"],
+        team: "Ομάδα 4",
+        memberOf: ["Ομάδα 4", "Τμήμα 4", "Τομέας 4"],
+        responsibleFor: ["Ομάδα 4", "Τμήμα 4", "Τομέας 4"],
       },
       {
         uid: "user-507",
@@ -228,8 +237,8 @@ class DummyDatabase {
         displayName: "Χρήστης 507",
         createdAt: new Date("2024-01-11"),
         userRole: "Άτομο",
-        team: "Ολόφωτοι",
-        memberOf: ["Ολόφωτοι", "Ναός 4", "Τομέας 4"],
+        team: "Ομάδα 4",
+        memberOf: ["Ομάδα 4", "Τμήμα 4", "Τομέας 4"],
       },
       {
         uid: "user-508",
@@ -238,11 +247,11 @@ class DummyDatabase {
         displayName: "Χρήστης 508",
         createdAt: new Date("2024-01-12"),
         userRole: "Άτομο",
-        team: "Ολόφωτοι",
-        memberOf: ["Ολόφωτοι", "Ναός 4", "Τομέας 4"],
+        team: "Ομάδα 4",
+        memberOf: ["Ομάδα 4", "Τμήμα 4", "Τομέας 4"],
       },
 
-      // Team 5: Νικητές (3 members)
+      // Team 5: Ομάδα 5 (3 members)
       {
         uid: "user-405",
         username: "405",
@@ -250,9 +259,9 @@ class DummyDatabase {
         displayName: "Υπεύθυνος 405",
         createdAt: new Date("2024-01-13"),
         userRole: "Άτομο",
-        team: "Νικητές",
-        memberOf: ["Νικητές", "Ναός 5", "Τομέας 5"],
-        responsibleFor: ["Νικητές", "Ναός 5", "Τομέας 5"],
+        team: "Ομάδα 5",
+        memberOf: ["Ομάδα 5", "Τμήμα 5", "Τομέας 5"],
+        responsibleFor: ["Ομάδα 5", "Τμήμα 5", "Τομέας 5"],
       },
       {
         uid: "user-509",
@@ -261,8 +270,8 @@ class DummyDatabase {
         displayName: "Χρήστης 509",
         createdAt: new Date("2024-01-14"),
         userRole: "Άτομο",
-        team: "Νικητές",
-        memberOf: ["Νικητές", "Ναός 5", "Τομέας 5"],
+        team: "Ομάδα 5",
+        memberOf: ["Ομάδα 5", "Τμήμα 5", "Τομέας 5"],
       },
       {
         uid: "user-510",
@@ -271,11 +280,11 @@ class DummyDatabase {
         displayName: "Χρήστης 510",
         createdAt: new Date("2024-01-15"),
         userRole: "Άτομο",
-        team: "Νικητές",
-        memberOf: ["Νικητές", "Ναός 5", "Τομέας 5"],
+        team: "Ομάδα 5",
+        memberOf: ["Ομάδα 5", "Τμήμα 5", "Τομέας 5"],
       },
 
-      // Team 6: Νικηφόροι (3 members)
+      // Team 6: Ομάδα 6 (3 members)
       {
         uid: "user-406",
         username: "406",
@@ -283,9 +292,9 @@ class DummyDatabase {
         displayName: "Υπεύθυνος 406",
         createdAt: new Date("2024-01-16"),
         userRole: "Άτομο",
-        team: "Νικηφόροι",
-        memberOf: ["Νικηφόροι", "Ναός 6", "Τομέας 6"],
-        responsibleFor: ["Νικηφόροι", "Ναός 6", "Τομέας 6"],
+        team: "Ομάδα 6",
+        memberOf: ["Ομάδα 6", "Τμήμα 6", "Τομέας 6"],
+        responsibleFor: ["Ομάδα 6", "Τμήμα 6", "Τομέας 6"],
       },
       {
         uid: "user-511",
@@ -294,8 +303,8 @@ class DummyDatabase {
         displayName: "Χρήστης 511",
         createdAt: new Date("2024-01-17"),
         userRole: "Άτομο",
-        team: "Νικηφόροι",
-        memberOf: ["Νικηφόροι", "Ναός 6", "Τομέας 6"],
+        team: "Ομάδα 6",
+        memberOf: ["Ομάδα 6", "Τμήμα 6", "Τομέας 6"],
       },
       {
         uid: "user-512",
@@ -304,11 +313,11 @@ class DummyDatabase {
         displayName: "Χρήστης 512",
         createdAt: new Date("2024-01-18"),
         userRole: "Άτομο",
-        team: "Νικηφόροι",
-        memberOf: ["Νικηφόροι", "Ναός 6", "Τομέας 6"],
+        team: "Ομάδα 6",
+        memberOf: ["Ομάδα 6", "Τμήμα 6", "Τομέας 6"],
       },
 
-      // Team 7: Φλόγα (3 members)
+      // Team 7: Ομάδα 7 (3 members)
       {
         uid: "user-407",
         username: "407",
@@ -316,9 +325,9 @@ class DummyDatabase {
         displayName: "Υπεύθυνος 407",
         createdAt: new Date("2024-01-19"),
         userRole: "Άτομο",
-        team: "Φλόγα",
-        memberOf: ["Φλόγα", "Ναός 7", "Τομέας 7"],
-        responsibleFor: ["Φλόγα", "Ναός 7", "Τομέας 7"],
+        team: "Ομάδα 7",
+        memberOf: ["Ομάδα 7", "Τμήμα 7", "Τομέας 7"],
+        responsibleFor: ["Ομάδα 7", "Τμήμα 7", "Τομέας 7"],
       },
       {
         uid: "user-513",
@@ -327,8 +336,8 @@ class DummyDatabase {
         displayName: "Χρήστης 513",
         createdAt: new Date("2024-01-20"),
         userRole: "Άτομο",
-        team: "Φλόγα",
-        memberOf: ["Φλόγα", "Ναός 7", "Τομέας 7"],
+        team: "Ομάδα 7",
+        memberOf: ["Ομάδα 7", "Τμήμα 7", "Τομέας 7"],
       },
       {
         uid: "user-514",
@@ -337,11 +346,11 @@ class DummyDatabase {
         displayName: "Χρήστης 514",
         createdAt: new Date("2024-01-21"),
         userRole: "Άτομο",
-        team: "Φλόγα",
-        memberOf: ["Φλόγα", "Ναός 7", "Τομέας 7"],
+        team: "Ομάδα 7",
+        memberOf: ["Ομάδα 7", "Τμήμα 7", "Τομέας 7"],
       },
 
-      // Team 8: Σύμψυχοι (3 members)
+      // Team 8: Ομάδα 8 (3 members)
       {
         uid: "user-408",
         username: "408",
@@ -349,9 +358,9 @@ class DummyDatabase {
         displayName: "Υπεύθυνος 408",
         createdAt: new Date("2024-01-22"),
         userRole: "Άτομο",
-        team: "Σύμψυχοι",
-        memberOf: ["Σύμψυχοι", "Ναός 8", "Τομέας 8"],
-        responsibleFor: ["Σύμψυχοι", "Ναός 8", "Τομέας 8"],
+        team: "Ομάδα 8",
+        memberOf: ["Ομάδα 8", "Τμήμα 8", "Τομέας 8"],
+        responsibleFor: ["Ομάδα 8", "Τμήμα 8", "Τομέας 8"],
       },
       {
         uid: "user-515",
@@ -360,8 +369,8 @@ class DummyDatabase {
         displayName: "Χρήστης 515",
         createdAt: new Date("2024-01-23"),
         userRole: "Άτομο",
-        team: "Σύμψυχοι",
-        memberOf: ["Σύμψυχοι", "Ναός 8", "Τομέας 8"],
+        team: "Ομάδα 8",
+        memberOf: ["Ομάδα 8", "Τμήμα 8", "Τομέας 8"],
       },
       {
         uid: "user-516",
@@ -370,8 +379,8 @@ class DummyDatabase {
         displayName: "Χρήστης 516",
         createdAt: new Date("2024-01-24"),
         userRole: "Άτομο",
-        team: "Σύμψυχοι",
-        memberOf: ["Σύμψυχοι", "Ναός 8", "Τομέας 8"],
+        team: "Ομάδα 8",
+        memberOf: ["Ομάδα 8", "Τμήμα 8", "Τομέας 8"],
       },
 
       // Ομάδα accounts for each team (8 total)
@@ -379,7 +388,7 @@ class DummyDatabase {
         uid: "team-enwmenoi",
         username: "600",
         accessLevel: "Χρήστης",
-        displayName: "Ενωμένοι",
+        displayName: "Ομάδα 1",
         createdAt: new Date("2024-01-05"),
         userRole: "Ομάδα",
       },
@@ -387,7 +396,7 @@ class DummyDatabase {
         uid: "team-sporiades",
         username: "601",
         accessLevel: "Χρήστης",
-        displayName: "Σποριάδες",
+        displayName: "Ομάδα 2",
         createdAt: new Date("2024-01-06"),
         userRole: "Ομάδα",
       },
@@ -395,7 +404,7 @@ class DummyDatabase {
         uid: "team-karpoforoi",
         username: "602",
         accessLevel: "Χρήστης",
-        displayName: "Καρποφόροι",
+        displayName: "Ομάδα 3",
         createdAt: new Date("2024-01-07"),
         userRole: "Ομάδα",
       },
@@ -403,7 +412,7 @@ class DummyDatabase {
         uid: "team-olofwtoi",
         username: "603",
         accessLevel: "Χρήστης",
-        displayName: "Ολόφωτοι",
+        displayName: "Ομάδα 4",
         createdAt: new Date("2024-01-08"),
         userRole: "Ομάδα",
       },
@@ -411,7 +420,7 @@ class DummyDatabase {
         uid: "team-nikhtes",
         username: "604",
         accessLevel: "Χρήστης",
-        displayName: "Νικητές",
+        displayName: "Ομάδα 5",
         createdAt: new Date("2024-01-09"),
         userRole: "Ομάδα",
       },
@@ -419,7 +428,7 @@ class DummyDatabase {
         uid: "team-nikhforoi",
         username: "605",
         accessLevel: "Χρήστης",
-        displayName: "Νικηφόροι",
+        displayName: "Ομάδα 6",
         createdAt: new Date("2024-01-10"),
         userRole: "Ομάδα",
       },
@@ -427,7 +436,7 @@ class DummyDatabase {
         uid: "team-floga",
         username: "606",
         accessLevel: "Χρήστης",
-        displayName: "Φλόγα",
+        displayName: "Ομάδα 7",
         createdAt: new Date("2024-01-11"),
         userRole: "Ομάδα",
       },
@@ -435,75 +444,75 @@ class DummyDatabase {
         uid: "team-sympsyxoi",
         username: "607",
         accessLevel: "Χρήστης",
-        displayName: "Σύμψυχοι",
+        displayName: "Ομάδα 8",
         createdAt: new Date("2024-01-12"),
         userRole: "Ομάδα",
       },
 
-      // Ναός accounts (8 total) - using same user pairs as teams
+      // Τμήμα accounts (8 total) - previously Ναός
       {
         uid: "naos-1",
         username: "700",
         accessLevel: "Χρήστης",
-        displayName: "Ναός 1",
+        displayName: "Τμήμα 1",
         createdAt: new Date("2024-01-14"),
-        userRole: "Ναός",
+        userRole: "Τμήμα",
       },
       {
         uid: "naos-2",
         username: "701",
         accessLevel: "Χρήστης",
-        displayName: "Ναός 2",
+        displayName: "Τμήμα 2",
         createdAt: new Date("2024-01-15"),
-        userRole: "Ναός",
+        userRole: "Τμήμα",
       },
       {
         uid: "naos-3",
         username: "703",
         accessLevel: "Χρήστης",
-        displayName: "Ναός 3",
+        displayName: "Τμήμα 3",
         createdAt: new Date("2024-01-16"),
-        userRole: "Ναός",
+        userRole: "Τμήμα",
       },
       {
         uid: "naos-4",
         username: "704",
         accessLevel: "Χρήστης",
-        displayName: "Ναός 4",
+        displayName: "Τμήμα 4",
         createdAt: new Date("2024-01-17"),
-        userRole: "Ναός",
+        userRole: "Τμήμα",
       },
       {
         uid: "naos-5",
         username: "705",
         accessLevel: "Χρήστης",
-        displayName: "Ναός 5",
+        displayName: "Τμήμα 5",
         createdAt: new Date("2024-01-18"),
-        userRole: "Ναός",
+        userRole: "Τμήμα",
       },
       {
         uid: "naos-6",
         username: "706",
         accessLevel: "Χρήστης",
-        displayName: "Ναός 6",
+        displayName: "Τμήμα 6",
         createdAt: new Date("2024-01-19"),
-        userRole: "Ναός",
+        userRole: "Τμήμα",
       },
       {
         uid: "naos-7",
         username: "707",
         accessLevel: "Χρήστης",
-        displayName: "Ναός 7",
+        displayName: "Τμήμα 7",
         createdAt: new Date("2024-01-20"),
-        userRole: "Ναός",
+        userRole: "Τμήμα",
       },
       {
         uid: "naos-8",
         username: "708",
         accessLevel: "Χρήστης",
-        displayName: "Ναός 8",
+        displayName: "Τμήμα 8",
         createdAt: new Date("2024-01-21"),
-        userRole: "Ναός",
+        userRole: "Τμήμα",
       },
 
       // Τομέας accounts (8 total) - using same user pairs as teams
@@ -809,7 +818,7 @@ class DummyDatabase {
         incomeProbability = 0.7
         incomeDelay = 20
         break
-      case "Ναός":
+      case "Τμήμα":
         incomeProbability = 0.6
         incomeDelay = 25
         break

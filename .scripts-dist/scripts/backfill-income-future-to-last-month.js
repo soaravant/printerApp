@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.main = void 0;
+exports.main = main;
 /* eslint-disable no-console */
 const dotenv_1 = require("dotenv");
 const fs_1 = require("fs");
@@ -124,7 +124,6 @@ async function main() {
     }
     console.log(`Done. Updated ${updated} income docs and ${updatedUsers} users.`);
 }
-exports.main = main;
 if (require.main === module) {
     main()
         .then(() => process.exit(0))
