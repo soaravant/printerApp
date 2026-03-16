@@ -1,0 +1,11 @@
+.git
+.next
+.next.stale-*
+.playwright-cli
+node_modules
+output
+generated-excel-import-pairs
+dist
+python
+.scripts-dist
+*.xlsx
