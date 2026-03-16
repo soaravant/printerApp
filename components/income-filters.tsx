@@ -104,7 +104,7 @@ export const IncomeFilters: React.FC<IncomeFiltersProps> = ({
                 <SelectItem value="Άτομο">Άτομο</SelectItem>
                 <SelectItem value="Ομάδα">Ομάδα</SelectItem>
                 <SelectItem value="Τομέας">Τομέας</SelectItem>
-                <SelectItem value="Τμήμα">Τμήμα</SelectItem>
+                <SelectItem value="Ναός">Ναός</SelectItem>
               </SelectContent>
             </Select>
           </div> */}

@@ -7,6 +7,7 @@ import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
 import { useState, useEffect } from "react"
 import type { FirebasePrintJob } from "@/lib/firebase-schema"
+import { getPrintTypeLabel } from "@/lib/utils"
 
 // Shared column definition for consistent widths
 function PrintJobsColGroup({ userRole }: { userRole: string }) {
@@ -32,22 +33,6 @@ interface PrintJobsTableProps {
   onRowHover?: (hoveredJob: { deviceName: string; printType: string } | null) => void
   printTypeFilter?: string // New prop for filtering expanded rows
   hasMore?: boolean
-}
-
-// Helper function to get print type label
-const getPrintTypeLabel = (type: string) => {
-  switch (type) {
-    case "A4BW": return "A4 Ασπρόμαυρο"
-    case "A4Color": return "A4 Έγχρωμο"
-    case "A3BW": return "A3 Ασπρόμαυρο"
-    case "A3Color": return "A3 Έγχρωμο"
-    case "RizochartoA3": return "Ριζόχαρτο A3"
-    case "RizochartoA4": return "Ριζόχαρτο A4"
-    case "ChartoniA3": return "Χαρτόνι A3"
-    case "ChartoniA4": return "Χαρτόνι A4"
-    case "Autokollito": return "Αυτοκόλλητο"
-    default: return type
-  }
 }
 
 // Helper function to convert print job to display format

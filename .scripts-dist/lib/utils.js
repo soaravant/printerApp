@@ -11,6 +11,12 @@ exports.addMoney = addMoney;
 exports.multiplyMoney = multiplyMoney;
 exports.subtractMoney = subtractMoney;
 exports.formatMoney = formatMoney;
+exports.normalizeUserRoleLabel = normalizeUserRoleLabel;
+exports.isNaosLikeRole = isNaosLikeRole;
+exports.isManagedEntityRole = isManagedEntityRole;
+exports.getUserRolePluralLabel = getUserRolePluralLabel;
+exports.getUserRoleObjectLabel = getUserRoleObjectLabel;
+exports.getPrintTypeLabel = getPrintTypeLabel;
 exports.calculatePrintJobTotal = calculatePrintJobTotal;
 exports.calculatePrintCost = calculatePrintCost;
 const clsx_1 = require("clsx");
@@ -110,6 +116,70 @@ function subtractMoney(total, paid) {
 function formatMoney(value) {
     return `€${roundMoney(value).toFixed(2).replace('.', ',')}`;
 }
+function normalizeUserRoleLabel(role) {
+    if (!role)
+        return "";
+    return role === "Τμήμα" ? "Ναός" : role;
+}
+function isNaosLikeRole(role) {
+    return role === "Ναός" || role === "Τμήμα";
+}
+function isManagedEntityRole(role) {
+    const normalizedRole = normalizeUserRoleLabel(role);
+    return normalizedRole === "Ομάδα" || normalizedRole === "Ναός" || normalizedRole === "Τομέας";
+}
+function getUserRolePluralLabel(role) {
+    switch (normalizeUserRoleLabel(role)) {
+        case "Άτομο":
+            return "Άτομα";
+        case "Ομάδα":
+            return "Ομάδες";
+        case "Ναός":
+            return "Ναοί";
+        case "Τομέας":
+            return "Τομείς";
+        default:
+            return normalizeUserRoleLabel(role);
+    }
+}
+function getUserRoleObjectLabel(role) {
+    switch (normalizeUserRoleLabel(role)) {
+        case "Ναός":
+            return "Ναό";
+        case "Τομέας":
+            return "Τομέα";
+        default:
+            return normalizeUserRoleLabel(role);
+    }
+}
+function getPrintTypeLabel(type) {
+    switch (type) {
+        case "A4BW":
+        case "ExcelBWImport":
+            return "A4 Ασπρόμαυρο";
+        case "A4Color":
+        case "ExcelColorImport":
+            return "A4 Έγχρωμο";
+        case "A3BW":
+            return "A3 Ασπρόμαυρο";
+        case "A3Color":
+            return "A3 Έγχρωμο";
+        case "RizochartoA3":
+            return "Ριζόχαρτο A3";
+        case "RizochartoA4":
+            return "Ριζόχαρτο A4";
+        case "ChartoniA3":
+            return "Χαρτόνι A3";
+        case "ChartoniA4":
+            return "Χαρτόνι A4";
+        case "Autokollito":
+            return "Αυτοκόλλητο";
+        case "ExcelAdjustmentImport":
+            return "Χρέωση προσαρμογής Excel";
+        default:
+            return type;
+    }
+}
 /**
  * Calculates the total cost for a print job with proper rounding.
  *
@@ -139,8 +209,8 @@ const getDynamicFilterOptions = (users) => {
         if (user.team) {
             teams.add(user.team);
         }
-        // Extract τμήματα from user data (users with userRole "Τμήμα")
-        if (user.userRole === "Τμήμα") {
+        // Extract naoi from user data (legacy "Τμήμα" is still treated as "Ναός")
+        if (isNaosLikeRole(user.userRole)) {
             naoi.add(user.displayName);
         }
         // Extract τομείς from user data (users with userRole "Τομέας")
@@ -157,7 +227,7 @@ const getDynamicFilterOptions = (users) => {
                     tomeis.add(member);
                 }
                 else {
-                    // Assume it's a team if it doesn't contain "Ναός"/"Τμήμα" or "Τομέας"
+                    // Assume it's a team if it doesn't contain "Ναός"/legacy "Τμήμα" or "Τομέας"
                     teams.add(member);
                 }
             });

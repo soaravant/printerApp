@@ -91,10 +91,13 @@ export async function POST(req: Request) {
       const lastUpdated = computeLastUpdated(items)
       const out = JSON.stringify({ lastUpdated, items })
       const fp = filePath(col)
+      // @ts-ignore - firebase-admin SaveOptions types don't include cacheControl directly but it works
       await bucket.file(fp).save(out, {
         contentType: "application/json",
         resumable: false,
-        cacheControl: "public, max-age=60, must-revalidate",
+        metadata: {
+          cacheControl: "public, max-age=60, must-revalidate",
+        }
       })
       result[col] = items.length
     }

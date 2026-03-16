@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin"
 import { FIREBASE_COLLECTIONS, FirebaseIncome } from "@/lib/firebase-schema"
-import { recomputeUserDebts } from "@/lib/server/debt"
+import { recomputeUserDebt } from "@/lib/server/debt"
 
 const roundMoney = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100
 
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
       const nextLast = currentLast && currentLast > incomeDate ? currentLast : incomeDate
       tx.set(userRef, { lastPayment: nextLast }, { merge: true })
     })
-    await recomputeUserDebts(body.uid)
+    await recomputeUserDebt(body.uid)
     // Read back updated user to return to client for local merge
     const updatedUserSnap = await getAdminDb().collection(FIREBASE_COLLECTIONS.USERS).doc(body.uid).get()
     const u = (updatedUserSnap.exists ? (updatedUserSnap.data() as any) : {})

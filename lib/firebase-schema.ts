@@ -17,6 +17,7 @@ export const FIREBASE_COLLECTIONS = {
   TRANSACTIONS: "transactions",
   BILLING: "billing",
   SETTINGS: "settings",
+  EXCEL_IMPORTS: "excelImports",
 } as const
 
 export type FirebaseCollectionName =
@@ -26,13 +27,16 @@ export type FirebaseCollectionName =
 // DOCUMENT SHAPES
 // ============================================================================
 
+export type FirebaseUserRole = "Άτομο" | "Ομάδα" | "Ναός" | "Τομέας"
+export type LegacyFirebaseUserRole = FirebaseUserRole | "Τμήμα"
+
 // Users
 export interface FirebaseUser {
   uid: string
   username: string
   displayName: string
   createdAt: Timestamp
-  userRole: "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας"
+  userRole: LegacyFirebaseUserRole
   memberOf?: string[]
   responsibleFor?: string[]
   accessLevel: "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος"
@@ -45,6 +49,11 @@ export interface FirebaseUser {
   totalDebt?: number
   // Last payment timestamp for quick UI access
   lastPayment?: Timestamp | null
+  // Imported opening balances used for debt recomputation
+  openingPrintDebt?: number
+  openingLaminationDebt?: number
+  openingDebtSource?: string | null
+  openingDebtImportedAt?: Timestamp | null
 }
 
 // Price tables (current app uses 2: printing, lamination)
@@ -73,6 +82,9 @@ export interface FirebasePrintJob {
     | "ChartoniA3"
     | "ChartoniA4"
     | "Autokollito"
+    | "ExcelBWImport"
+    | "ExcelColorImport"
+    | "ExcelAdjustmentImport"
   quantity: number
   pricePerUnit: number
   totalCost: number
@@ -93,7 +105,7 @@ export interface FirebaseLaminationJob {
   uid: string
   username: string
   userDisplayName: string
-  type: "A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover"
+  type: "A3" | "A4" | "A5" | "cards" | "spiral" | "colored_cardboard" | "plastic_cover" | "ExcelLaminationImport"
   quantity: number
   pricePerUnit: number
   totalCost: number
@@ -142,4 +154,20 @@ export interface FirebaseTransaction {
 export interface SchemaValidationResult {
   isValid: boolean
   errors: string[]
+}
+
+export interface FirebaseExcelImportRunSummary {
+  importId: string
+  periodKey: string
+  periodLabel: string
+  rowCount: number
+  missingUsers: number
+  createdAt: Timestamp
+  completedAt?: Timestamp | null
+  createdByUid: string
+  createdByDisplayName: string
+  status: "running" | "completed" | "rolling_back" | "rolled_back" | "failed"
+  rolledBackAt?: Timestamp | null
+  finalExcelDebt: number
+  computedFinalDebt: number
 }

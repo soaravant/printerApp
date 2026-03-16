@@ -1,9 +1,10 @@
 import { db } from "./firebase-client"
 import { collection, doc, getDoc, getDocs, orderBy, query, where, limit, startAfter } from "firebase/firestore"
 import { useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query"
-import { FIREBASE_COLLECTIONS, FirebasePrintJob, FirebaseLaminationJob, FirebaseUser, FirebaseIncome, FirebaseBank, FirebasePriceTable } from "./firebase-schema"
+import { FIREBASE_COLLECTIONS, FirebasePrintJob, FirebaseLaminationJob, FirebaseUser, FirebaseIncome, FirebaseBank, FirebasePriceTable, FirebaseExcelImportRunSummary } from "./firebase-schema"
 import { auth } from "./firebase-client"
 import { getAdminDb } from "./firebase-admin"
+import { coerceToDate } from "./debt-projection"
 
 export async function fetchAllUsers(): Promise<FirebaseUser[]> {
   const snap = await getDocs(collection(db, FIREBASE_COLLECTIONS.USERS))
@@ -103,6 +104,30 @@ export function useUsers() {
   return useQuery({
     queryKey: ["users"],
     queryFn: () => fetchUsers(),
+    staleTime: 60 * 1000,
+  })
+}
+
+export async function fetchExcelImportHistory(): Promise<FirebaseExcelImportRunSummary[]> {
+  const response = await fetch("/api/import/excel/history", {
+    cache: "no-store",
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to fetch excel import history: ${response.status}`)
+  }
+  const payload = await response.json() as { history?: Array<Record<string, any>> }
+  return (payload.history ?? []).map((item) => ({
+    ...item,
+    createdAt: coerceToDate(item.createdAt),
+    completedAt: coerceToDate(item.completedAt),
+    rolledBackAt: coerceToDate(item.rolledBackAt),
+  })) as FirebaseExcelImportRunSummary[]
+}
+
+export function useExcelImportHistory() {
+  return useQuery({
+    queryKey: ["excelImports"],
+    queryFn: () => fetchExcelImportHistory(),
     staleTime: 60 * 1000,
   })
 }

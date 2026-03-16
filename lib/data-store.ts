@@ -1,3 +1,5 @@
+import type { LegacyFirebaseUserRole } from "@/lib/firebase-schema"
+
 // Simple in-memory data store for demo purposes
 // In production, this would be replaced with a real database
 
@@ -6,7 +8,7 @@ export interface User {
   username: string
   accessLevel: "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος"
   displayName: string
-  userRole: "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας"
+  userRole: LegacyFirebaseUserRole
   responsiblePerson?: string
   team?: string
   members?: string[]

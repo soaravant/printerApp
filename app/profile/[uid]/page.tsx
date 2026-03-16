@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { TagInput } from "@/components/ui/tag-input"
+import { normalizeUserRoleLabel } from "@/lib/utils"
 
 
 interface ProfilePageProps {
@@ -64,11 +65,11 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
   const handleSave = async () => {
     try {
       await updateUserServer(editedUser.uid, editedUser)
-      
+
       // Update local state
       setProfileUser(editedUser)
       setIsEditMode(false)
-      
+
       toast({
         title: "Επιτυχία",
         description: "Τα στοιχεία του χρήστη ενημερώθηκαν επιτυχώς.",
@@ -154,12 +155,12 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
 
   // Function to get the appropriate icon based on user role
   const getRoleIcon = (userRole: string) => {
-    switch (userRole) {
+    switch (normalizeUserRoleLabel(userRole)) {
       case "Άτομο":
         return <User className="h-4 w-4" />;
       case "Ομάδα":
         return <Users className="h-4 w-4" />;
-      case "Τμήμα":
+      case "Ναός":
         return <Church className="h-4 w-4" />;
       case "Τομέας":
         return <MapPin className="h-4 w-4" />;
@@ -172,7 +173,7 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
   const getResponsibleUsers = () => {
     const allUsers = [profileUser]
     const responsibleUsers: string[] = []
-    
+
     // For users with "Χρήστης" access level, find their team's responsible person through members field
     if (profileUser.accessLevel === "Χρήστης" && profileUser.memberOf && profileUser.memberOf.length > 0) {
       // Find the first team in the memberOf list and then find Υπεύθυνοι responsible for that team
@@ -189,23 +190,23 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
         }
       }
     }
-    
+
     // For other cases (admin, Υπεύθυνος, or users without members), use the old logic
     const ypefthynoiUsers = allUsers.filter(user => user.accessLevel === "Υπεύθυνος")
-    
+
     ypefthynoiUsers.forEach(ypefthynos => {
       if (ypefthynos.responsibleFor && ypefthynos.responsibleFor.length > 0) {
-        const isResponsible = ypefthynos.responsibleFor.some(responsibleFor => {
-          return responsibleFor === profileUser.displayName || 
-                 responsibleFor === profileUser.userRole
+        const isResponsible = ypefthynos.responsibleFor.some((responsibleFor: string) => {
+          return responsibleFor === profileUser.displayName ||
+            responsibleFor === profileUser.userRole
         })
-        
+
         if (isResponsible) {
           responsibleUsers.push(ypefthynos.displayName)
         }
       }
     })
-    
+
     return responsibleUsers
   }
 
@@ -238,15 +239,15 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
                     </p>
                   </div>
                 </div>
-                
+
                 {/* Edit/Save/Cancel buttons for admin */}
                 {currentUser?.accessLevel === "Διαχειριστής" && (
                   <div className="flex items-center gap-2">
-                                         {!isEditMode ? (
-                       <Button onClick={handleEdit} className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold">
-                         <Edit className="h-4 w-4" />
-                         Επεξεργασία
-                       </Button>
+                    {!isEditMode ? (
+                      <Button onClick={handleEdit} className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold">
+                        <Edit className="h-4 w-4" />
+                        Επεξεργασία
+                      </Button>
                     ) : (
                       <>
                         <Button onClick={handleSave} className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold">
@@ -313,7 +314,7 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
                     </Label>
                     {isEditMode ? (
                       <Select
-                        value={editedUser.userRole || ''}
+                        value={normalizeUserRoleLabel(editedUser.userRole || '')}
                         onValueChange={(value) => handleInputChange('userRole', value)}
                       >
                         <SelectTrigger className="text-lg">
@@ -322,12 +323,12 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
                         <SelectContent>
                           <SelectItem value="Άτομο">Άτομο</SelectItem>
                           <SelectItem value="Ομάδα">Ομάδα</SelectItem>
-                          <SelectItem value="Τμήμα">Τμήμα</SelectItem>
+                          <SelectItem value="Ναός">Ναός</SelectItem>
                           <SelectItem value="Τομέας">Τομέας</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
-                      <div className="text-lg bg-gray-50 p-3 rounded-lg">{profileUser.userRole}</div>
+                      <div className="text-lg bg-gray-50 p-3 rounded-lg">{normalizeUserRoleLabel(profileUser.userRole)}</div>
                     )}
                   </div>
 
@@ -347,7 +348,7 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
                       Επίπεδο Πρόσβασης
                     </Label>
                     {isEditMode ? (
-                        <Select
+                      <Select
                         value={editedUser.accessLevel || ''}
                         onValueChange={(value) => handleInputChange('accessLevel', value)}
                       >
@@ -362,7 +363,7 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
                       </Select>
                     ) : (
                       <div className="text-lg">
-                         <RoleBadge accessLevel={profileUser.accessLevel as any} />
+                        <RoleBadge accessLevel={profileUser.accessLevel as any} />
                       </div>
                     )}
                   </div>
@@ -400,67 +401,67 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
                     ) : null
                   })()}
 
-                                     {/* Show memberOf field for Άτομο users, even if empty */}
-                   {profileUser.userRole === "Άτομο" && (
-                     <div className="space-y-2">
-                       <Label className="flex items-center gap-2 text-sm font-medium text-gray-500">
-                         <Users className="h-4 w-4" />
-                         Μέλος σε:
-                       </Label>
-                       {isEditMode ? (
-                         <TagInput
-                           tags={editedUser.memberOf || []}
-                           onTagsChange={(memberOf) => handleInputChange('memberOf', memberOf)}
-                           placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
-                           availableOptions={getAvailableMembers()}
-                           maxTags={5}
-                         />
-                       ) : (
-                         <div className="flex flex-wrap gap-2">
-                           {profileUser.memberOf && profileUser.memberOf.length > 0 ? (
-                             profileUser.memberOf.map((member: string, index: number) => (
-                               <Badge key={index} variant="outline" className="text-sm">
-                                 {member}
-                               </Badge>
-                             ))
-                           ) : (
-                             <span className="text-gray-500 text-sm">Δεν είναι μέλος σε κάποια ομάδα</span>
-                           )}
-                         </div>
-                       )}
-                     </div>
-                   )}
+                  {/* Show memberOf field for Άτομο users, even if empty */}
+                  {profileUser.userRole === "Άτομο" && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                        <Users className="h-4 w-4" />
+                        Μέλος σε:
+                      </Label>
+                      {isEditMode ? (
+                        <TagInput
+                          tags={editedUser.memberOf || []}
+                          onTagsChange={(memberOf) => handleInputChange('memberOf', memberOf)}
+                          placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
+                          availableOptions={getAvailableMembers()}
+                          maxTags={5}
+                        />
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {profileUser.memberOf && profileUser.memberOf.length > 0 ? (
+                            profileUser.memberOf.map((member: string, index: number) => (
+                              <Badge key={index} variant="outline" className="text-sm">
+                                {member}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-gray-500 text-sm">Δεν είναι μέλος σε κάποια ομάδα</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                                     {/* Show responsibleFor field for Υπεύθυνος users, even if empty */}
-                   {profileUser.accessLevel === "Υπεύθυνος" && (
-                     <div className="space-y-2">
-                       <Label className="flex items-center gap-2 text-sm font-medium text-gray-500">
-                         <Shield className="h-4 w-4" />
-                         Υπεύθυνος για:
-                       </Label>
-                       {isEditMode ? (
-                         <TagInput
-                           tags={editedUser.responsibleFor || []}
-                           onTagsChange={(responsibleFor) => handleInputChange('responsibleFor', responsibleFor)}
-                           placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
-                           availableOptions={getAvailableResponsibleFor()}
-                           maxTags={5}
-                         />
-                       ) : (
-                         <div className="flex flex-wrap gap-2">
-                           {profileUser.responsibleFor && profileUser.responsibleFor.length > 0 ? (
-                             profileUser.responsibleFor.map((responsibleFor: string, index: number) => (
-                               <Badge key={index} variant="default" className="text-sm">
-                                 {responsibleFor}
-                               </Badge>
-                             ))
-                           ) : (
-                             <span className="text-gray-500 text-sm">Δεν είναι υπεύθυνος για κάποια ομάδα</span>
-                           )}
-                         </div>
-                       )}
-                     </div>
-                   )}
+                  {/* Show responsibleFor field for Υπεύθυνος users, even if empty */}
+                  {profileUser.accessLevel === "Υπεύθυνος" && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                        <Shield className="h-4 w-4" />
+                        Υπεύθυνος για:
+                      </Label>
+                      {isEditMode ? (
+                        <TagInput
+                          tags={editedUser.responsibleFor || []}
+                          onTagsChange={(responsibleFor) => handleInputChange('responsibleFor', responsibleFor)}
+                          placeholder="Προσθήκη Ομάδας/Ναού/Τομέα..."
+                          availableOptions={getAvailableResponsibleFor()}
+                          maxTags={5}
+                        />
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {profileUser.responsibleFor && profileUser.responsibleFor.length > 0 ? (
+                            profileUser.responsibleFor.map((responsibleFor: string, index: number) => (
+                              <Badge key={index} variant="default" className="text-sm">
+                                {responsibleFor}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-gray-500 text-sm">Δεν είναι υπεύθυνος για κάποια ομάδα</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
 
                 </CardContent>

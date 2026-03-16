@@ -5,7 +5,17 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
 // import { dummyDB } from "@/lib/dummy-database"
-import { multiplyMoney, roundMoney, getDynamicFilterOptions } from "@/lib/utils"
+import {
+  getDynamicFilterOptions,
+  getUserRoleObjectLabel,
+  getUserRolePluralLabel,
+  isManagedEntityRole,
+  isNaosLikeRole,
+  multiplyMoney,
+  normalizeGreek,
+  normalizeUserRoleLabel,
+  roundMoney,
+} from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,8 +35,6 @@ import { getSnapshot, saveSnapshot, makeScopeKey, mergeById, sortByTimestampDesc
 import { AdminUsersTab } from "@/components/admin-users-tab"
 import { TagInput } from "@/components/ui/tag-input"
 import { addPrintJobServer, addLaminationJobServer, addIncomeServer, addUserServer, usePriceTable, useUsers, useUsersMutations, useJobsMutations } from "@/lib/firebase-queries"
-import { normalizeGreek } from "@/lib/utils"
-
 export default function AdminPage() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -35,7 +43,7 @@ export default function AdminPage() {
   const [filteredUsers, setFilteredUsers] = useState<FirebaseUser[]>([])
   const [usersTabSearchTerm, setUsersTabSearchTerm] = useState("")
 
-  const [roleFilter, setRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Τμήμα, Τομέας
+  const [roleFilter, setRoleFilter] = useState("all") // all, Άτομο, Ομάδα, Ναός, Τομέας
   const [teamFilter, setTeamFilter] = useState("all") // all, Ενωμένοι, Σποριάδες, etc.
   const [selectedUser, setSelectedUser] = useState("")
   const [selectedPrinter, setSelectedPrinter] = useState("Canon Color")
@@ -49,7 +57,7 @@ export default function AdminPage() {
     password: "",
     displayName: "",
     accessLevel: "Χρήστης" as "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος",
-    userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας",
+    userRole: "Άτομο" as FirebaseUser["userRole"],
     memberOf: [] as string[],
     responsibleFor: [] as string[],
   })
@@ -78,7 +86,7 @@ export default function AdminPage() {
   const getPricePropertyName = (printType: string): string => {
     const priceMap: { [key: string]: string } = {
       "A4BW": "a4BW",
-      "A4Color": "a4Color", 
+      "A4Color": "a4Color",
       "A3BW": "a3BW",
       "A3Color": "a3Color",
       "RizochartoA3": "rizochartoA3",
@@ -143,7 +151,7 @@ export default function AdminPage() {
 
     // Apply role filter
     if (roleFilter !== "all") {
-      filtered = filtered.filter((u) => u.userRole === roleFilter)
+      filtered = filtered.filter((u) => normalizeUserRoleLabel(u.userRole) === roleFilter)
     }
 
     // Apply team filter (only for Άτομο role or when "all" is selected)
@@ -163,16 +171,16 @@ export default function AdminPage() {
       const accessLevelOrder = { Διαχειριστής: 0, Υπεύθυνος: 1, Χρήστης: 2 } as const
       const aLevel = accessLevelOrder[a.accessLevel as keyof typeof accessLevelOrder] ?? 3
       const bLevel = accessLevelOrder[b.accessLevel as keyof typeof accessLevelOrder] ?? 3
-      
+
       if (aLevel !== bLevel) {
         return aLevel - bLevel
       }
-      
-      // If same access level, sort by role: Ομάδα, Τομέας, Τμήμα, Άτομο
-      const roleOrder = { Ομάδα: 0, Τομέας: 1, Τμήμα: 2, Άτομο: 3 }
-      const aRole = roleOrder[a.userRole as keyof typeof roleOrder] ?? 4
-      const bRole = roleOrder[b.userRole as keyof typeof roleOrder] ?? 4
-      
+
+      // If same access level, sort by role: Ομάδα, Τομέας, Ναός, Άτομο
+      const roleOrder = { Ομάδα: 0, Τομέας: 1, Ναός: 2, Άτομο: 3 }
+      const aRole = roleOrder[normalizeUserRoleLabel(a.userRole) as keyof typeof roleOrder] ?? 4
+      const bRole = roleOrder[normalizeUserRoleLabel(b.userRole) as keyof typeof roleOrder] ?? 4
+
       return aRole - bRole
     })
 
@@ -382,7 +390,7 @@ export default function AdminPage() {
         throw new Error("Ο χρήστης δεν βρέθηκε")
       }
 
-      const newIncome: Income = {
+      const newIncome: FirebaseIncome = {
         incomeId: "temp",
         uid: debtReductionUser,
         username: selectedUserData.username,
@@ -433,10 +441,10 @@ export default function AdminPage() {
 
   // Function to validate that all Τομείς and Ναοί have Υπεύθυνοι
   const validateResponsiblePersons = (userRole: string, responsiblePersons: string[]) => {
-    if ((userRole === "Τομέας" || userRole === "Τμήμα") && responsiblePersons.length === 0) {
+    if ((userRole === "Τομέας" || isNaosLikeRole(userRole)) && responsiblePersons.length === 0) {
       return {
         isValid: false,
-        message: `Οι ${userRole === "Τομέας" ? "Τομείς" : "Ναοί"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο`
+        message: `Οι ${getUserRolePluralLabel(userRole)} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο`
       }
     }
     return { isValid: true }
@@ -449,39 +457,39 @@ export default function AdminPage() {
       .map(u => u.displayName)
   }
 
-// Function to dynamically compute responsible persons for Ομάδα/Τμήμα/Τομέας
+  // Function to dynamically compute responsible persons for Ομάδα/Ναός/Τομέας
   const getDynamicResponsiblePersons = (userData: any) => {
     const responsibleUsers: string[] = []
-    
-    // Only compute for Ομάδα, Τμήμα, and Τομέας
-    if (userData.userRole === "Ομάδα" || userData.userRole === "Τμήμα" || userData.userRole === "Τομέας") {
+
+    // Only compute for Ομάδα, Ναός, and Τομέας
+    if (isManagedEntityRole(userData.userRole)) {
       const ypefthynoiUsers = users.filter((user: any) => user.accessLevel === "Υπεύθυνος")
-      
+
       ypefthynoiUsers.forEach((ypefthynos: any) => {
         if (ypefthynos.responsibleFor && ypefthynos.responsibleFor.length > 0) {
           const isResponsible = ypefthynos.responsibleFor.some((responsibleFor: string) => {
             return responsibleFor === userData.displayName
           })
-          
+
           if (isResponsible) {
             responsibleUsers.push(ypefthynos.displayName)
           }
         }
       })
     }
-    
+
     return responsibleUsers
   }
 
   // Function to check if all Τομείς and Ναοί have Υπεύθυνοι
   const checkResponsiblePersonsCompliance = () => {
-    const tomeisWithoutYpefthynos = users.filter(u => 
+    const tomeisWithoutYpefthynos = users.filter(u =>
       u.userRole === "Τομέας" && getDynamicResponsiblePersons(u).length === 0
     )
-    const naoiWithoutYpefthynos = users.filter(u => 
-      u.userRole === "Τμήμα" && getDynamicResponsiblePersons(u).length === 0
+    const naoiWithoutYpefthynos = users.filter(u =>
+      isNaosLikeRole(u.userRole) && getDynamicResponsiblePersons(u).length === 0
     )
-    
+
     return {
       tomeisWithoutYpefthynos,
       naoiWithoutYpefthynos,
@@ -492,17 +500,17 @@ export default function AdminPage() {
   // Function to check if all Άτομο users have proper team assignments
   const checkTeamAssignments = () => {
     const { teams } = getDynamicFilterOptions(users)
-    
-    const atomoUsersWithoutTeam = users.filter(u => 
-      u.userRole === "Άτομο" && u.accessLevel === "Χρήστης" && 
+
+    const atomoUsersWithoutTeam = users.filter(u =>
+      u.userRole === "Άτομο" && u.accessLevel === "Χρήστης" &&
       (!u.memberOf || !u.memberOf.some(member => teams.includes(member)))
     )
-    
-    const atomoUsersWithMultipleTeams = users.filter(u => 
-      u.userRole === "Άτομο" && u.accessLevel === "Χρήστης" && 
+
+    const atomoUsersWithMultipleTeams = users.filter(u =>
+      u.userRole === "Άτομο" && u.accessLevel === "Χρήστης" &&
       u.memberOf && u.memberOf.filter(member => teams.includes(member)).length > 1
     )
-    
+
     return {
       atomoUsersWithoutTeam,
       atomoUsersWithMultipleTeams,
@@ -556,7 +564,7 @@ export default function AdminPage() {
     if (newUser.userRole === "Άτομο" && newUser.accessLevel === "Χρήστης") {
       const { teams } = getDynamicFilterOptions(users)
       const teamsInMembers = newUser.memberOf.filter(member => teams.includes(member))
-      
+
       if (teamsInMembers.length === 0) {
         toast({
           title: "Σφάλμα Επικύρωσης",
@@ -565,7 +573,7 @@ export default function AdminPage() {
         })
         return
       }
-      
+
       if (teamsInMembers.length > 1) {
         toast({
           title: "Σφάλμα Επικύρωσης",
@@ -618,7 +626,7 @@ export default function AdminPage() {
         }
       }
 
-      const userToAdd: User = {
+      const userToAdd: FirebaseUser = {
         uid: `user-${Date.now()}`,
         username: newUser.username,
         accessLevel: newUser.accessLevel,
@@ -720,7 +728,7 @@ export default function AdminPage() {
       password: "",
       displayName: "",
       accessLevel: "Χρήστης" as "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος",
-    userRole: "Άτομο" as "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας",
+      userRole: "Άτομο" as FirebaseUser["userRole"],
       memberOf: [] as string[],
       responsibleFor: [] as string[],
     })
@@ -746,29 +754,29 @@ export default function AdminPage() {
 
             <Tabs defaultValue="users" className="w-full">
               <TabsList className="grid w-full grid-cols-4 bg-white mb-8 p-2 h-16">
-                <TabsTrigger 
-                  value="users" 
+                <TabsTrigger
+                  value="users"
                   className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-yellow-500 data-[state=active]:text-yellow-700 data-[state=active]:bg-transparent hover:bg-yellow-50 hover:text-yellow-700 transition-colors text-base font-medium py-3"
                 >
                   <Users className="h-5 w-5" />
                   Χρήστες
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="printing" 
+                <TabsTrigger
+                  value="printing"
                   className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:text-blue-700 data-[state=active]:bg-transparent hover:bg-blue-50 hover:text-blue-700 transition-colors text-base font-medium py-3"
                 >
                   <Printer className="h-5 w-5" />
                   Χρέωση ΤΟ. ΦΩ.
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="lamination" 
+                <TabsTrigger
+                  value="lamination"
                   className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:bg-transparent hover:bg-green-50 hover:text-green-700 transition-colors text-base font-medium py-3"
                 >
                   <CreditCard className="h-5 w-5" />
                   Χρέωση ΠΛΑ. ΤΟ.
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="debt-reduction" 
+                <TabsTrigger
+                  value="debt-reduction"
                   className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-yellow-500 data-[state=active]:text-yellow-700 data-[state=active]:bg-transparent hover:bg-yellow-50 hover:text-yellow-700 transition-colors text-base font-medium py-3"
                 >
                   <Euro className="h-5 w-5" />
@@ -816,7 +824,7 @@ export default function AdminPage() {
                         <Label htmlFor="user" className="text-gray-700">Χρήστης</Label>
                         <SearchableSelect
                           options={users
-      .filter((u) => u.accessLevel === "Χρήστης")
+                            .filter((u) => u.accessLevel === "Χρήστης")
                             .map((user) => ({
                               value: user.uid,
                               label: user.displayName,
@@ -859,8 +867,8 @@ export default function AdminPage() {
 
                       <div>
                         <Label htmlFor="type" className="text-gray-700">Τύπος Εκτύπωσης</Label>
-                        <Select 
-                          value={printingType} 
+                        <Select
+                          value={printingType}
                           onValueChange={(value: any) => setPrintingType(value)}
                           disabled={a4BWOnlyPrinters.includes(selectedPrinter)}
                         >
@@ -868,27 +876,27 @@ export default function AdminPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                                             {getAvailablePrintTypes().map((type) => {
-                   const isDisabled = a4BWOnlyPrinters.includes(selectedPrinter) && type !== "A4BW"
-                   return (
-                     <SelectItem
-                       key={type}
-                       value={type}
-                       disabled={isDisabled}
-                       className={isDisabled ? "text-gray-400" : ""}
-                     >
-                       {type === "A4BW" && `A4 Ασπρόμαυρο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
-                       {type === "A4Color" && `A4 Έγχρωμο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
-                       {type === "A3BW" && `A3 Ασπρόμαυρο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
-                       {type === "A3Color" && `A3 Έγχρωμο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
-                       {type === "RizochartoA3" && `Ριζόχαρτο A3 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
-                       {type === "RizochartoA4" && `Ριζόχαρτο A4 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
-                       {type === "ChartoniA3" && `Χαρτόνι A3 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
-                       {type === "ChartoniA4" && `Χαρτόνι A4 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
-                       {type === "Autokollito" && `Αυτοκόλλητο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
-                     </SelectItem>
-                   )
-                 })}
+                            {getAvailablePrintTypes().map((type) => {
+                              const isDisabled = a4BWOnlyPrinters.includes(selectedPrinter) && type !== "A4BW"
+                              return (
+                                <SelectItem
+                                  key={type}
+                                  value={type}
+                                  disabled={isDisabled}
+                                  className={isDisabled ? "text-gray-400" : ""}
+                                >
+                                  {type === "A4BW" && `A4 Ασπρόμαυρο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                                  {type === "A4Color" && `A4 Έγχρωμο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                                  {type === "A3BW" && `A3 Ασπρόμαυρο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                                  {type === "A3Color" && `A3 Έγχρωμο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                                  {type === "RizochartoA3" && `Ριζόχαρτο A3 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                                  {type === "RizochartoA4" && `Ριζόχαρτο A4 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                                  {type === "ChartoniA3" && `Χαρτόνι A3 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                                  {type === "ChartoniA4" && `Χαρτόνι A4 (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                                  {type === "Autokollito" && `Αυτοκόλλητο (${formatPrice(printingPrices[getPricePropertyName(type)])})`}
+                                </SelectItem>
+                              )
+                            })}
                           </SelectContent>
                         </Select>
                         {a4BWOnlyPrinters.includes(selectedPrinter) && (
@@ -965,7 +973,7 @@ export default function AdminPage() {
                         <Label htmlFor="user" className="text-gray-700">Χρήστης</Label>
                         <SearchableSelect
                           options={users
-      .filter((u) => u.accessLevel === "Χρήστης")
+                            .filter((u) => u.accessLevel === "Χρήστης")
                             .map((user) => ({
                               value: user.uid,
                               label: user.displayName,
@@ -1089,7 +1097,7 @@ export default function AdminPage() {
                         <Input
                           id="debt-amount"
                           type="number"
-                           step="1"
+                          step="1"
                           min="0"
                           value={debtReductionAmount}
                           onChange={(e) => setDebtReductionAmount(e.target.value)}
@@ -1114,39 +1122,39 @@ export default function AdminPage() {
                       const currentLaminationDebt = selectedUserData?.laminationDebt || 0
                       const currentTotalDebt = selectedUserData?.totalDebt || 0
                       const paymentAmount = parseFloat(debtReductionAmount) || 0
-                      
-                       // Calculate remaining debt after payment
-                       // Start from current category debts and any existing credit (negative total)
-                       let remainingLamination = Math.max(0, currentLaminationDebt)
-                       let remainingPrint = Math.max(0, currentPrintDebt)
-                       let extraCredit = currentTotalDebt < 0 ? Math.abs(currentTotalDebt) : 0
-                      
+
+                      // Calculate remaining debt after payment
+                      // Start from current category debts and any existing credit (negative total)
+                      let remainingLamination = Math.max(0, currentLaminationDebt)
+                      let remainingPrint = Math.max(0, currentPrintDebt)
+                      let extraCredit = currentTotalDebt < 0 ? Math.abs(currentTotalDebt) : 0
+
                       if (paymentAmount > 0) {
                         // Apply payment to debts (lamination first, then printing)
                         let remainingPayment = paymentAmount
-                        
+
                         // First pay lamination debt
                         if (remainingLamination > 0) {
                           const laminationPayment = Math.min(remainingPayment, remainingLamination)
                           remainingLamination -= laminationPayment
                           remainingPayment -= laminationPayment
                         }
-                        
+
                         // Then pay printing debt with remaining amount
                         if (remainingPayment > 0 && remainingPrint > 0) {
                           const printPayment = Math.min(remainingPayment, remainingPrint)
                           remainingPrint -= printPayment
                           remainingPayment -= printPayment
                         }
-                        
-                         // If there's still payment remaining, increase credit (affects only total)
-                         if (remainingPayment > 0) {
-                           extraCredit += remainingPayment
-                         }
+
+                        // If there's still payment remaining, increase credit (affects only total)
+                        if (remainingPayment > 0) {
+                          extraCredit += remainingPayment
+                        }
                       }
-                      
-                       const remainingTotal = remainingLamination + remainingPrint - extraCredit
-                      
+
+                      const remainingTotal = remainingLamination + remainingPrint - extraCredit
+
                       return (
                         <div className="bg-gray-50 rounded-lg p-4">
                           <Label className="text-gray-700 mb-2 block">
@@ -1189,93 +1197,93 @@ export default function AdminPage() {
                 {(() => {
                   const compliance = checkResponsiblePersonsCompliance()
                   const teamIssues = checkTeamAssignments()
-                  
-      if (compliance.hasIssues || teamIssues.hasIssues) {
-        return (
-          <div className="mb-6 space-y-4">
-            {compliance.hasIssues && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-medium text-red-800">
-                      Προσοχή: Λείπουν Υπεύθυνοι
-                    </h3>
-                    <div className="mt-2 text-sm text-red-700">
-                      {compliance.tomeisWithoutYpefthynos.length > 0 && (
-                        <div className="mb-2">
-                          <strong>Τομείς χωρίς Υπεύθυνο:</strong>
-                          <ul className="ml-4 mt-1">
-                            {compliance.tomeisWithoutYpefthynos.map(user => (
-                              <li key={user.uid}>• {user.displayName}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {compliance.naoiWithoutYpefthynos.length > 0 && (
-                        <div>
-                          <strong>Τμήματα χωρίς Υπεύθυνο:</strong>
-                          <ul className="ml-4 mt-1">
-                            {compliance.naoiWithoutYpefthynos.map(user => (
-                              <li key={user.uid}>• {user.displayName}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {teamIssues.hasIssues && (
-              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-medium text-orange-800">
-                      Προσοχή: Προβλήματα με Ομάδες
-                    </h3>
-                    <div className="mt-2 text-sm text-orange-700">
-                      {teamIssues.atomoUsersWithoutTeam.length > 0 && (
-                        <div className="mb-2">
-                          <strong>Άτομα χωρίς ομάδα:</strong>
-                          <ul className="ml-4 mt-1">
-                            {teamIssues.atomoUsersWithoutTeam.map(user => (
-                              <li key={user.uid}>• {user.displayName}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {teamIssues.atomoUsersWithMultipleTeams.length > 0 && (
-                        <div>
-                          <strong>Άτομα με πολλαπλές ομάδες:</strong>
-                          <ul className="ml-4 mt-1">
-                            {teamIssues.atomoUsersWithMultipleTeams.map(user => (
-                              <li key={user.uid}>• {user.displayName}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )
-      }
-      return null
-    })()}
-                
+
+                  if (compliance.hasIssues || teamIssues.hasIssues) {
+                    return (
+                      <div className="mb-6 space-y-4">
+                        {compliance.hasIssues && (
+                          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="text-sm font-medium text-red-800">
+                                  Προσοχή: Λείπουν Υπεύθυνοι
+                                </h3>
+                                <div className="mt-2 text-sm text-red-700">
+                                  {compliance.tomeisWithoutYpefthynos.length > 0 && (
+                                    <div className="mb-2">
+                                      <strong>Τομείς χωρίς Υπεύθυνο:</strong>
+                                      <ul className="ml-4 mt-1">
+                                        {compliance.tomeisWithoutYpefthynos.map(user => (
+                                          <li key={user.uid}>• {user.displayName}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {compliance.naoiWithoutYpefthynos.length > 0 && (
+                                    <div>
+                                      <strong>Ναοί χωρίς Υπεύθυνο:</strong>
+                                      <ul className="ml-4 mt-1">
+                                        {compliance.naoiWithoutYpefthynos.map(user => (
+                                          <li key={user.uid}>• {user.displayName}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {teamIssues.hasIssues && (
+                          <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="text-sm font-medium text-orange-800">
+                                  Προσοχή: Προβλήματα με Ομάδες
+                                </h3>
+                                <div className="mt-2 text-sm text-orange-700">
+                                  {teamIssues.atomoUsersWithoutTeam.length > 0 && (
+                                    <div className="mb-2">
+                                      <strong>Άτομα χωρίς ομάδα:</strong>
+                                      <ul className="ml-4 mt-1">
+                                        {teamIssues.atomoUsersWithoutTeam.map(user => (
+                                          <li key={user.uid}>• {user.displayName}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {teamIssues.atomoUsersWithMultipleTeams.length > 0 && (
+                                    <div>
+                                      <strong>Άτομα με πολλαπλές ομάδες:</strong>
+                                      <ul className="ml-4 mt-1">
+                                        {teamIssues.atomoUsersWithMultipleTeams.map(user => (
+                                          <li key={user.uid}>• {user.displayName}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
+
                 {/* User Registration Form Card */}
                 <Card className="border-yellow-200 mb-6">
                   <CardHeader className="bg-yellow-100">
@@ -1305,21 +1313,21 @@ export default function AdminPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <Label htmlFor="username">Username</Label>
-                        <Input 
-                          id="username" 
-                          value={newUser.username} 
-                          onChange={e => setNewUser({ ...newUser, username: e.target.value })} 
+                        <Input
+                          id="username"
+                          value={newUser.username}
+                          onChange={e => setNewUser({ ...newUser, username: e.target.value })}
                           placeholder="Εισάγετε το username"
                         />
                       </div>
                       <div>
                         <Label htmlFor="password">Password</Label>
                         <div className="relative">
-                          <Input 
-                            id="password" 
-                            type={showPassword ? "text" : "password"} 
-                            value={newUser.password} 
-                            onChange={e => setNewUser({ ...newUser, password: e.target.value })} 
+                          <Input
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            value={newUser.password}
+                            onChange={e => setNewUser({ ...newUser, password: e.target.value })}
                             placeholder="Εισάγετε τον κωδικό πρόσβασης"
                           />
                           <button
@@ -1341,18 +1349,17 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <div className={`grid grid-cols-1 gap-4 ${
-                      (newUser.userRole === "Άτομο" && newUser.accessLevel === "Υπεύθυνος") ? "md:grid-cols-4" : 
-                      (newUser.userRole === "Άτομο" && newUser.accessLevel === "Διαχειριστής") ? "md:grid-cols-2" :
-                      (newUser.userRole === "Άτομο" || newUser.accessLevel === "Υπεύθυνος") ? "md:grid-cols-3" : 
-                      "md:grid-cols-2"
-                    }`}>
+                    <div className={`grid grid-cols-1 gap-4 ${(newUser.userRole === "Άτομο" && newUser.accessLevel === "Υπεύθυνος") ? "md:grid-cols-4" :
+                        (newUser.userRole === "Άτομο" && newUser.accessLevel === "Διαχειριστής") ? "md:grid-cols-2" :
+                          (newUser.userRole === "Άτομο" || newUser.accessLevel === "Υπεύθυνος") ? "md:grid-cols-3" :
+                            "md:grid-cols-2"
+                      }`}>
                       <div>
-                         <Label htmlFor="role">Επίπεδο Πρόσβασης</Label>
+                        <Label htmlFor="role">Επίπεδο Πρόσβασης</Label>
                         <Select value={newUser.accessLevel} onValueChange={accessLevel => {
                           const newAccessLevel = accessLevel as "Χρήστης" | "Διαχειριστής" | "Υπεύθυνος"
-                          setNewUser({ 
-                            ...newUser, 
+                          setNewUser({
+                            ...newUser,
                             accessLevel: newAccessLevel,
                             // Automatically set role to "Άτομο" for admin and Υπεύθυνος
                             userRole: (newAccessLevel === "Διαχειριστής" || newAccessLevel === "Υπεύθυνος") ? "Άτομο" : newUser.userRole
@@ -1362,18 +1369,18 @@ export default function AdminPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                           <SelectItem value="Χρήστης">Χρήστης</SelectItem>
+                            <SelectItem value="Χρήστης">Χρήστης</SelectItem>
                             <SelectItem value="Υπεύθυνος">Υπεύθυνος</SelectItem>
-                           <SelectItem value="Διαχειριστής">Διαχειριστής</SelectItem>
+                            <SelectItem value="Διαχειριστής">Διαχειριστής</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div>
                         <Label htmlFor="userRole">Ρόλος</Label>
-                        <Select 
-                          value={newUser.userRole} 
-                          onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as "Άτομο" | "Ομάδα" | "Τμήμα" | "Τομέας" })}
+                        <Select
+                          value={newUser.userRole}
+                          onValueChange={userRole => setNewUser({ ...newUser, userRole: userRole as FirebaseUser["userRole"] })}
                           disabled={newUser.accessLevel === "Διαχειριστής" || newUser.accessLevel === "Υπεύθυνος"}
                         >
                           <SelectTrigger className={newUser.accessLevel === "Διαχειριστής" || newUser.accessLevel === "Υπεύθυνος" ? "bg-gray-100 text-gray-500" : ""}>
@@ -1382,7 +1389,7 @@ export default function AdminPage() {
                           <SelectContent>
                             <SelectItem value="Άτομο">Άτομο</SelectItem>
                             <SelectItem value="Ομάδα">Ομάδα</SelectItem>
-                            <SelectItem value="Τμήμα">Τμήμα</SelectItem>
+                            <SelectItem value="Ναός">Ναός</SelectItem>
                             <SelectItem value="Τομέας">Τομέας</SelectItem>
                           </SelectContent>
                         </Select>
@@ -1395,7 +1402,7 @@ export default function AdminPage() {
 
                       {newUser.userRole === "Άτομο" && newUser.accessLevel !== "Διαχειριστής" && (
                         <div>
-                          <Label>Μέλος (Ομάδα/Τμήμα/Τομέας)</Label>
+                          <Label>Μέλος (Ομάδα/Ναός/Τομέας)</Label>
                           <TagInput
                             tags={newUser.memberOf}
                             onTagsChange={(memberOf) => setNewUser({ ...newUser, memberOf })}
@@ -1405,7 +1412,7 @@ export default function AdminPage() {
                           />
                         </div>
                       )}
-                      
+
                       {newUser.accessLevel === "Υπεύθυνος" && (
                         <div>
                           <Label>Υπεύθυνος για:</Label>
@@ -1419,16 +1426,16 @@ export default function AdminPage() {
                         </div>
                       )}
                     </div>
-                    
-                    {(newUser.userRole === "Τομέας" || newUser.userRole === "Τμήμα" || newUser.userRole === "Ομάδα") && (
+
+                    {isManagedEntityRole(newUser.userRole) && (
                       <div>
                         <Label className="flex items-center gap-2">
                           Υπεύθυνοι
                           <span className="text-red-500">*</span>
                         </Label>
                         <div className="text-xs text-gray-500 mt-1 space-y-1">
-                          <div>1) Οι {newUser.userRole === "Τομέας" ? "Τομείς" : newUser.userRole === "Τμήμα" ? "Τμήματα" : "Ομάδες"} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο.</div>
-                          <div>2) Οι Υπεύθυνοι πρέπει να έχουν αυτό το {newUser.userRole === "Τομέας" ? "Τομέα" : newUser.userRole === "Τμήμα" ? "Τμήμα" : "Ομάδα"} στη λίστα "Υπεύθυνος για".</div>
+                          <div>1) Οι {getUserRolePluralLabel(newUser.userRole)} πρέπει να έχουν τουλάχιστον έναν Υπεύθυνο.</div>
+                          <div>2) Οι Υπεύθυνοι πρέπει να έχουν αυτό το {getUserRoleObjectLabel(newUser.userRole)} στη λίστα "Υπεύθυνος για".</div>
                         </div>
                       </div>
                     )}

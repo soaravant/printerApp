@@ -51,6 +51,7 @@ export default function LaminationJobsTable({ data, page, pageSize, onPageChange
       case "spiral": return "Σπιράλ"
       case "colored_cardboard": return "Χρωματιστά Χαρτόνια"
       case "plastic_cover": return "Πλαστικό Κάλυμμα"
+      case "ExcelLaminationImport": return "Excel εισαγωγή"
       default: return type
     }
   }

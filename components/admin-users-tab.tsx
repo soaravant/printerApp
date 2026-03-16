@@ -5,7 +5,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { User, Building, Printer, Search, Users, Church, MapPin, CreditCard, RotateCcw } from "lucide-react";
-import { roundMoney, getDynamicFilterOptions } from "@/lib/utils";
+import {
+  getDynamicFilterOptions,
+  isManagedEntityRole,
+  isNaosLikeRole,
+  normalizeUserRoleLabel,
+  roundMoney,
+} from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
 interface AdminUsersTabProps {
@@ -35,12 +41,12 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
 
   // Function to get the appropriate icon based on user role
   const getRoleIcon = (userRole: string) => {
-    switch (userRole) {
+    switch (normalizeUserRoleLabel(userRole)) {
       case "Άτομο":
         return <User className="h-4 w-4" />;
       case "Ομάδα":
         return <Users className="h-4 w-4" />;
-      case "Τμήμα":
+      case "Ναός":
         return <Church className="h-4 w-4" />;
       case "Τομέας":
         return <MapPin className="h-4 w-4" />;
@@ -81,13 +87,13 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
     return responsibleUsers
   }
 
-  // Function to dynamically compute responsible persons for Ομάδα/Τμήμα/Τομέας
+  // Function to dynamically compute responsible persons for Ομάδα/Ναός/Τομέας
   const getDynamicResponsiblePersons = (userData: any) => {
     const allUsers = users
     const responsibleUsers: string[] = []
     
-    // Only compute for Ομάδα, Τμήμα, and Τομέας
-    if (userData.userRole === "Ομάδα" || userData.userRole === "Τμήμα" || userData.userRole === "Τομέας") {
+    // Only compute for Ομάδα, Ναός, and Τομέας
+    if (isManagedEntityRole(userData.userRole)) {
       const ypefthynoiUsers = allUsers.filter((user: any) => user.accessLevel === "Υπεύθυνος")
       
       ypefthynoiUsers.forEach((ypefthynos: any) => {
@@ -130,8 +136,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
           </div>
           <div className="w-full md:w-60 flex items-center">
             <Select value={teamFilter} onValueChange={(value) => {
-              // Reset role filter to "all" if current role is "Τμήμα" or "Τομέας" and a specific team is selected
-              if ((roleFilter === "Τμήμα" || roleFilter === "Τομέας") && value !== "all") {
+              // Reset role filter to "all" if current role is "Ναός" or "Τομέας" and a specific team is selected
+              if ((isNaosLikeRole(roleFilter) || roleFilter === "Τομέας") && value !== "all") {
                 setRoleFilter("all");
               }
               setTeamFilter(value);
@@ -167,7 +173,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 <SelectItem value="all">Όλοι οι ρόλοι</SelectItem>
                 <SelectItem value="Άτομο">Άτομο</SelectItem>
                 <SelectItem value="Ομάδα">Ομάδα</SelectItem>
-                <SelectItem value="Τμήμα">Τμήμα</SelectItem>
+                <SelectItem value="Ναός">Ναός</SelectItem>
                 <SelectItem value="Τομέας">Τομέας</SelectItem>
               </SelectContent>
             </Select>
@@ -223,7 +229,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   </Badge>
                 </CardTitle>
                 <CardDescription className="flex items-center gap-2">
-                  {userData.userRole}
+                  {normalizeUserRoleLabel(userData.userRole)}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col flex-1 space-y-4">
@@ -251,7 +257,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 )}
 
                 {/* Dynamic responsible persons display for Ομάδα/Ναός/Τομέας */}
-                {(userData.userRole === "Ομάδα" || userData.userRole === "Τμήμα" || userData.userRole === "Τομέας") && (() => {
+                {isManagedEntityRole(userData.userRole) && (() => {
                   const dynamicResponsiblePersons = getDynamicResponsiblePersons(userData)
                   return (
                     <div className="space-y-2">

@@ -14,6 +14,7 @@
   "include": [
     "scripts/seed-firestore.ts",
     "scripts/clear-firestore.ts",
+    "scripts/bootstrap-dummy-history.ts",
     "scripts/backfill-device-ip.ts",
     "scripts/backfill-last-income.ts",
     "scripts/backfill-income-createdAt-and-ids.ts",
@@ -22,8 +23,12 @@
     "scripts/export-snapshots.ts",
     "scripts/migrations/2025-rename-labels.ts",
     "scripts/utils/firebase-admin.ts",
+    "lib/firebase-admin.ts",
+    "lib/debt-projection.ts",
+    "lib/excel-import.ts",
+    "lib/server/debt.ts",
+    "lib/server/excel-import.ts",
     "lib/firebase-schema.ts",
     "lib/utils.ts"
   ]
 }
-

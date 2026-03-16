@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
+if [ ! -d node_modules ]; then
+  echo "Dependencies are missing. Run 'npm install' first."
+  exit 1
+fi
+
+if [ ! -f .env.local ]; then
+  echo "Missing .env.local. Copy env.example and fill in the required values before starting the dev server."
+  exit 1
+fi
+
+exec npm run dev:next -- --hostname 0.0.0.0

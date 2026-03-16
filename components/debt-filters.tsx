@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Filter, RotateCcw } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { getDynamicFilterOptions, normalizeGreek } from "@/lib/utils"
+import { getDynamicFilterOptions, isNaosLikeRole, normalizeGreek, normalizeUserRoleLabel } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
 interface DebtFiltersProps {
@@ -110,7 +110,7 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                 <SelectItem value="Άτομο">Άτομο</SelectItem>
                 <SelectItem value="Ομάδα">Ομάδα</SelectItem>
                 <SelectItem value="Τομέας">Τομέας</SelectItem>
-                <SelectItem value="Τμήμα">Τμήμα</SelectItem>
+                <SelectItem value="Ναός">Ναός</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -119,8 +119,8 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
             <div>
               <Label htmlFor="debtTeam" className="text-gray-700">Ομάδα</Label>
               <Select value={teamFilter} onValueChange={(value) => {
-                // Reset role filter to "all" if current role is "Τμήμα" or "Τομέας" and a specific team is selected
-                if ((roleFilter === "Τμήμα" || roleFilter === "Τομέας") && value !== "all") {
+                // Reset role filter to "all" if current role is "Ναός" or "Τομέας" and a specific team is selected
+                if ((isNaosLikeRole(roleFilter) || roleFilter === "Τομέας") && value !== "all") {
                   setRoleFilter("all");
                 }
                 setTeamFilter(value);
@@ -197,13 +197,13 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                         ? userData.displayName 
                         : userData.responsiblePerson || "-";
                       const matchesSearch = normalizeGreek(userData.displayName).includes(normSearch) ||
-                                           normalizeGreek(userData.userRole).includes(normSearch) ||
+                                           normalizeGreek(normalizeUserRoleLabel(userData.userRole)).includes(normSearch) ||
                                            normalizeGreek(responsiblePerson).includes(normSearch);
                       if (!matchesSearch) return false;
                     }
                     
                     // Apply role filter
-                    if (roleFilter !== "all" && userData.userRole !== roleFilter) {
+                    if (roleFilter !== "all" && normalizeUserRoleLabel(userData.userRole) !== roleFilter) {
                       return false;
                     }
                     
@@ -318,13 +318,13 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                           ? userData.displayName 
                           : userData.responsiblePerson || "-";
                         const matchesSearch = normalizeGreek(userData.displayName).includes(normSearch) ||
-                                             normalizeGreek(userData.userRole).includes(normSearch) ||
+                                             normalizeGreek(normalizeUserRoleLabel(userData.userRole)).includes(normSearch) ||
                                              normalizeGreek(responsiblePerson).includes(normSearch);
                         if (!matchesSearch) return false;
                       }
                       
                       // Apply role filter
-                      if (roleFilter !== "all" && userData.userRole !== roleFilter) {
+                      if (roleFilter !== "all" && normalizeUserRoleLabel(userData.userRole) !== roleFilter) {
                         return false;
                       }
                       
@@ -414,13 +414,13 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                         ? userData.displayName 
                         : userData.responsiblePerson || "-";
                       const matchesSearch = normalizeGreek(userData.displayName).includes(normSearch) ||
-                                           normalizeGreek(userData.userRole).includes(normSearch) ||
+                                           normalizeGreek(normalizeUserRoleLabel(userData.userRole)).includes(normSearch) ||
                                            normalizeGreek(responsiblePerson).includes(normSearch);
                       if (!matchesSearch) return false;
                     }
                     
                     // Apply role filter
-                    if (roleFilter !== "all" && userData.userRole !== roleFilter) {
+                    if (roleFilter !== "all" && normalizeUserRoleLabel(userData.userRole) !== roleFilter) {
                       return false;
                     }
                     
@@ -497,13 +497,13 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                           ? userData.displayName 
                           : userData.responsiblePerson || "-";
                         const matchesSearch = userData.displayName.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
-                                             userData.userRole.toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
+                                             normalizeUserRoleLabel(userData.userRole).toLowerCase().includes(debtSearchTerm.toLowerCase()) ||
                                              responsiblePerson.toLowerCase().includes(debtSearchTerm.toLowerCase());
                         if (!matchesSearch) return false;
                       }
                       
                       // Apply role filter
-                      if (roleFilter !== "all" && userData.userRole !== roleFilter) {
+                      if (roleFilter !== "all" && normalizeUserRoleLabel(userData.userRole) !== roleFilter) {
                         return false;
                       }
                       

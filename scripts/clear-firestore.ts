@@ -13,25 +13,17 @@ const COLLECTIONS_IN_SAFE_ORDER: string[] = [
   FIREBASE_COLLECTIONS.INCOME,
   FIREBASE_COLLECTIONS.TRANSACTIONS,
   FIREBASE_COLLECTIONS.BILLING,
+  FIREBASE_COLLECTIONS.EXCEL_IMPORTS,
   FIREBASE_COLLECTIONS.PRICE_TABLES,
   FIREBASE_COLLECTIONS.SETTINGS,
   FIREBASE_COLLECTIONS.USERS,
   FIREBASE_COLLECTIONS.BANK,
 ]
 
-async function deleteCollection(collectionPath: string, batchSize = 300) {
+async function deleteCollection(collectionPath: string) {
   const db = getAdminDb()
-  let deleted = 0
-  while (true) {
-    const snapshot = await db.collection(collectionPath).limit(batchSize).get()
-    if (snapshot.empty) break
-    const batch = db.batch()
-    snapshot.docs.forEach((doc) => batch.delete(doc.ref))
-    await batch.commit()
-    deleted += snapshot.size
-    console.log(`Deleted ${snapshot.size} from ${collectionPath} (total ${deleted})`)
-    if (snapshot.size < batchSize) break
-  }
+  await db.recursiveDelete(db.collection(collectionPath))
+  console.log(`Deleted ${collectionPath}`)
 }
 
 export async function main() {
@@ -52,5 +44,4 @@ if (require.main === module) {
       process.exit(1)
     })
 }
-
 

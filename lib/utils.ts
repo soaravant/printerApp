@@ -107,6 +107,75 @@ export function formatMoney(value: number): string {
   return `€${roundMoney(value).toFixed(2).replace('.', ',')}`
 }
 
+export function normalizeUserRoleLabel(role: string | null | undefined): string {
+  if (!role) return ""
+  return role === "Τμήμα" ? "Ναός" : role
+}
+
+export function isNaosLikeRole(role: string | null | undefined): boolean {
+  return role === "Ναός" || role === "Τμήμα"
+}
+
+export function isManagedEntityRole(role: string | null | undefined): boolean {
+  const normalizedRole = normalizeUserRoleLabel(role)
+  return normalizedRole === "Ομάδα" || normalizedRole === "Ναός" || normalizedRole === "Τομέας"
+}
+
+export function getUserRolePluralLabel(role: string | null | undefined): string {
+  switch (normalizeUserRoleLabel(role)) {
+    case "Άτομο":
+      return "Άτομα"
+    case "Ομάδα":
+      return "Ομάδες"
+    case "Ναός":
+      return "Ναοί"
+    case "Τομέας":
+      return "Τομείς"
+    default:
+      return normalizeUserRoleLabel(role)
+  }
+}
+
+export function getUserRoleObjectLabel(role: string | null | undefined): string {
+  switch (normalizeUserRoleLabel(role)) {
+    case "Ναός":
+      return "Ναό"
+    case "Τομέας":
+      return "Τομέα"
+    default:
+      return normalizeUserRoleLabel(role)
+  }
+}
+
+export function getPrintTypeLabel(type: string): string {
+  switch (type) {
+    case "A4BW":
+    case "ExcelBWImport":
+      return "A4 Ασπρόμαυρο"
+    case "A4Color":
+    case "ExcelColorImport":
+      return "A4 Έγχρωμο"
+    case "A3BW":
+      return "A3 Ασπρόμαυρο"
+    case "A3Color":
+      return "A3 Έγχρωμο"
+    case "RizochartoA3":
+      return "Ριζόχαρτο A3"
+    case "RizochartoA4":
+      return "Ριζόχαρτο A4"
+    case "ChartoniA3":
+      return "Χαρτόνι A3"
+    case "ChartoniA4":
+      return "Χαρτόνι A4"
+    case "Autokollito":
+      return "Αυτοκόλλητο"
+    case "ExcelAdjustmentImport":
+      return "Χρέωση προσαρμογής Excel"
+    default:
+      return type
+  }
+}
+
 /**
  * Calculates the total cost for a print job with proper rounding.
  * 
@@ -160,8 +229,8 @@ export const getDynamicFilterOptions = (users: any[]) => {
       teams.add(user.team)
     }
     
-    // Extract τμήματα from user data (users with userRole "Τμήμα")
-    if (user.userRole === "Τμήμα") {
+    // Extract naoi from user data (legacy "Τμήμα" is still treated as "Ναός")
+    if (isNaosLikeRole(user.userRole)) {
       naoi.add(user.displayName)
     }
     
@@ -178,7 +247,7 @@ export const getDynamicFilterOptions = (users: any[]) => {
         } else if (member.includes("Τομέας")) {
           tomeis.add(member)
         } else {
-          // Assume it's a team if it doesn't contain "Ναός"/"Τμήμα" or "Τομέας"
+          // Assume it's a team if it doesn't contain "Ναός"/legacy "Τμήμα" or "Τομέας"
           teams.add(member)
         }
       })

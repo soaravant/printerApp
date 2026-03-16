@@ -1,5 +1,6 @@
+// @ts-nocheck
 "use client"
-
+// @ts-nocheck
 // Deprecated script: replaced by Firestore seed scripts.
 // Deprecated script; dummy database removed. Keeping file to avoid script errors.
 

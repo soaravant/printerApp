@@ -6,20 +6,22 @@ A comprehensive printer billing and management system built with Next.js, Fireba
 
 ### Prerequisites
 - Node.js 18.x or higher
-- pnpm package manager
+- npm
 - Firebase project (required)
 
 ### Local Development
 ```bash
 # Install dependencies
-pnpm install
+npm install
 
 # Copy environment variables
 cp env.example .env.local
 
-# Start development server
-pnpm dev
+# Start the auto-reloading dev server
+./dev
 ```
+
+`./dev` is the repo entrypoint for local development. It checks that `node_modules` and `.env.local` exist, then starts `next dev` with hot reloading enabled.
 
 ### Vercel Deployment
 
@@ -114,11 +116,12 @@ FIREBASE_SERVICE_ACCOUNT_KEY=your_base64_encoded_service_account_key
 
 ### Available Scripts
 ```bash
-pnpm dev          # Start development server
-pnpm build        # Build for production
-pnpm start        # Start production server
-pnpm lint         # Run ESLint
-pnpm ts-node -P tsconfig.scripts.json scripts/backfill-income-createdAt-and-ids.ts  # Backfill income createdAt and IDs
+npm run dev       # Start the repo dev server wrapper
+npm run dev:next  # Run raw Next.js dev server
+npm run build     # Build for production
+npm run start     # Start production server
+npm run lint      # Run ESLint
+npx ts-node -P tsconfig.scripts.json scripts/backfill-income-createdAt-and-ids.ts  # Backfill income createdAt and IDs
 ```
 
 ### Tech Stack

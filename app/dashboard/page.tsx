@@ -5,7 +5,13 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useRefresh } from "@/lib/refresh-context"
 // import { dummyDB } from "@/lib/dummy-database"
-import type { FirebasePrintJob, FirebaseLaminationJob, FirebaseUser, FirebaseIncome } from "@/lib/firebase-schema"
+import type {
+  FirebasePrintJob,
+  FirebaseLaminationJob,
+  FirebaseUser,
+  FirebaseIncome,
+  FirebaseExcelImportRunSummary,
+} from "@/lib/firebase-schema"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -26,15 +32,18 @@ import { Separator } from "@/components/ui/separator"
 let XLSX: any
 import React from "react"
 
+import { ExcelImportWizard } from "@/components/excel-import-wizard"
+import { ExcelPeriodTimeline } from "@/components/excel-period-timeline"
 import { PrintFilters } from "@/components/print-filters"
 import { LaminationFilters } from "@/components/lamination-filters"
 import { DebtFilters } from "@/components/debt-filters"
 import { IncomeFilters } from "@/components/income-filters"
 
 // Firestore
-import { fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite, fetchPrintJobsSince, fetchLaminationJobsSince, fetchIncomeSince, useBankTotals, fetchUsers } from "@/lib/firebase-queries"
+import { fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite, fetchPrintJobsSince, fetchLaminationJobsSince, fetchIncomeSince, fetchUsers, useExcelImportHistory } from "@/lib/firebase-queries"
 import { FIREBASE_COLLECTIONS } from "@/lib/firebase-schema"
-import { normalizeGreek } from "@/lib/utils"
+import { getPrintTypeLabel, isManagedEntityRole, normalizeGreek, normalizeUserRoleLabel, roundMoney } from "@/lib/utils"
+import { coerceToDate, computeDebtsAndBankForUser } from "@/lib/debt-projection"
 import { getSnapshot, saveSnapshot, makeScopeKey, mergeById, sortByTimestampDesc } from "@/lib/snapshot-store"
 import { loadRemoteSnapshot } from "@/lib/remote-snapshot"
 
@@ -49,6 +58,22 @@ function ErrorBoundary({ children, fallback }: { children: React.ReactNode; fall
 
 const useFirestore = true
 const allowRemoteSnapshotUpdate = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_ENABLE_REMOTE_SNAPSHOT_UPDATE === "true"
+
+type DashboardTimelineStop = FirebaseExcelImportRunSummary & {
+  createdAt: Date
+  completedAt?: Date | null
+}
+
+type ProjectedDashboardState = {
+  users: FirebaseUser[]
+  printJobs: FirebasePrintJob[]
+  laminationJobs: FirebaseLaminationJob[]
+  income: FirebaseIncome[]
+  bank: {
+    printBank: number
+    laminationBank: number
+  }
+}
 
 const PrintJobsTable = dynamic(() => import("@/components/print-jobs-table"), {
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση εκτυπώσεων...</div>,
@@ -78,6 +103,131 @@ function Pagination({ page, total, pageSize, onPageChange }: { page: number; tot
       <Button size="sm" variant="outline" onClick={() => onPageChange(page + 1)} disabled={page === totalPages}>&gt;</Button>
     </div>
   )
+}
+
+function collapseImportHistoryByPeriod(history: FirebaseExcelImportRunSummary[]) {
+  const latestByPeriod = new Map<string, DashboardTimelineStop>()
+
+  for (const item of history) {
+    const createdAt = coerceToDate(item.createdAt)
+    if (!createdAt || item.status !== "completed") continue
+    const completedAt = coerceToDate(item.completedAt ?? null)
+    latestByPeriod.set(item.periodKey, {
+      ...item,
+      createdAt,
+      completedAt,
+    })
+  }
+
+  return Array.from(latestByPeriod.values()).sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+}
+
+function projectDashboardState(params: {
+  allUsers: FirebaseUser[]
+  printJobs: FirebasePrintJob[]
+  laminationJobs: FirebaseLaminationJob[]
+  income: FirebaseIncome[]
+  cutoff: Date | null
+}): ProjectedDashboardState {
+  const cutoffMs = params.cutoff?.getTime() ?? null
+  const isWithinCutoff = (value: unknown) => {
+    if (cutoffMs === null) return true
+    const date = coerceToDate(value as any)
+    if (!date) return false
+    return date.getTime() <= cutoffMs
+  }
+
+  const visiblePrintJobs = params.printJobs.filter((job) => isWithinCutoff(job.timestamp))
+  const visibleLaminationJobs = params.laminationJobs.filter((job) => isWithinCutoff(job.timestamp))
+  const visibleIncome = params.income.filter((entry) => isWithinCutoff(entry.timestamp))
+  const eventsByUid = new Map<string, Array<{ kind: "print" | "lamination" | "income"; amount: number; timestamp: Date }>>()
+  const incomeByUid = new Map<string, FirebaseIncome[]>()
+
+  const pushEvent = (uid: string, event: { kind: "print" | "lamination" | "income"; amount: number; timestamp: Date }) => {
+    const bucket = eventsByUid.get(uid) ?? []
+    bucket.push(event)
+    eventsByUid.set(uid, bucket)
+  }
+
+  for (const job of visiblePrintJobs) {
+    const timestamp = coerceToDate(job.timestamp)
+    if (!timestamp) continue
+    pushEvent(job.uid, { kind: "print", amount: Number(job.totalCost || 0), timestamp })
+  }
+
+  for (const job of visibleLaminationJobs) {
+    const timestamp = coerceToDate(job.timestamp)
+    if (!timestamp) continue
+    pushEvent(job.uid, { kind: "lamination", amount: Number(job.totalCost || 0), timestamp })
+  }
+
+  for (const entry of visibleIncome) {
+    const timestamp = coerceToDate(entry.timestamp)
+    if (!timestamp) continue
+    pushEvent(entry.uid, { kind: "income", amount: Number(entry.amount || 0), timestamp })
+    const bucket = incomeByUid.get(entry.uid) ?? []
+    bucket.push(entry)
+    incomeByUid.set(entry.uid, bucket)
+  }
+
+  let printBank = 0
+  let laminationBank = 0
+
+  const projectedUsers = params.allUsers
+    .map((currentUser) => {
+      const createdAt = coerceToDate(currentUser.createdAt)
+      const openingDebtImportedAt = coerceToDate(currentUser.openingDebtImportedAt ?? null)
+      const hasOpeningBalance =
+        Number(currentUser.openingPrintDebt || 0) !== 0 ||
+        Number(currentUser.openingLaminationDebt || 0) !== 0 ||
+        Boolean(currentUser.openingDebtSource)
+      const openingBalancesAreActive =
+        hasOpeningBalance && (!openingDebtImportedAt || cutoffMs === null || openingDebtImportedAt.getTime() <= cutoffMs)
+      const userEvents = eventsByUid.get(currentUser.uid) ?? []
+      const userExistsAtCutoff =
+        cutoffMs === null ||
+        !createdAt ||
+        createdAt.getTime() <= cutoffMs ||
+        userEvents.length > 0 ||
+        openingBalancesAreActive
+
+      if (!userExistsAtCutoff) return null
+
+      const { debts, bank } = computeDebtsAndBankForUser(userEvents, {
+        printDebt: openingBalancesAreActive ? Number(currentUser.openingPrintDebt || 0) : 0,
+        laminationDebt: openingBalancesAreActive ? Number(currentUser.openingLaminationDebt || 0) : 0,
+      })
+      printBank = roundMoney(printBank + bank.printBank)
+      laminationBank = roundMoney(laminationBank + bank.laminationBank)
+
+      const visibleIncomeRows = incomeByUid.get(currentUser.uid) ?? []
+      const lastPayment = visibleIncomeRows.length
+        ? visibleIncomeRows
+          .map((entry) => coerceToDate(entry.timestamp))
+          .filter((entry): entry is Date => Boolean(entry))
+          .reduce((latest, current) => (current > latest ? current : latest))
+        : null
+
+      return {
+        ...currentUser,
+        printDebt: debts.printDebt,
+        laminationDebt: debts.laminationDebt,
+        totalDebt: debts.totalDebt,
+        lastPayment,
+      }
+    })
+    .filter(Boolean) as FirebaseUser[]
+
+  return {
+    users: projectedUsers,
+    printJobs: visiblePrintJobs,
+    laminationJobs: visibleLaminationJobs,
+    income: visibleIncome,
+    bank: {
+      printBank,
+      laminationBank,
+    },
+  }
 }
 
 export default function DashboardPage() {
@@ -153,31 +303,69 @@ export default function DashboardPage() {
   const [prefetchEnabled, setPrefetchEnabled] = useState(false)
   const [snapshotsLoaded, setSnapshotsLoaded] = useState(false)
   const MAX_INITIAL_PAGES = Number(process.env.NEXT_PUBLIC_MAX_INITIAL_PAGES ?? 1)
-  
+
+  const persistDashboardSnapshots = async (
+    currentUidFilter: string | undefined,
+    nextPrintJobs: FirebasePrintJob[],
+    nextLaminationJobs: FirebaseLaminationJob[],
+    nextIncome: FirebaseIncome[],
+  ) => {
+    const scopeKey = (collection: string) => makeScopeKey(collection, currentUidFilter)
+    await Promise.all([
+      saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: nextPrintJobs as any }),
+      saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: nextLaminationJobs as any }),
+      saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: nextIncome as any }),
+    ])
+  }
+
+  const fetchDashboardDataFromServer = async (currentUidFilter: string | undefined) => {
+    const [nextPrintJobs, nextLaminationJobs, nextIncome, nextUsers] = await Promise.all([
+      fetchPrintJobsFor(currentUidFilter),
+      fetchLaminationJobsFor(currentUidFilter),
+      fetchIncomeFor(currentUidFilter),
+      fetchUsers(),
+    ])
+
+    return {
+      nextPrintJobs,
+      nextLaminationJobs,
+      nextIncome,
+      nextUsers,
+    }
+  }
+
+  const applyDashboardDataFromServer = async (
+    currentUidFilter: string | undefined,
+    nextData: {
+      nextPrintJobs: FirebasePrintJob[]
+      nextLaminationJobs: FirebaseLaminationJob[]
+      nextIncome: FirebaseIncome[]
+      nextUsers: FirebaseUser[]
+    },
+  ) => {
+    initializedDebtRangeRef.current = false
+    initializedIncomeRangeRef.current = false
+    setPrintJobs(nextData.nextPrintJobs as any)
+    setLaminationJobs(nextData.nextLaminationJobs as any)
+    setIncome(nextData.nextIncome as any)
+    setAllUsers(nextData.nextUsers as any)
+    setSnapshotsLoaded(true)
+    setPrefetchEnabled(false)
+    await persistDashboardSnapshots(
+      currentUidFilter,
+      nextData.nextPrintJobs,
+      nextData.nextLaminationJobs,
+      nextData.nextIncome,
+    )
+  }
+
   const handleManualRefresh = async () => {
     if (!user) return
     try {
       setLoadingLabel("Ανανέωση δεδομένων...")
       setLoading(true)
-      // Force a hard refetch from Firestore for all three datasets and users
-      const [pjFresh, ljFresh, incFresh, usersFresh] = await Promise.all([
-        fetchPrintJobsFor(uidFilter),
-        fetchLaminationJobsFor(uidFilter),
-        fetchIncomeFor(uidFilter),
-        fetchUsers(),
-      ])
-      setPrintJobs(pjFresh as any)
-      setLaminationJobs(ljFresh as any)
-      setIncome(incFresh as any)
-      setAllUsers(usersFresh as any)
-
-      // Overwrite local snapshots so next visit is up to date
-      const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
-      await Promise.all([
-        saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: pjFresh as any }),
-        saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: ljFresh as any }),
-        saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: incFresh as any }),
-      ])
+      const nextData = await fetchDashboardDataFromServer(uidFilter)
+      await applyDashboardDataFromServer(uidFilter, nextData)
       setLoading(false)
     } catch (e) {
       setLoading(false)
@@ -205,7 +393,12 @@ export default function DashboardPage() {
   const [showLaminationBankResetDialog, setShowLaminationBankResetDialog] = useState(false)
   const [showTotalBankResetDialog, setShowTotalBankResetDialog] = useState(false)
 
+  // Excel Wizard Dialog state
+  const [isExcelWizardOpen, setIsExcelWizardOpen] = useState(false)
+  const [selectedTimelineImportId, setSelectedTimelineImportId] = useState<string | null>(null)
+
   const { data: cachedUsers } = useUsers()
+  const { data: excelImportHistory = [] } = useExcelImportHistory()
 
   // Use react-query infinite caches to avoid reloads when switching routes
   const uidFilter = (user?.accessLevel === "Χρήστης") ? user.uid : undefined
@@ -219,6 +412,34 @@ export default function DashboardPage() {
     return `dashboard:prefetch-incomplete:${scope}`
   }, [uidFilter])
 
+  const timelineStops = useMemo(() => collapseImportHistoryByPeriod(excelImportHistory), [excelImportHistory])
+  const selectedTimelineIndex = useMemo(
+    () => timelineStops.findIndex((stop) => stop.importId === selectedTimelineImportId),
+    [timelineStops, selectedTimelineImportId]
+  )
+  const activeTimelineIndex = selectedTimelineIndex >= 0 ? selectedTimelineIndex : Math.max(0, timelineStops.length - 1)
+  const selectedTimelineStop =
+    selectedTimelineIndex >= 0 ? timelineStops[selectedTimelineIndex] : (timelineStops[timelineStops.length - 1] ?? null)
+  const selectedTimelineCutoff = selectedTimelineStop ? (selectedTimelineStop.completedAt || selectedTimelineStop.createdAt) : null
+
+  const projectedDashboardState = useMemo(
+    () =>
+      projectDashboardState({
+        allUsers,
+        printJobs,
+        laminationJobs,
+        income,
+        cutoff: selectedTimelineCutoff,
+      }),
+    [allUsers, printJobs, laminationJobs, income, selectedTimelineCutoff]
+  )
+
+  const timelineUsers = projectedDashboardState.users
+  const timelinePrintJobs = projectedDashboardState.printJobs
+  const timelineLaminationJobs = projectedDashboardState.laminationJobs
+  const timelineIncome = projectedDashboardState.income
+  const timelineBank = projectedDashboardState.bank
+
   // Ensure users are always loaded into local state regardless of prefetch path
   useEffect(() => {
     if (cachedUsers && cachedUsers.length) {
@@ -226,68 +447,94 @@ export default function DashboardPage() {
     }
   }, [cachedUsers])
 
+  useEffect(() => {
+    if (!timelineStops.length) {
+      setSelectedTimelineImportId(null)
+      return
+    }
+    const selectedStillExists = timelineStops.some((stop) => stop.importId === selectedTimelineImportId)
+    if (!selectedTimelineImportId || !selectedStillExists) {
+      setSelectedTimelineImportId(timelineStops[timelineStops.length - 1].importId)
+    }
+  }, [timelineStops, selectedTimelineImportId])
+
+  useEffect(() => {
+    setPrintJobsPage(1)
+    setLaminationJobsPage(1)
+    setIncomePage(1)
+    setDebtPage(1)
+  }, [selectedTimelineImportId])
+
   // Load snapshots first, then optionally enable/resume prefetch
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      if (!user) return
-      const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
-      const resumeWanted = (typeof window !== "undefined") && Boolean(localStorage.getItem(prefetchResumeKey))
-      const [pjSnap, ljSnap, incSnap] = await Promise.all([
-        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS)),
-        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS)),
-        getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.INCOME)),
-      ])
-      if (cancelled) return
-      let hadAnySnapshot = false
-      if (pjSnap && pjSnap.items?.length) {
-        setPrintJobs(sortByTimestampDesc(pjSnap.items as any))
-        hadAnySnapshot = true
-      }
-      if (ljSnap && ljSnap.items?.length) {
-        setLaminationJobs(sortByTimestampDesc(ljSnap.items as any))
-        hadAnySnapshot = true
-      }
-      if (incSnap && incSnap.items?.length) {
-        setIncome(sortByTimestampDesc(incSnap.items as any))
-        hadAnySnapshot = true
-      }
-      setSnapshotsLoaded(true)
-      // If we have at least one snapshot, do delta fetches; resume full prefetch if it was incomplete
-      if (hadAnySnapshot) {
-        // Compute since per collection from snapshot metadata or top timestamp
-        const pjSince = pjSnap?.lastUpdated ? new Date(pjSnap.lastUpdated) : (pjSnap?.items?.[0]?.timestamp ? new Date(pjSnap.items[0].timestamp) : null)
-        const ljSince = ljSnap?.lastUpdated ? new Date(ljSnap.lastUpdated) : (ljSnap?.items?.[0]?.timestamp ? new Date(ljSnap.items[0].timestamp) : null)
-        const incSince = incSnap?.lastUpdated ? new Date(incSnap.lastUpdated) : (incSnap?.items?.[0]?.timestamp ? new Date(incSnap.items[0].timestamp) : null)
-        const [pjDelta, ljDelta, incDelta] = await Promise.all([
-          pjSince ? fetchPrintJobsSince({ uid: uidFilter, since: pjSince }) : Promise.resolve([]),
-          ljSince ? fetchLaminationJobsSince({ uid: uidFilter, since: ljSince }) : Promise.resolve([]),
-          incSince ? fetchIncomeSince({ uid: uidFilter, since: incSince }) : Promise.resolve([]),
+      ; (async () => {
+        if (!user) return
+        if (refreshTrigger > 0) {
+          const nextData = await fetchDashboardDataFromServer(uidFilter)
+          if (cancelled) return
+          await applyDashboardDataFromServer(uidFilter, nextData)
+          if (cancelled) return
+          setLoading(false)
+          return
+        }
+        const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
+        const resumeWanted = (typeof window !== "undefined") && Boolean(localStorage.getItem(prefetchResumeKey))
+        const [pjSnap, ljSnap, incSnap] = await Promise.all([
+          getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS)),
+          getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS)),
+          getSnapshot<any>(scopeKey(FIREBASE_COLLECTIONS.INCOME)),
         ])
         if (cancelled) return
-        if (pjDelta.length) {
-          const merged = sortByTimestampDesc(mergeById(pjSnap?.items || [], pjDelta, ["jobId"]))
-          setPrintJobs(merged as any)
-          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: merged as any })
+        let hadAnySnapshot = false
+        if (pjSnap && pjSnap.items?.length) {
+          setPrintJobs(sortByTimestampDesc(pjSnap.items as any))
+          hadAnySnapshot = true
         }
-        if (ljDelta.length) {
-          const merged = sortByTimestampDesc(mergeById(ljSnap?.items || [], ljDelta, ["jobId"]))
-          setLaminationJobs(merged as any)
-          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: merged as any })
+        if (ljSnap && ljSnap.items?.length) {
+          setLaminationJobs(sortByTimestampDesc(ljSnap.items as any))
+          hadAnySnapshot = true
         }
-        if (incDelta.length) {
-          const merged = sortByTimestampDesc(mergeById(incSnap?.items || [], incDelta, ["incomeId"]))
-          setIncome(merged as any)
-          await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: merged as any })
+        if (incSnap && incSnap.items?.length) {
+          setIncome(sortByTimestampDesc(incSnap.items as any))
+          hadAnySnapshot = true
         }
-        // If user had exited early previously, resume background prefetch to complete it
-        setPrefetchEnabled(resumeWanted)
-        // Ensure overlay stays until initial filter pass completes
-        setLoading(false)
-      } else {
-        setPrefetchEnabled(true)
-      }
-    })()
+        setSnapshotsLoaded(true)
+        // If we have at least one snapshot, do delta fetches; resume full prefetch if it was incomplete
+        if (hadAnySnapshot) {
+          // Compute since per collection from snapshot metadata or top timestamp
+          const pjSince = pjSnap?.lastUpdated ? new Date(pjSnap.lastUpdated) : (pjSnap?.items?.[0]?.timestamp ? new Date(pjSnap.items[0].timestamp) : null)
+          const ljSince = ljSnap?.lastUpdated ? new Date(ljSnap.lastUpdated) : (ljSnap?.items?.[0]?.timestamp ? new Date(ljSnap.items[0].timestamp) : null)
+          const incSince = incSnap?.lastUpdated ? new Date(incSnap.lastUpdated) : (incSnap?.items?.[0]?.timestamp ? new Date(incSnap.items[0].timestamp) : null)
+          const [pjDelta, ljDelta, incDelta] = await Promise.all([
+            pjSince ? fetchPrintJobsSince({ uid: uidFilter, since: pjSince }) : Promise.resolve([]),
+            ljSince ? fetchLaminationJobsSince({ uid: uidFilter, since: ljSince }) : Promise.resolve([]),
+            incSince ? fetchIncomeSince({ uid: uidFilter, since: incSince }) : Promise.resolve([]),
+          ])
+          if (cancelled) return
+          if (pjDelta.length) {
+            const merged = sortByTimestampDesc(mergeById(pjSnap?.items || [], pjDelta, ["jobId"]))
+            setPrintJobs(merged as any)
+            await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: merged as any })
+          }
+          if (ljDelta.length) {
+            const merged = sortByTimestampDesc(mergeById(ljSnap?.items || [], ljDelta, ["jobId"]))
+            setLaminationJobs(merged as any)
+            await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: merged as any })
+          }
+          if (incDelta.length) {
+            const merged = sortByTimestampDesc(mergeById(incSnap?.items || [], incDelta, ["incomeId"]))
+            setIncome(merged as any)
+            await saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: merged as any })
+          }
+          // If user had exited early previously, resume background prefetch to complete it
+          setPrefetchEnabled(resumeWanted)
+          // Ensure overlay stays until initial filter pass completes
+          setLoading(false)
+        } else {
+          setPrefetchEnabled(true)
+        }
+      })()
     return () => { cancelled = true }
   }, [user, uidFilter, prefetchResumeKey, refreshTrigger])
 
@@ -303,49 +550,49 @@ export default function DashboardPage() {
       const lTok = lamPrefetchTokenRef.current
       const iTok = incomePrefetchTokenRef.current
 
-      ;(async () => {
-        // Ensure at least first page
-        if (!printInf.data && !printInf.isFetching) await printInf.fetchNextPage()
-        // Fetch remaining pages
-        let pagesFetchedInLoop = 0
-        while (true) {
-          if (printPrefetchTokenRef.current !== pTok) break
-          const lastCursor = (printInf.data?.pages.slice(-1)[0]?.nextCursor)
-          if (!lastCursor) break
-          if (printInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
-          await printInf.fetchNextPage()
-          pagesFetchedInLoop += 1
-          if (pagesFetchedInLoop >= MAX_INITIAL_PAGES) break
-        }
-      })()
+        ; (async () => {
+          // Ensure at least first page
+          if (!printInf.data && !printInf.isFetching) await printInf.fetchNextPage()
+          // Fetch remaining pages
+          let pagesFetchedInLoop = 0
+          while (true) {
+            if (printPrefetchTokenRef.current !== pTok) break
+            const lastCursor = (printInf.data?.pages.slice(-1)[0]?.nextCursor)
+            if (!lastCursor) break
+            if (printInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
+            await printInf.fetchNextPage()
+            pagesFetchedInLoop += 1
+            if (pagesFetchedInLoop >= MAX_INITIAL_PAGES) break
+          }
+        })()
 
-      ;(async () => {
-        if (!lamInf.data && !lamInf.isFetching) await lamInf.fetchNextPage()
-        let pagesFetchedInLoop = 0
-        while (true) {
-          if (lamPrefetchTokenRef.current !== lTok) break
-          const lastCursor = (lamInf.data?.pages.slice(-1)[0]?.nextCursor)
-          if (!lastCursor) break
-          if (lamInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
-          await lamInf.fetchNextPage()
-          pagesFetchedInLoop += 1
-          if (pagesFetchedInLoop >= MAX_INITIAL_PAGES) break
-        }
-      })()
+        ; (async () => {
+          if (!lamInf.data && !lamInf.isFetching) await lamInf.fetchNextPage()
+          let pagesFetchedInLoop = 0
+          while (true) {
+            if (lamPrefetchTokenRef.current !== lTok) break
+            const lastCursor = (lamInf.data?.pages.slice(-1)[0]?.nextCursor)
+            if (!lastCursor) break
+            if (lamInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
+            await lamInf.fetchNextPage()
+            pagesFetchedInLoop += 1
+            if (pagesFetchedInLoop >= MAX_INITIAL_PAGES) break
+          }
+        })()
 
-      ;(async () => {
-        if (!incInf.data && !incInf.isFetching) await incInf.fetchNextPage()
-        let pagesFetchedInLoop = 0
-        while (true) {
-          if (incomePrefetchTokenRef.current !== iTok) break
-          const lastCursor = (incInf.data?.pages.slice(-1)[0]?.nextCursor)
-          if (!lastCursor) break
-          if (incInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
-          await incInf.fetchNextPage()
-          pagesFetchedInLoop += 1
-          if (pagesFetchedInLoop >= MAX_INITIAL_PAGES) break
-        }
-      })()
+        ; (async () => {
+          if (!incInf.data && !incInf.isFetching) await incInf.fetchNextPage()
+          let pagesFetchedInLoop = 0
+          while (true) {
+            if (incomePrefetchTokenRef.current !== iTok) break
+            const lastCursor = (incInf.data?.pages.slice(-1)[0]?.nextCursor)
+            if (!lastCursor) break
+            if (incInf.isFetching) { await new Promise(r => setTimeout(r, 100)); continue }
+            await incInf.fetchNextPage()
+            pagesFetchedInLoop += 1
+            if (pagesFetchedInLoop >= MAX_INITIAL_PAGES) break
+          }
+        })()
 
       const pj = (printInf.data?.pages.flatMap(p => p.items) ?? []) as any
       const lj = (lamInf.data?.pages.flatMap(p => p.items) ?? []) as any
@@ -357,42 +604,18 @@ export default function DashboardPage() {
         if (inc.length >= income.length) setIncome(inc)
         // Save partial snapshots to speed up subsequent visits
         const scopeKey = (collection: string) => makeScopeKey(collection, uidFilter)
-        ;(async () => {
-          await Promise.all([
-            saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: pj }),
-            saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: lj }),
-            saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: inc }),
-          ])
-        })()
+          ; (async () => {
+            await Promise.all([
+              saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.PRINT_JOBS), { lastUpdated: Date.now(), items: pj }),
+              saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.LAMINATION_JOBS), { lastUpdated: Date.now(), items: lj }),
+              saveSnapshot(scopeKey(FIREBASE_COLLECTIONS.INCOME), { lastUpdated: Date.now(), items: inc }),
+            ])
+          })()
       }
       setHasMorePrint(Boolean(printInf.data?.pages.slice(-1)[0]?.nextCursor))
       setHasMoreLam(Boolean(lamInf.data?.pages.slice(-1)[0]?.nextCursor))
       setHasMoreIncome(Boolean(incInf.data?.pages.slice(-1)[0]?.nextCursor))
       if (cachedUsers) setAllUsers(cachedUsers as any)
-
-      // Initialize debt slider range once
-      if (!initializedDebtRangeRef.current && (cachedUsers && cachedUsers.length)) {
-        const visibleUsers = (user.accessLevel === "Διαχειριστής")
-          ? cachedUsers
-          : (user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0)
-            ? cachedUsers.filter(u => {
-                if (u.userRole === "Άτομο") {
-                  return u.memberOf?.some((g: string) => user.responsibleFor?.includes(g))
-                }
-                return user.responsibleFor?.includes(u.displayName)
-              })
-            : cachedUsers.filter(u => u.uid === user.uid)
-        const amounts = visibleUsers
-          .filter(u => u.accessLevel !== "Διαχειριστής")
-          .map(u => typeof u.totalDebt === "number" ? u.totalDebt : (u.printDebt || 0) + (u.laminationDebt || 0))
-        if (amounts.length > 0) {
-          const minDebt = Math.floor(Math.min(...amounts))
-          const maxDebt = Math.ceil(Math.max(...amounts))
-          setPriceRange([minDebt, maxDebt])
-          setPriceRangeInputs([minDebt.toString(), maxDebt.toString()])
-          initializedDebtRangeRef.current = true
-        }
-      }
     }
   }, [user, useFirestore, prefetchEnabled, printInf.data, lamInf.data, incInf.data, cachedUsers, printInf.isFetching, lamInf.isFetching, incInf.isFetching, printJobs.length, laminationJobs.length, income.length])
 
@@ -400,17 +623,17 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
     if (initializedDebtRangeRef.current) return
-    if (!allUsers || !allUsers.length) return
+    if (!timelineUsers || !timelineUsers.length) return
     const visibleUsers = (user.accessLevel === "Διαχειριστής")
-      ? allUsers
+      ? timelineUsers
       : (user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0)
-        ? allUsers.filter(u => {
-            if (u.userRole === "Άτομο") {
-              return u.memberOf?.some((g: string) => user.responsibleFor?.includes(g))
-            }
-            return user.responsibleFor?.includes(u.displayName)
-          })
-        : allUsers.filter(u => u.uid === user.uid)
+        ? timelineUsers.filter(u => {
+          if (u.userRole === "Άτομο") {
+            return u.memberOf?.some((g: string) => user.responsibleFor?.includes(g))
+          }
+          return user.responsibleFor?.includes(u.displayName)
+        })
+        : timelineUsers.filter(u => u.uid === user.uid)
     const amounts = visibleUsers
       .filter(u => u.accessLevel !== "Διαχειριστής")
       .map(u => typeof u.totalDebt === "number" ? u.totalDebt : (u.printDebt || 0) + (u.laminationDebt || 0))
@@ -421,13 +644,13 @@ export default function DashboardPage() {
       setPriceRangeInputs([minDebt.toString(), maxDebt.toString()])
       initializedDebtRangeRef.current = true
     }
-  }, [user, allUsers])
+  }, [user, timelineUsers])
 
   // Initialize income range once when income data becomes available
   useEffect(() => {
     if (initializedIncomeRangeRef.current) return
-    if (!income || !income.length) return
-    const amounts = income.map(i => i.amount || 0)
+    if (!timelineIncome || !timelineIncome.length) return
+    const amounts = timelineIncome.map(i => i.amount || 0)
     if (amounts.length > 0) {
       const minIncome = Math.floor(Math.min(...amounts))
       const maxIncome = Math.ceil(Math.max(...amounts))
@@ -435,7 +658,7 @@ export default function DashboardPage() {
       setIncomeAmountInputs([minIncome.toString(), maxIncome.toString()])
       initializedIncomeRangeRef.current = true
     }
-  }, [income])
+  }, [timelineIncome])
 
   // Persist snapshots after full prefetch completion
   useEffect(() => {
@@ -465,9 +688,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (typeof window === "undefined") return
     if (prefetchEnabled) {
-      try { localStorage.setItem(prefetchResumeKey, "1") } catch {}
+      try { localStorage.setItem(prefetchResumeKey, "1") } catch { }
     } else {
-      try { localStorage.removeItem(prefetchResumeKey) } catch {}
+      try { localStorage.removeItem(prefetchResumeKey) } catch { }
     }
   }, [prefetchEnabled, prefetchResumeKey])
 
@@ -520,9 +743,10 @@ export default function DashboardPage() {
     typeFilter,
     deviceFilter,
     userFilter,
-    printJobs,
-    laminationJobs,
-    income,
+    timelinePrintJobs,
+    timelineLaminationJobs,
+    timelineIncome,
+    timelineUsers,
     // New tab-specific filters
     activeTab,
     printTypeFilter,
@@ -548,186 +772,185 @@ export default function DashboardPage() {
 
   // Bank amounts
   const bankAmounts = undefined
-  const { data: bankTotals } = useBankTotals()
 
   // ... rest of file remains unchanged
 
   const applyFilters = () => {
     startFilteringTransition(() => {
-    // Filter Print Jobs with tab-specific filters
-    let filteredPJ = [...printJobs]
-    if (deferredSearchTerm) {
-      const normSearch = normalizeCached(deferredSearchTerm)
-      filteredPJ = filteredPJ.filter(
-        (item) =>
-          normalizeCached(item.deviceName || "").includes(normSearch) ||
-          normalizeCached(item.deviceIP || "").includes(normSearch) ||
-          normalizeCached(item.userDisplayName || "").includes(normSearch),
-      )
-    }
-    if (dateFrom || dateTo) {
-      filteredPJ = filteredPJ.filter((item) => {
-        const itemDate = new Date(item.timestamp)
-        const fromDate = dateFrom ? new Date(dateFrom) : null
-        const toDate = dateTo ? new Date(dateTo) : null
-        if (fromDate && itemDate < fromDate) return false
-        if (toDate && itemDate > toDate) return false
-        return true
-      })
-    }
-    if (statusFilter !== "all" && statusFilter !== "paid" && statusFilter !== "unpaid") {
-      filteredPJ = filteredPJ.filter((item) => item.status === statusFilter)
-    }
-    if (deviceFilter !== "all") {
-      filteredPJ = filteredPJ.filter((item) => item.deviceName === deviceFilter)
-    }
-    if (userFilter !== "all") {
-      filteredPJ = filteredPJ.filter((item) => item.uid === userFilter)
-    }
-    
-    // Apply print type filter
-    if (printTypeFilter !== "all") {
-      filteredPJ = filteredPJ.filter((item) => {
-        switch (printTypeFilter) {
-          case "a4BW":
-            return item.type === "A4BW"
-          case "a4Color":
-            return item.type === "A4Color"
-          case "a3BW":
-            return item.type === "A3BW"
-          case "a3Color":
-            return item.type === "A3Color"
-          case "rizochartoA3":
-            return item.type === "RizochartoA3"
-          case "rizochartoA4":
-            return item.type === "RizochartoA4"
-          case "chartoniA3":
-            return item.type === "ChartoniA3"
-          case "chartoniA4":
-            return item.type === "ChartoniA4"
-          case "autokollito":
-            return item.type === "Autokollito"
-          default:
-            return true
-        }
-      })
-    }
-    setFilteredPrintJobs(filteredPJ)
+      // Filter Print Jobs with tab-specific filters
+      let filteredPJ = [...timelinePrintJobs]
+      if (deferredSearchTerm) {
+        const normSearch = normalizeCached(deferredSearchTerm)
+        filteredPJ = filteredPJ.filter(
+          (item) =>
+            normalizeCached(item.deviceName || "").includes(normSearch) ||
+            normalizeCached(item.deviceIP || "").includes(normSearch) ||
+            normalizeCached(item.userDisplayName || "").includes(normSearch),
+        )
+      }
+      if (dateFrom || dateTo) {
+        filteredPJ = filteredPJ.filter((item) => {
+          const itemDate = new Date(item.timestamp)
+          const fromDate = dateFrom ? new Date(dateFrom) : null
+          const toDate = dateTo ? new Date(dateTo) : null
+          if (fromDate && itemDate < fromDate) return false
+          if (toDate && itemDate > toDate) return false
+          return true
+        })
+      }
+      if (statusFilter !== "all" && statusFilter !== "paid" && statusFilter !== "unpaid") {
+        filteredPJ = filteredPJ.filter((item) => item.status === statusFilter)
+      }
+      if (deviceFilter !== "all") {
+        filteredPJ = filteredPJ.filter((item) => item.deviceName === deviceFilter)
+      }
+      if (userFilter !== "all") {
+        filteredPJ = filteredPJ.filter((item) => item.uid === userFilter)
+      }
 
-    // Filter Lamination Jobs with tab-specific filters
-    let filteredLJ = [...laminationJobs]
-    if (deferredSearchTerm) {
-      const normSearch = normalizeCached(deferredSearchTerm)
-      filteredLJ = filteredLJ.filter(
-        (item) =>
-          normalizeCached(item.type || "").includes(normSearch) ||
-          normalizeCached(item.notes || "").includes(normSearch) ||
-          normalizeCached(item.userDisplayName || "").includes(normSearch),
-      )
-    }
-    if (dateFrom || dateTo) {
-      filteredLJ = filteredLJ.filter((item) => {
-        const itemDate = new Date(item.timestamp)
-        const fromDate = dateFrom ? new Date(dateFrom) : null
-        const toDate = dateTo ? new Date(dateTo) : null
-        if (fromDate && itemDate < fromDate) return false
-        if (toDate && itemDate > toDate) return false
-        return true
-      })
-    }
-    if (statusFilter !== "all" && statusFilter !== "paid" && statusFilter !== "unpaid") {
-      filteredLJ = filteredLJ.filter((item) => item.status === statusFilter)
-    }
-    if (typeFilter !== "all") {
-      filteredLJ = filteredLJ.filter((item) => item.type === typeFilter)
-    }
-    if (userFilter !== "all") {
-      filteredLJ = filteredLJ.filter((item) => item.uid === userFilter)
-    }
-    
-    // Apply machine filter
-    if (machineFilter !== "all") {
-      filteredLJ = filteredLJ.filter((item) => {
-        // Filter based on machine type
-        if (machineFilter === "lamination") {
-          // Only include laminator types: A3, A4, A5, cards
-          return ["A3", "A4", "A5", "cards"].includes(item.type)
-        }
-        if (machineFilter === "binding") {
-          // Only include binding types: spiral, colored_cardboard, plastic_cover
-          return ["spiral", "colored_cardboard", "plastic_cover"].includes(item.type)
-        }
-        return true
-      })
-    }
-    
-    // Apply lamination type filter
-    if (laminationTypeFilter !== "all") {
-      filteredLJ = filteredLJ.filter((item) => item.type === laminationTypeFilter)
-    }
-    setFilteredLaminationJobs(filteredLJ)
+      // Apply print type filter
+      if (printTypeFilter !== "all") {
+        filteredPJ = filteredPJ.filter((item) => {
+          switch (printTypeFilter) {
+            case "a4BW":
+              return item.type === "A4BW"
+            case "a4Color":
+              return item.type === "A4Color"
+            case "a3BW":
+              return item.type === "A3BW"
+            case "a3Color":
+              return item.type === "A3Color"
+            case "rizochartoA3":
+              return item.type === "RizochartoA3"
+            case "rizochartoA4":
+              return item.type === "RizochartoA4"
+            case "chartoniA3":
+              return item.type === "ChartoniA3"
+            case "chartoniA4":
+              return item.type === "ChartoniA4"
+            case "autokollito":
+              return item.type === "Autokollito"
+            default:
+              return true
+          }
+        })
+      }
+      setFilteredPrintJobs(filteredPJ)
 
-    // Filter Income with new income filters
-    let filteredInc = [...income]
-    
-    // Apply income search filter
-    if (deferredIncomeSearchTerm) {
-      const normIncomeSearch = normalizeCached(deferredIncomeSearchTerm)
-      filteredInc = filteredInc.filter(
-        (item) =>
-          normalizeCached(item.userDisplayName || "").includes(normIncomeSearch) ||
-          normalizeCached(item.username || "").includes(normIncomeSearch)
-      )
-    }
-    
-    // Apply income role filter
-    if (incomeRoleFilter !== "all") {
+      // Filter Lamination Jobs with tab-specific filters
+      let filteredLJ = [...timelineLaminationJobs]
+      if (deferredSearchTerm) {
+        const normSearch = normalizeCached(deferredSearchTerm)
+        filteredLJ = filteredLJ.filter(
+          (item) =>
+            normalizeCached(item.type || "").includes(normSearch) ||
+            normalizeCached(item.notes || "").includes(normSearch) ||
+            normalizeCached(item.userDisplayName || "").includes(normSearch),
+        )
+      }
+      if (dateFrom || dateTo) {
+        filteredLJ = filteredLJ.filter((item) => {
+          const itemDate = new Date(item.timestamp)
+          const fromDate = dateFrom ? new Date(dateFrom) : null
+          const toDate = dateTo ? new Date(dateTo) : null
+          if (fromDate && itemDate < fromDate) return false
+          if (toDate && itemDate > toDate) return false
+          return true
+        })
+      }
+      if (statusFilter !== "all" && statusFilter !== "paid" && statusFilter !== "unpaid") {
+        filteredLJ = filteredLJ.filter((item) => item.status === statusFilter)
+      }
+      if (typeFilter !== "all") {
+        filteredLJ = filteredLJ.filter((item) => item.type === typeFilter)
+      }
+      if (userFilter !== "all") {
+        filteredLJ = filteredLJ.filter((item) => item.uid === userFilter)
+      }
+
+      // Apply machine filter
+      if (machineFilter !== "all") {
+        filteredLJ = filteredLJ.filter((item) => {
+          // Filter based on machine type
+          if (machineFilter === "lamination") {
+            // Only include laminator types: A3, A4, A5, cards
+            return ["A3", "A4", "A5", "cards"].includes(item.type)
+          }
+          if (machineFilter === "binding") {
+            // Only include binding types: spiral, colored_cardboard, plastic_cover
+            return ["spiral", "colored_cardboard", "plastic_cover"].includes(item.type)
+          }
+          return true
+        })
+      }
+
+      // Apply lamination type filter
+      if (laminationTypeFilter !== "all") {
+        filteredLJ = filteredLJ.filter((item) => item.type === laminationTypeFilter)
+      }
+      setFilteredLaminationJobs(filteredLJ)
+
+      // Filter Income with new income filters
+      let filteredInc = [...timelineIncome]
+
+      // Apply income search filter
+      if (deferredIncomeSearchTerm) {
+        const normIncomeSearch = normalizeCached(deferredIncomeSearchTerm)
+        filteredInc = filteredInc.filter(
+          (item) =>
+            normalizeCached(item.userDisplayName || "").includes(normIncomeSearch) ||
+            normalizeCached(item.username || "").includes(normIncomeSearch)
+        )
+      }
+
+      // Apply income role filter
+      if (incomeRoleFilter !== "all") {
+        filteredInc = filteredInc.filter((item) => {
+          const userData = timelineUsers.find(u => u.uid === item.uid);
+          return userData && normalizeUserRoleLabel(userData.userRole) === incomeRoleFilter;
+        })
+      }
+
+      // Apply income date filters
+      if (incomeDateFrom) {
+        filteredInc = filteredInc.filter((item) => {
+          const itemDate = new Date(item.timestamp);
+          const fromDate = new Date(incomeDateFrom);
+          return itemDate >= fromDate;
+        })
+      }
+
+      if (incomeDateTo) {
+        filteredInc = filteredInc.filter((item) => {
+          const itemDate = new Date(item.timestamp);
+          const toDate = new Date(incomeDateTo);
+          return itemDate <= toDate;
+        })
+      }
+
+      // Apply income amount range filter
       filteredInc = filteredInc.filter((item) => {
-        const userData = allUsers.find(u => u.uid === item.uid);
-        return userData && userData.userRole === incomeRoleFilter;
+        const amount = item.amount || 0;
+        return amount >= incomeAmountRange[0] && amount <= incomeAmountRange[1];
       })
-    }
-    
-    // Apply income date filters
-    if (incomeDateFrom) {
-      filteredInc = filteredInc.filter((item) => {
-        const itemDate = new Date(item.timestamp);
-        const fromDate = new Date(incomeDateFrom);
-        return itemDate >= fromDate;
-      })
-    }
-    
-    if (incomeDateTo) {
-      filteredInc = filteredInc.filter((item) => {
-        const itemDate = new Date(item.timestamp);
-        const toDate = new Date(incomeDateTo);
-        return itemDate <= toDate;
-      })
-    }
-    
-    // Apply income amount range filter
-    filteredInc = filteredInc.filter((item) => {
-      const amount = item.amount || 0;
-      return amount >= incomeAmountRange[0] && amount <= incomeAmountRange[1];
-    })
-    
-    // Apply income responsibleFor filter for Υπεύθυνος users
-    if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0 && incomeResponsibleForFilter !== "all") {
-      filteredInc = filteredInc.filter((item) => {
-        const userData = allUsers.find(u => u.uid === item.uid);
-        if (!userData) return false;
-        
-        // For individual users, check if they belong to any of the responsibleFor groups
-        if (userData.userRole === "Άτομο") {
-          return userData.memberOf?.some((group: string) => user.responsibleFor?.includes(group));
-        } else {
-          // For groups, check if the group is in the responsibleFor list
-          return user.responsibleFor?.includes(userData.displayName);
-        }
-      })
-    }
-    
-    setFilteredIncome(filteredInc)
+
+      // Apply income responsibleFor filter for Υπεύθυνος users
+      if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0 && incomeResponsibleForFilter !== "all") {
+        filteredInc = filteredInc.filter((item) => {
+          const userData = timelineUsers.find(u => u.uid === item.uid);
+          if (!userData) return false;
+
+          // For individual users, check if they belong to any of the responsibleFor groups
+          if (userData.userRole === "Άτομο") {
+            return userData.memberOf?.some((group: string) => user.responsibleFor?.includes(group));
+          } else {
+            // For groups, check if the group is in the responsibleFor list
+            return user.responsibleFor?.includes(userData.displayName);
+          }
+        })
+      }
+
+      setFilteredIncome(filteredInc)
     })
   }
 
@@ -747,17 +970,17 @@ export default function DashboardPage() {
     setDebtSearchTerm("")
     setDebtFilter("all")
     setAmountFilter("all")
-    
+
     // Reset price range to actual debt range from data
-    if (allUsers.length > 0) {
-      const userDebtAmounts = allUsers
+    if (timelineUsers.length > 0) {
+      const userDebtAmounts = timelineUsers
         .filter(userData => userData.accessLevel !== "Διαχειριστής")
         .map(user => user.totalDebt || 0);
-      
+
       if (userDebtAmounts.length > 0) {
         const actualMinDebt = Math.floor(Math.min(...userDebtAmounts));
         const actualMaxDebt = Math.ceil(Math.max(...userDebtAmounts));
-        
+
         setPriceRange([actualMinDebt, actualMaxDebt]);
         setPriceRangeInputs([
           actualMinDebt.toString(),
@@ -773,7 +996,7 @@ export default function DashboardPage() {
       setPriceRange([0, 100]);
       setPriceRangeInputs(["0", "100"]);
     }
-    
+
     setRoleFilter("all")
     setTeamFilter("all")
     setResponsibleForFilter("all")
@@ -784,15 +1007,15 @@ export default function DashboardPage() {
     setIncomeRoleFilter("all")
     setIncomeDateFrom("")
     setIncomeDateTo("")
-    
+
     // Reset income amount range to actual range from data
-    if (income.length > 0) {
-      const incomeAmounts = income.map(inc => inc.amount || 0);
-      
+    if (timelineIncome.length > 0) {
+      const incomeAmounts = timelineIncome.map(inc => inc.amount || 0);
+
       if (incomeAmounts.length > 0) {
         const actualMinIncome = Math.floor(Math.min(...incomeAmounts));
         const actualMaxIncome = Math.ceil(Math.max(...incomeAmounts));
-        
+
         setIncomeAmountRange([actualMinIncome, actualMaxIncome]);
         setIncomeAmountInputs([
           actualMinIncome.toString(),
@@ -808,7 +1031,7 @@ export default function DashboardPage() {
       setIncomeAmountRange([0, 100]);
       setIncomeAmountInputs(["0", "100"]);
     }
-    
+
     setIncomeResponsibleForFilter("all")
   }
 
@@ -846,16 +1069,16 @@ export default function DashboardPage() {
       XLSX = mod
     }
     // Build AOA (array of arrays)
-    const aoa = title 
+    const aoa = title
       ? [
-          [title], // Title row
-          columns.map(col => col.label), // Header row
-          ...data.map(row => columns.map(col => row[col.key] ?? "")) // Data rows
-        ]
+        [title], // Title row
+        columns.map(col => col.label), // Header row
+        ...data.map(row => columns.map(col => row[col.key] ?? "")) // Data rows
+      ]
       : [
-          columns.map(col => col.label), // Header row
-          ...data.map(row => columns.map(col => row[col.key] ?? "")) // Data rows
-        ]
+        columns.map(col => col.label), // Header row
+        ...data.map(row => columns.map(col => row[col.key] ?? "")) // Data rows
+      ]
 
     const ws = XLSX.utils.aoa_to_sheet(aoa)
 
@@ -868,13 +1091,13 @@ export default function DashboardPage() {
         fill: { patternType: "solid", fgColor: { rgb: headerColor } },
         alignment: { horizontal: "center", vertical: "center", wrapText: true },
         border: {
-          top:    { style: "thin", color: { rgb: "000000" } },
+          top: { style: "thin", color: { rgb: "000000" } },
           bottom: { style: "thin", color: { rgb: "000000" } },
-          left:   { style: "thin", color: { rgb: "000000" } },
-          right:  { style: "thin", color: { rgb: "000000" } }
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
         }
       }
-      
+
       // Merge title cell across all columns
       if (!ws['!merges']) ws['!merges'] = []
       ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } })
@@ -891,10 +1114,10 @@ export default function DashboardPage() {
         fill: { patternType: "solid", fgColor: { rgb: headerColor } },
         alignment: { horizontal: "center", vertical: "center", wrapText: true },
         border: {
-          top:    { style: "thin", color: { rgb: "000000" } },
+          top: { style: "thin", color: { rgb: "000000" } },
           bottom: { style: "thin", color: { rgb: "000000" } },
-          left:   { style: "thin", color: { rgb: "000000" } },
-          right:  { style: "thin", color: { rgb: "000000" } }
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
         }
       }
     }
@@ -910,7 +1133,7 @@ export default function DashboardPage() {
     ws['!cols'] = colWidths
 
     // Row heights for title and header
-    const rowHeights = title 
+    const rowHeights = title
       ? [{ hpt: 35 }, { hpt: 25 }] // Title row taller, header row normal
       : [{ hpt: 25 }] // Just header row
     ws['!rows'] = rowHeights
@@ -922,8 +1145,8 @@ export default function DashboardPage() {
 
   // Memoized unique devices list used in filters (must be before any early return)
   const allDevices = useMemo(() => {
-    return [...new Set(printJobs.map((job) => job.deviceName).filter(Boolean))]
-  }, [printJobs])
+    return [...new Set(timelinePrintJobs.map((job) => job.deviceName).filter(Boolean))]
+  }, [timelinePrintJobs])
   const uniqueDevices = useMemo(() => {
     return ["Canon Color", "Canon B/W", "Brother", "Κυδωνιών"].filter(device => allDevices.includes(device))
   }, [allDevices])
@@ -937,27 +1160,27 @@ export default function DashboardPage() {
   }
 
   // Calculate totals based on user debt fields
-  const allUsersData = allUsers
-  
+  const allUsersData = timelineUsers
+
   // For the top 3 cards, show personal debts for Υπεύθυνος and Χρήστης users
-  const personalDebtUsers = user.accessLevel === "Διαχειριστής" 
-    ? allUsersData 
+  const personalDebtUsers = user.accessLevel === "Διαχειριστής"
+    ? allUsersData
     : allUsersData.filter(u => u.uid === user.uid) // Both Υπεύθυνος and Χρήστης see only their personal data
-  
+
   // For the debt table, show different data based on access level
-  const relevantUsers = user.accessLevel === "Διαχειριστής" 
-    ? allUsersData 
+  const relevantUsers = user.accessLevel === "Διαχειριστής"
+    ? allUsersData
     : user.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.length > 0
       ? allUsersData.filter(u => {
-          // For individual users, check if they belong to any of the responsibleFor groups
-          if (u.userRole === "Άτομο") {
-            return u.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
-          }
-          // For groups, check if the group is in the responsibleFor list
-          return user.responsibleFor?.includes(u.displayName) || false
-        })
+        // For individual users, check if they belong to any of the responsibleFor groups
+        if (u.userRole === "Άτομο") {
+          return u.memberOf?.some(group => user.responsibleFor?.includes(group)) || false
+        }
+        // For groups, check if the group is in the responsibleFor list
+        return user.responsibleFor?.includes(u.displayName) || false
+      })
       : allUsersData.filter(u => u.uid === user.uid) // Regular users (Χρήστης) see only their personal data
-  
+
   const printUnpaid = personalDebtUsers.reduce((sum, u) => sum + (u.printDebt || 0), 0)
   const laminationUnpaid = personalDebtUsers.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
   // Use users' totalDebt directly so negative credit is reflected in the summary
@@ -971,29 +1194,30 @@ export default function DashboardPage() {
   const totalLaminationUnpaid = allUsersData.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
 
   // Check if any filters are applied
-  const hasFilters = searchTerm || 
-                    statusFilter !== "all" || 
-                    userFilter !== "all"
+  const hasFilters = searchTerm ||
+    statusFilter !== "all" ||
+    userFilter !== "all"
 
   // Calculate percentages for debt cards
   // Each type shows percentage of its own total (without filters)
   const printUnpaidPercentage = totalPrintUnpaid > 0 ? (printUnpaid / totalPrintUnpaid) * 100 : 0
   const laminationUnpaidPercentage = totalLaminationUnpaid > 0 ? (laminationUnpaid / totalLaminationUnpaid) * 100 : 0
-  
+
   // Calculate total percentage (combined debts)
   const totalCombinedUnpaid = totalPrintUnpaid + totalLaminationUnpaid
   const totalUnpaidPercentage = totalCombinedUnpaid > 0 ? (totalUnpaid / totalCombinedUnpaid) * 100 : 0
 
   const currentMonth = new Date().toISOString().slice(0, 7)
-  const currentMonthPrintJobs = printJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
-  const currentMonthLaminationJobs = laminationJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
+  const currentMonthPrintJobs = timelinePrintJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
+  const currentMonthLaminationJobs = timelineLaminationJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
   const currentMonthPrintCost = currentMonthPrintJobs.reduce((sum, j) => sum + j.totalCost, 0)
   const currentMonthLaminationCost = currentMonthLaminationJobs.reduce((sum, j) => sum + j.totalCost, 0)
-  
+
   // Bank values for cards
-  const printBank: number = useFirestore ? (bankTotals?.printBank ?? 0) : 0
-  const laminationBank: number = useFirestore ? (bankTotals?.laminationBank ?? 0) : 0
+  const printBank: number = useFirestore ? timelineBank.printBank : 0
+  const laminationBank: number = useFirestore ? timelineBank.laminationBank : 0
   const totalBank = printBank + laminationBank
+  const showBankResetActions = user.accessLevel === "Διαχειριστής" && timelineStops.length === 0
 
   const getLaminationTypeLabel = (type: string) => {
     switch (type) {
@@ -1001,10 +1225,22 @@ export default function DashboardPage() {
         return "A3"
       case "A4":
         return "A4"
+      case "A5":
+        return "A5"
+      case "cards":
+        return "Κάρτες"
       case "card_small":
         return "Κάρτα Μικρή"
       case "card_large":
         return "Κάρτα Μεγάλη"
+      case "spiral":
+        return "Σπιράλ"
+      case "colored_cardboard":
+        return "Χρωματιστά Χαρτόνια"
+      case "plastic_cover":
+        return "Πλαστικό Κάλυμμα"
+      case "ExcelLaminationImport":
+        return "Excel εισαγωγή"
       default:
         return type
     }
@@ -1071,7 +1307,7 @@ export default function DashboardPage() {
     stats.canonColour.a3Total = stats.canonColour.a3BW + stats.canonColour.a3Colour
     stats.canonColour.total = stats.canonColour.a4Total + stats.canonColour.a3Total
     stats.kydonion.total = stats.kydonion.a4BW
-    
+
     // Calculate overall total
     stats.total = stats.canonBW.a4BW + stats.canonColour.total + stats.brother.a4BW + stats.kydonion.total
 
@@ -1147,13 +1383,13 @@ export default function DashboardPage() {
       user.responsibleFor.forEach(teamName => {
         // Find the team entity itself (not its members)
         const teamEntity = allUsersData.find(u => u.displayName === teamName && u.userRole === "Ομάδα")
-        
+
         if (teamEntity) {
           // Apply role filter to team entries
-          if (roleFilter !== "all" && teamEntity.userRole !== roleFilter) {
+          if (roleFilter !== "all" && normalizeUserRoleLabel(teamEntity.userRole) !== roleFilter) {
             return // Skip this team if it doesn't match the role filter
           }
-          
+
           // Apply team filter for admin users to team entries
           if (user?.accessLevel === "Διαχειριστής" && teamFilter !== "all") {
             // For teams, check if the team name matches the selected team filter
@@ -1161,7 +1397,7 @@ export default function DashboardPage() {
               return // Skip this team if it doesn't match the team filter
             }
           }
-          
+
           // Apply responsibleFor filter to team entries
           if (responsibleForFilter !== "all") {
             // For teams, check if the team name matches the selected responsibleFor filter
@@ -1169,12 +1405,12 @@ export default function DashboardPage() {
               return // Skip this team if it doesn't match the responsibleFor filter
             }
           }
-          
+
           // Use the team's own debt values, not the sum of member debts
           const teamPrintDebt = teamEntity.printDebt || 0
           const teamLaminationDebt = teamEntity.laminationDebt || 0
           const teamTotalDebt = teamEntity.totalDebt || 0
-          
+
           // Apply debt status filter to team entries
           if (debtFilter !== "all") {
             const hasUnpaidDebt = (teamPrintDebt > 0) || (teamLaminationDebt > 0)
@@ -1185,7 +1421,7 @@ export default function DashboardPage() {
               return // Skip this team if it doesn't match the debt status filter
             }
           }
-          
+
           // Apply amount filter to team entries
           if (amountFilter !== "all") {
             switch (amountFilter) {
@@ -1200,33 +1436,33 @@ export default function DashboardPage() {
                 break
             }
           }
-          
+
           // Apply price range filter to team entries
           if (priceRange[0] !== 0 || priceRange[1] !== 100) {
             if (teamTotalDebt < priceRange[0] || teamTotalDebt > priceRange[1]) {
               return // Skip this team if it doesn't match the price range filter
             }
           }
-          
-                // Find the latest income date for this team
-      const teamIncome = income.filter(inc => inc.uid === teamEntity.uid)
-      const latestTeamIncome = teamIncome.length > 0 
-        ? teamIncome.reduce((latest, current) => 
-            current.timestamp > latest.timestamp ? current : latest
-          ).timestamp
-        : null
 
-      // Add team to the map
-      userDebtMap.set(`team-${teamName}`, {
-        uid: `team-${teamName}`,
-        userDisplayName: teamName,
-        userRole: "Ομάδα",
-        responsiblePerson: user.displayName,
-        printDebt: teamPrintDebt,
-        laminationDebt: teamLaminationDebt,
-        totalDebt: teamTotalDebt,
-        lastPayment: latestTeamIncome
-      })
+          // Find the latest income date for this team
+          const teamIncome = timelineIncome.filter(inc => inc.uid === teamEntity.uid)
+          const latestTeamIncome = teamIncome.length > 0
+            ? teamIncome.reduce((latest, current) =>
+              current.timestamp > latest.timestamp ? current : latest
+            ).timestamp
+            : null
+
+          // Add team to the map
+          userDebtMap.set(`team-${teamName}`, {
+            uid: `team-${teamName}`,
+            userDisplayName: teamName,
+            userRole: "Ομάδα",
+            responsiblePerson: user.displayName,
+            printDebt: teamPrintDebt,
+            laminationDebt: teamLaminationDebt,
+            totalDebt: teamTotalDebt,
+            lastPayment: latestTeamIncome
+          })
         }
       })
     }
@@ -1235,29 +1471,29 @@ export default function DashboardPage() {
     relevantUsers.forEach(userData => {
       // Skip admin users from the debt table
       if (userData.accessLevel === "Διαχειριστής") return
-      
+
       // Skip if this is a team entry that was already added for Υπεύθυνος users
       if (user?.accessLevel === "Υπεύθυνος" && user?.responsibleFor && user.responsibleFor.includes(userData.displayName) && userData.userRole === "Ομάδα") {
         return
       }
-      
+
       // Apply search filter
       if (debtSearchTerm) {
-        const responsiblePerson = userData.userRole === "Άτομο" 
-          ? userData.displayName 
+        const responsiblePerson = userData.userRole === "Άτομο"
+          ? userData.displayName
           : "-";
         const norm = normalizeGreek(debtSearchTerm)
         const matchesSearch = normalizeGreek(userData.displayName).includes(norm) ||
-                             normalizeGreek(userData.userRole).includes(norm) ||
-                             normalizeGreek(responsiblePerson).includes(norm);
+          normalizeGreek(normalizeUserRoleLabel(userData.userRole)).includes(norm) ||
+          normalizeGreek(responsiblePerson).includes(norm);
         if (!matchesSearch) return
       }
-      
+
       // Apply role filter
-      if (roleFilter !== "all" && userData.userRole !== roleFilter) {
+      if (roleFilter !== "all" && normalizeUserRoleLabel(userData.userRole) !== roleFilter) {
         return
       }
-      
+
       // Apply team filter for admin users
       if (user?.accessLevel === "Διαχειριστής" && teamFilter !== "all") {
         // For individual users, check if they belong to the selected team
@@ -1272,7 +1508,7 @@ export default function DashboardPage() {
           }
         }
       }
-      
+
       // Apply responsibleFor filter
       if (responsibleForFilter !== "all") {
         // For individual users, check if they belong to the selected responsibleFor group
@@ -1287,60 +1523,60 @@ export default function DashboardPage() {
           }
         }
       }
-      
+
       // Function to get dynamic responsible persons for Ομάδα/Ναός/Τομέας
       const getDynamicResponsiblePersons = (userData: any) => {
         const responsibleUsers: string[] = []
-        
-        if (userData.userRole === "Ομάδα" || userData.userRole === "Τμήμα" || userData.userRole === "Τομέας") {
+
+        if (isManagedEntityRole(userData.userRole)) {
           const ypefthynoiUsers = allUsersData.filter((user: any) => user.accessLevel === "Υπεύθυνος")
-          
+
           ypefthynoiUsers.forEach((ypefthynos: any) => {
             if (ypefthynos.responsibleFor && ypefthynos.responsibleFor.length > 0) {
               const isResponsible = ypefthynos.responsibleFor.some((responsibleFor: string) => {
                 return responsibleFor === userData.displayName
               })
-              
+
               if (isResponsible) {
                 responsibleUsers.push(ypefthynos.displayName)
               }
             }
           })
         }
-        
+
         return responsibleUsers
       }
 
       // Function to get responsible users for Άτομο users based on their team membership
       const getResponsibleUsers = (userData: any) => {
         const responsibleUsers: string[] = []
-        
+
         if (userData.userRole === "Άτομο" && userData.memberOf && userData.memberOf.length > 0) {
           const userTeam = userData.memberOf.find((member: string) => {
-            const teamAccount = allUsersData.find((user: any) => 
+            const teamAccount = allUsersData.find((user: any) =>
               user.userRole === "Ομάδα" && user.displayName === member
             )
             return teamAccount
           })
-          
+
           if (userTeam) {
-            const teamAccount = allUsersData.find((user: any) => 
+            const teamAccount = allUsersData.find((user: any) =>
               user.userRole === "Ομάδα" && user.displayName === userTeam
             )
-            
+
             if (teamAccount) {
               const teamResponsiblePersons = getDynamicResponsiblePersons(teamAccount)
               responsibleUsers.push(...teamResponsiblePersons)
             }
           }
         }
-        
+
         return responsibleUsers
       }
 
       // Get responsible person based on user role
       let responsiblePerson = "Δεν έχει ανατεθεί Υπεύθυνος"
-      
+
       if ((userData.accessLevel as string) === "Υπεύθυνος") {
         responsiblePerson = "-"
       } else if ((userData.accessLevel as string) === "Διαχειριστής") {
@@ -1348,18 +1584,18 @@ export default function DashboardPage() {
       } else if (userData.userRole === "Άτομο") {
         const responsibleUsers = getResponsibleUsers(userData)
         responsiblePerson = responsibleUsers.length > 0 ? responsibleUsers.join(", ") : "Δεν έχει ανατεθεί Υπεύθυνος"
-      } else if (userData.userRole === "Ομάδα" || userData.userRole === "Τμήμα" || userData.userRole === "Τομέας") {
+      } else if (isManagedEntityRole(userData.userRole)) {
         const responsibleUsers = getDynamicResponsiblePersons(userData)
         responsiblePerson = responsibleUsers.length > 0 ? responsibleUsers.join(", ") : "Δεν έχει ανατεθεί Υπεύθυνος"
       } else {
         // For any other cases, show the default message
         responsiblePerson = "Δεν έχει ανατεθεί Υπεύθυνος"
       }
-      
+
       const printDebt = userData.printDebt || 0
       const laminationDebt = userData.laminationDebt || 0
       const totalDebt = userData.totalDebt || 0
-      
+
       // Apply debt status filter
       if (debtFilter !== "all") {
         const hasUnpaidDebt = (printDebt > 0) || (laminationDebt > 0)
@@ -1370,7 +1606,7 @@ export default function DashboardPage() {
           return // Skip this user if it doesn't match the debt status filter
         }
       }
-      
+
       // Apply amount filter
       if (amountFilter !== "all") {
         switch (amountFilter) {
@@ -1385,14 +1621,14 @@ export default function DashboardPage() {
             break
         }
       }
-      
+
       // Apply price range filter
       if (priceRange[0] !== 0 || priceRange[1] !== 100) {
         if (totalDebt < priceRange[0] || totalDebt > priceRange[1]) {
           return // Skip this user if it doesn't match the price range filter
         }
       }
-      
+
       // Use precomputed lastPayment on user when available to avoid recomputing per visit
       const latestUserIncome = (userData as any).lastPayment ? new Date((userData as any).lastPayment) : null
 
@@ -1400,7 +1636,7 @@ export default function DashboardPage() {
       userDebtMap.set(userData.uid, {
         uid: userData.uid,
         userDisplayName: userData.displayName,
-        userRole: userData.userRole,
+        userRole: normalizeUserRoleLabel(userData.userRole),
         responsiblePerson: responsiblePerson,
         printDebt: printDebt,
         laminationDebt: laminationDebt,
@@ -1419,6 +1655,15 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-50">
         <Navigation />
 
+        {isExcelWizardOpen && (
+          <ExcelImportWizard
+            open={isExcelWizardOpen}
+            onOpenChange={setIsExcelWizardOpen}
+            onImportCompleted={(importRun) => setSelectedTimelineImportId(importRun.importId)}
+            users={allUsers}
+          />
+        )}
+
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             <div className="mb-8">
@@ -1431,8 +1676,20 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Add Refresh Data Button */}
-            <div className="mb-6 flex justify-end">
+            {/* Add Refresh & Import Data Buttons */}
+            <div className="mb-6 flex justify-end gap-3">
+              {user.accessLevel === "Διαχειριστής" && (
+                <Button
+                  onClick={() => setIsExcelWizardOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50"
+                  title="Εισαγωγή Δεδομένων από Excel"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Εισαγωγή Δεδομένων
+                </Button>
+              )}
               <Button
                 onClick={handleManualRefresh}
                 variant="outline"
@@ -1445,62 +1702,72 @@ export default function DashboardPage() {
               </Button>
             </div>
 
+            <ExcelPeriodTimeline
+              stops={timelineStops}
+              selectedIndex={activeTimelineIndex}
+              onSelect={(index) => {
+                const nextStop = timelineStops[index]
+                if (!nextStop) return
+                setSelectedTimelineImportId(nextStop.importId)
+              }}
+            />
+
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Total Debts Card - Yellow Theme */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
-                                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
-                    <div className="flex items-center justify-between">
-                      <Receipt className="h-6 w-6 text-yellow-700" />
-                      <div className="text-center flex-1">
-                        <div className="text-lg font-semibold text-yellow-900">ΣΥΝΟΛΟ</div>
-                        <div className="text-sm font-medium text-yellow-800">
-                          {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
-                        </div>
+                <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+                  <div className="flex items-center justify-between">
+                    <Receipt className="h-6 w-6 text-yellow-700" />
+                    <div className="text-center flex-1">
+                      <div className="text-lg font-semibold text-yellow-900">ΣΥΝΟΛΟ</div>
+                      <div className="text-sm font-medium text-yellow-800">
+                        {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
                       </div>
-                      {user.accessLevel === "Διαχειριστής" && (
-                        <AlertDialog open={showTotalBankResetDialog} onOpenChange={setShowTotalBankResetDialog}>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 w-8 p-0 border-yellow-300 bg-white hover:bg-yellow-50 text-yellow-600"
-                              title="Επαναφορά Συνολικού Τραπεζικού Λογαριασμού"
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Επαναφορά Συνολικού Τραπεζικού Λογαριασμού</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Είστε σίγουροι ότι θέλετε να επαναφέρετε τον συνολικό τραπεζικό λογαριασμό στο 0;
-                                <br /><br />
-                                <strong>Τρέχουσα τιμή: {formatPrice(totalBank)}</strong>
-                                <br /><br />
-                                <span className="text-red-600 font-medium">Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.</span>
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={handleTotalBankReset} 
-                                className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
-                              >
-                                Επαναφορά
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
                     </div>
+                    {showBankResetActions && (
+                      <AlertDialog open={showTotalBankResetDialog} onOpenChange={setShowTotalBankResetDialog}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0 border-yellow-300 bg-white hover:bg-yellow-50 text-yellow-600"
+                            title="Επαναφορά Συνολικού Τραπεζικού Λογαριασμού"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Επαναφορά Συνολικού Τραπεζικού Λογαριασμού</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Είστε σίγουροι ότι θέλετε να επαναφέρετε τον συνολικό τραπεζικό λογαριασμό στο 0;
+                              <br /><br />
+                              <strong>Τρέχουσα τιμή: {formatPrice(totalBank)}</strong>
+                              <br /><br />
+                              <span className="text-red-600 font-medium">Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.</span>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={handleTotalBankReset}
+                              className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+                            >
+                              Επαναφορά
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
+                </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
                     <div className={`text-3xl font-bold ${totalUnpaid <= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
                     </div>
-                   {user.accessLevel === "Διαχειριστής" && (
+                    {user.accessLevel === "Διαχειριστής" && (
                       <div className="text-2xl font-bold text-green-600">
                         {formatPrice(totalBank)}
                       </div>
@@ -1514,16 +1781,16 @@ export default function DashboardPage() {
 
               {/* Print Debts Card - Blue Theme */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
-                                  <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
-                    <div className="flex items-center justify-between">
-                      <Printer className="h-6 w-6 text-blue-700" />
-                      <div className="text-center flex-1">
-                        <div className="text-lg font-semibold text-blue-900">ΤΟ. ΦΩ.</div>
-                        <div className="text-sm font-medium text-blue-800">
-                          {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
-                        </div>
+                <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <Printer className="h-6 w-6 text-blue-700" />
+                    <div className="text-center flex-1">
+                      <div className="text-lg font-semibold text-blue-900">ΤΟ. ΦΩ.</div>
+                      <div className="text-sm font-medium text-blue-800">
+                        {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
                       </div>
-                    {user.accessLevel === "Διαχειριστής" && (
+                    </div>
+                    {showBankResetActions && (
                       <AlertDialog open={showPrintBankResetDialog} onOpenChange={setShowPrintBankResetDialog}>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -1548,8 +1815,8 @@ export default function DashboardPage() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={handlePrintBankReset} 
+                            <AlertDialogAction
+                              onClick={handlePrintBankReset}
                               className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
                             >
                               Επαναφορά
@@ -1579,15 +1846,15 @@ export default function DashboardPage() {
 
               {/* Lamination Debts Card - Green Theme */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
-                                  <div className="bg-green-100 px-6 py-4 border-b border-green-200">
-                    <div className="flex items-center justify-between">
-                      <CreditCard className="h-6 w-6 text-green-700" />
-                      <div className="text-center flex-1">
-                        <div className="text-lg font-semibold text-green-900">ΠΛΑ. ΤΟ.</div>
-                        <div className="text-sm font-medium text-green-800">
-                          {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
-                        </div>
+                <div className="bg-green-100 px-6 py-4 border-b border-green-200">
+                  <div className="flex items-center justify-between">
+                    <CreditCard className="h-6 w-6 text-green-700" />
+                    <div className="text-center flex-1">
+                      <div className="text-lg font-semibold text-green-900">ΠΛΑ. ΤΟ.</div>
+                      <div className="text-sm font-medium text-green-800">
+                        {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
                       </div>
+                    </div>
                     {user.accessLevel === "Διαχειριστής" && (
                       <AlertDialog open={showLaminationBankResetDialog} onOpenChange={setShowLaminationBankResetDialog}>
                         <AlertDialogTrigger asChild>
@@ -1613,8 +1880,8 @@ export default function DashboardPage() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={handleLaminationBankReset} 
+                            <AlertDialogAction
+                              onClick={handleLaminationBankReset}
                               className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
                             >
                               Επαναφορά
@@ -1666,7 +1933,7 @@ export default function DashboardPage() {
                     responsibleForFilter={responsibleForFilter}
                     setResponsibleForFilter={setResponsibleForFilter}
                     priceDistribution={{ min: 0, max: 100 }}
-                    users={allUsers}
+                    users={timelineUsers}
                     clearFilters={clearFilters}
                     combinedDebtData={combinedDebtData}
                     resetDebtPage={() => setDebtPage(1)}
@@ -1720,7 +1987,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="p-6 flex-1 flex flex-col">
                     <div className="flex-1">
                       <DebtTable
@@ -1759,8 +2026,8 @@ export default function DashboardPage() {
                     setIncomeAmountInputs={setIncomeAmountInputs}
                     incomeResponsibleForFilter={incomeResponsibleForFilter}
                     setIncomeResponsibleForFilter={setIncomeResponsibleForFilter}
-                    incomeData={income}
-                    users={allUsers}
+                    incomeData={timelineIncome}
+                    users={timelineUsers}
                     clearIncomeFilters={clearIncomeFilters}
                     resetIncomePage={() => setIncomePage(1)}
                   />
@@ -1809,7 +2076,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="p-6 flex-1 flex flex-col">
                     <div className="flex-1">
                       <ErrorBoundary fallback={<div>Φόρτωση εσόδων...</div>}>
@@ -1888,22 +2155,6 @@ export default function DashboardPage() {
                             {(user.accessLevel === "Διαχειριστής" || user.accessLevel === "Υπεύθυνος") && (
                               <Button
                                 onClick={() => {
-                                  // Helper function to get print type label
-                                  const getPrintTypeLabel = (type: string) => {
-                                    switch (type) {
-                                      case "A4BW": return "A4 Ασπρόμαυρο"
-                                      case "A4Color": return "A4 Έγχρωμο"
-                                      case "A3BW": return "A3 Ασπρόμαυρο"
-                                      case "A3Color": return "A3 Έγχρωμο"
-                                      case "RizochartoA3": return "Ριζόχαρτο A3"
-                                      case "RizochartoA4": return "Ριζόχαρτο A4"
-                                      case "ChartoniA3": return "Χαρτόνι A3"
-                                      case "ChartoniA4": return "Χαρτόνι A4"
-                                      case "Autokollito": return "Αυτοκόλλητο"
-                                      default: return type
-                                    }
-                                  }
-                                  
                                   const expandedData = filteredPrintJobs.map(job => ({
                                     timestamp: job.timestamp.toLocaleString("el-GR"),
                                     uid: job.uid,
@@ -1913,7 +2164,7 @@ export default function DashboardPage() {
                                     quantity: job.quantity,
                                     cost: formatPrice(job.totalCost)
                                   }))
-                                  
+
                                   exportTableXLSX(
                                     expandedData,
                                     "print_jobs",
@@ -1975,21 +2226,19 @@ export default function DashboardPage() {
                           {/* Row 1 */}
                           <div>
                             <div className="text-xs text-gray-600">A4 B/W</div>
-                            <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Color", "A4 Ασπρόμαυρο")
-                                ? "text-blue-600 bg-blue-100 rounded px-1"
-                                : "text-black"
-                            }`}>
+                            <div className={`text-lg font-bold ${isPrintStatHighlighted("Canon Color", "A4 Ασπρόμαυρο")
+                              ? "text-blue-600 bg-blue-100 rounded px-1"
+                              : "text-black"
+                              }`}>
                               {printStats.canonColour.a4BW}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">A4 Colour</div>
-                            <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Color", "A4 Έγχρωμο")
-                                ? "text-blue-600 bg-blue-100 rounded px-1"
-                                : "text-black"
-                            }`}>
+                            <div className={`text-lg font-bold ${isPrintStatHighlighted("Canon Color", "A4 Έγχρωμο")
+                              ? "text-blue-600 bg-blue-100 rounded px-1"
+                              : "text-black"
+                              }`}>
                               {printStats.canonColour.a4Colour}
                             </div>
                           </div>
@@ -2005,21 +2254,19 @@ export default function DashboardPage() {
                           {/* Row 2 */}
                           <div>
                             <div className="text-xs text-gray-600">A3 B/W</div>
-                            <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Color", "A3 Ασπρόμαυρο")
-                                ? "text-blue-600 bg-blue-100 rounded px-1"
-                                : "text-black"
-                            }`}>
+                            <div className={`text-lg font-bold ${isPrintStatHighlighted("Canon Color", "A3 Ασπρόμαυρο")
+                              ? "text-blue-600 bg-blue-100 rounded px-1"
+                              : "text-black"
+                              }`}>
                               {printStats.canonColour.a3BW}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">A3 Colour</div>
-                            <div className={`text-lg font-bold ${
-                              isPrintStatHighlighted("Canon Color", "A3 Έγχρωμο")
-                                ? "text-blue-600 bg-blue-100 rounded px-1"
-                                : "text-black"
-                            }`}>
+                            <div className={`text-lg font-bold ${isPrintStatHighlighted("Canon Color", "A3 Έγχρωμο")
+                              ? "text-blue-600 bg-blue-100 rounded px-1"
+                              : "text-black"
+                              }`}>
                               {printStats.canonColour.a3Colour}
                             </div>
                           </div>
@@ -2042,11 +2289,10 @@ export default function DashboardPage() {
                       <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
-                          <div className={`text-xl font-bold ${
-                            isPrintStatHighlighted("Canon B/W", "A4 Ασπρόμαυρο") 
-                              ? "text-blue-600 bg-blue-100 rounded px-1" 
-                              : "text-black"
-                          }`}>
+                          <div className={`text-xl font-bold ${isPrintStatHighlighted("Canon B/W", "A4 Ασπρόμαυρο")
+                            ? "text-blue-600 bg-blue-100 rounded px-1"
+                            : "text-black"
+                            }`}>
                             {printStats.canonBW.a4BW}
                           </div>
                         </div>
@@ -2064,11 +2310,10 @@ export default function DashboardPage() {
                       <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
-                          <div className={`text-xl font-bold ${
-                            isPrintStatHighlighted("Brother", "A4 Ασπρόμαυρο") 
-                              ? "text-blue-600 bg-blue-100 rounded px-1" 
-                              : "text-black"
-                          }`}>
+                          <div className={`text-xl font-bold ${isPrintStatHighlighted("Brother", "A4 Ασπρόμαυρο")
+                            ? "text-blue-600 bg-blue-100 rounded px-1"
+                            : "text-black"
+                            }`}>
                             {printStats.brother.a4BW}
                           </div>
                         </div>
@@ -2086,11 +2331,10 @@ export default function DashboardPage() {
                       <div className="p-4">
                         <div className="text-center">
                           <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
-                          <div className={`text-xl font-bold ${
-                            isPrintStatHighlighted("Κυδωνιών", "A4 Ασπρόμαυρο") 
-                              ? "text-blue-600 bg-blue-100 rounded px-1" 
-                              : "text-black"
-                          }`}>
+                          <div className={`text-xl font-bold ${isPrintStatHighlighted("Κυδωνιών", "A4 Ασπρόμαυρο")
+                            ? "text-blue-600 bg-blue-100 rounded px-1"
+                            : "text-black"
+                            }`}>
                             {printStats.kydonion.a4BW}
                           </div>
                         </div>
@@ -2220,41 +2464,37 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-4 gap-2 text-center">
                           <div>
                             <div className="text-xs text-gray-600">Α3</div>
-                            <div className={`text-lg font-bold ${
-                              isLaminationStatHighlighted("laminator", "A3") 
-                                ? "text-green-600 bg-green-100 rounded px-1" 
-                                : "text-gray-900"
-                            }`}>
+                            <div className={`text-lg font-bold ${isLaminationStatHighlighted("laminator", "A3")
+                              ? "text-green-600 bg-green-100 rounded px-1"
+                              : "text-gray-900"
+                              }`}>
                               {laminationStats.laminator.a3}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Α4</div>
-                            <div className={`text-lg font-bold ${
-                              isLaminationStatHighlighted("laminator", "A4") 
-                                ? "text-green-600 bg-green-100 rounded px-1" 
-                                : "text-gray-900"
-                            }`}>
+                            <div className={`text-lg font-bold ${isLaminationStatHighlighted("laminator", "A4")
+                              ? "text-green-600 bg-green-100 rounded px-1"
+                              : "text-gray-900"
+                              }`}>
                               {laminationStats.laminator.a4}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Α5</div>
-                            <div className={`text-lg font-bold ${
-                              isLaminationStatHighlighted("laminator", "A5") 
-                                ? "text-green-600 bg-green-100 rounded px-1" 
-                                : "text-gray-900"
-                            }`}>
+                            <div className={`text-lg font-bold ${isLaminationStatHighlighted("laminator", "A5")
+                              ? "text-green-600 bg-green-100 rounded px-1"
+                              : "text-gray-900"
+                              }`}>
                               {laminationStats.laminator.a5}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Κάρτες</div>
-                            <div className={`text-lg font-bold ${
-                              isLaminationStatHighlighted("laminator", "cards") 
-                                ? "text-green-600 bg-green-100 rounded px-1" 
-                                : "text-gray-900"
-                            }`}>
+                            <div className={`text-lg font-bold ${isLaminationStatHighlighted("laminator", "cards")
+                              ? "text-green-600 bg-green-100 rounded px-1"
+                              : "text-gray-900"
+                              }`}>
                               {laminationStats.laminator.cards}
                             </div>
                           </div>
@@ -2274,31 +2514,28 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-3 gap-2 text-center">
                           <div>
                             <div className="text-xs text-gray-600">Σπιράλ</div>
-                            <div className={`text-lg font-bold ${
-                              isLaminationStatHighlighted("binding", "spiral") 
-                                ? "text-green-600 bg-green-100 rounded px-1" 
-                                : "text-gray-900"
-                            }`}>
+                            <div className={`text-lg font-bold ${isLaminationStatHighlighted("binding", "spiral")
+                              ? "text-green-600 bg-green-100 rounded px-1"
+                              : "text-gray-900"
+                              }`}>
                               {laminationStats.binding.spiral}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Χρωματιστά Χαρτόνια</div>
-                            <div className={`text-lg font-bold ${
-                              isLaminationStatHighlighted("binding", "colored_cardboard") 
-                                ? "text-green-600 bg-green-100 rounded px-1" 
-                                : "text-gray-900"
-                            }`}>
+                            <div className={`text-lg font-bold ${isLaminationStatHighlighted("binding", "colored_cardboard")
+                              ? "text-green-600 bg-green-100 rounded px-1"
+                              : "text-gray-900"
+                              }`}>
                               {laminationStats.binding.coloredCardboard}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-600">Πλαστικό Κάλυμμα</div>
-                            <div className={`text-lg font-bold ${
-                              isLaminationStatHighlighted("binding", "plastic_cover") 
-                                ? "text-green-600 bg-green-100 rounded px-1" 
-                                : "text-gray-900"
-                            }`}>
+                            <div className={`text-lg font-bold ${isLaminationStatHighlighted("binding", "plastic_cover")
+                              ? "text-green-600 bg-green-100 rounded px-1"
+                              : "text-gray-900"
+                              }`}>
                               {laminationStats.binding.plasticCover}
                             </div>
                           </div>

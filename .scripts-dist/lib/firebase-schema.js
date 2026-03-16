@@ -16,4 +16,5 @@ exports.FIREBASE_COLLECTIONS = {
     TRANSACTIONS: "transactions",
     BILLING: "billing",
     SETTINGS: "settings",
+    EXCEL_IMPORTS: "excelImports",
 };

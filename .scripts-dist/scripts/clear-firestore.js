@@ -20,26 +20,16 @@ const COLLECTIONS_IN_SAFE_ORDER = [
     firebase_schema_1.FIREBASE_COLLECTIONS.INCOME,
     firebase_schema_1.FIREBASE_COLLECTIONS.TRANSACTIONS,
     firebase_schema_1.FIREBASE_COLLECTIONS.BILLING,
+    firebase_schema_1.FIREBASE_COLLECTIONS.EXCEL_IMPORTS,
     firebase_schema_1.FIREBASE_COLLECTIONS.PRICE_TABLES,
     firebase_schema_1.FIREBASE_COLLECTIONS.SETTINGS,
     firebase_schema_1.FIREBASE_COLLECTIONS.USERS,
     firebase_schema_1.FIREBASE_COLLECTIONS.BANK,
 ];
-async function deleteCollection(collectionPath, batchSize = 300) {
+async function deleteCollection(collectionPath) {
     const db = (0, firebase_admin_1.default)();
-    let deleted = 0;
-    while (true) {
-        const snapshot = await db.collection(collectionPath).limit(batchSize).get();
-        if (snapshot.empty)
-            break;
-        const batch = db.batch();
-        snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-        await batch.commit();
-        deleted += snapshot.size;
-        console.log(`Deleted ${snapshot.size} from ${collectionPath} (total ${deleted})`);
-        if (snapshot.size < batchSize)
-            break;
-    }
+    await db.recursiveDelete(db.collection(collectionPath));
+    console.log(`Deleted ${collectionPath}`);
 }
 async function main() {
     for (const col of COLLECTIONS_IN_SAFE_ORDER) {

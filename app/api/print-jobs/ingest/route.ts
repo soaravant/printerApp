@@ -37,6 +37,8 @@ function mapTypeToPriceKey(type: FirebasePrintJob["type"]): string {
       return "chartoniA4"
     case "Autokollito":
       return "autokollito"
+    default:
+      throw new Error(`Unsupported ingest print type: ${type}`)
   }
 }
 
@@ -159,5 +161,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Server error" }, { status: 500 })
   }
 }
-
 

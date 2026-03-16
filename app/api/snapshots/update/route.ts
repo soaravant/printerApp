@@ -126,10 +126,13 @@ export async function POST(req: Request) {
 
     // Save updated snapshot
     const out = JSON.stringify({ lastUpdated: maxMs || Date.now(), items: merged })
+    // @ts-ignore - firebase-admin SaveOptions types don't include cacheControl directly but it works
     await file.save(out, {
       contentType: "application/json",
       resumable: false,
-      cacheControl: "public, max-age=60, must-revalidate",
+      metadata: {
+        cacheControl: "public, max-age=60, must-revalidate",
+      }
     })
 
     return NextResponse.json({ ok: true, updated: true })
