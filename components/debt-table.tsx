@@ -35,7 +35,7 @@ interface DebtTableProps {
   pageSize: number
   onPageChange: (page: number) => void
   userRole: string
-  onRowHover?: (hoveredJob: { deviceName: string; printType: string } | null) => void
+  onRowHover?: (hoveredJob: { rawType: "combined"; isExcelImport: false } | null) => void
 }
 
 export default function DebtTable({ data, page, pageSize, onPageChange, userRole, onRowHover }: DebtTableProps) {
@@ -177,7 +177,7 @@ export default function DebtTable({ data, page, pageSize, onPageChange, userRole
                 <TableRow 
                   key={item.uid}
                   className="hover:bg-yellow-50 cursor-pointer transition-colors duration-200"
-                  onMouseEnter={() => onRowHover?.({ deviceName: "billing", printType: "combined" })}
+                  onMouseEnter={() => onRowHover?.({ rawType: "combined", isExcelImport: false })}
                   onMouseLeave={() => onRowHover?.(null)}
                 >
                   <TableCell className="text-center font-medium">{item.userRole}</TableCell>

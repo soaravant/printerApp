@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -33,6 +34,7 @@ interface ExcelPeriodTimelineProps {
 }
 
 const TIMELINE_START_PERIOD_KEY = "2025-01"
+const TIMELINE_CARD_WIDTH = 140
 
 function formatStopDate(value: Date | null | undefined) {
   if (!value) return ""
@@ -72,13 +74,10 @@ export function ExcelPeriodTimeline({
   selectedIndex,
   onSelect,
 }: ExcelPeriodTimelineProps) {
-  if (!stops.length) {
-    return (
-      <div className="mb-6 flex h-16 items-center justify-center px-4 text-sm text-slate-500">
-        Δεν υπάρχει διαθέσιμο ιστορικό εισαγωγών.
-      </div>
-    )
-  }
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const activeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const hasAutoCenteredRef = useRef(false)
+  const [edgePadding, setEdgePadding] = useState(40)
 
   const latestRealPeriodKey = stops[stops.length - 1]?.periodKey ?? TIMELINE_START_PERIOD_KEY
   const timelineEndPeriodKey =
@@ -107,6 +106,49 @@ export function ExcelPeriodTimeline({
     cursor = nextPeriodKey(cursor)
   }
 
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const updateEdgePadding = () => {
+      const nextPadding = Math.max(40, Math.round(container.clientWidth / 2 - TIMELINE_CARD_WIDTH / 2))
+      setEdgePadding((current) => (Math.abs(current - nextPadding) > 1 ? nextPadding : current))
+    }
+
+    updateEdgePadding()
+
+    const observer = new ResizeObserver(() => updateEdgePadding())
+    observer.observe(container)
+
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    const activeButton = activeButtonRef.current
+    if (!stops.length || !container || !activeButton) return
+
+    const targetLeft =
+      activeButton.offsetLeft + activeButton.offsetWidth / 2 - container.clientWidth / 2
+    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth)
+    const nextScrollLeft = Math.min(Math.max(0, targetLeft), maxScrollLeft)
+
+    container.scrollTo({
+      left: nextScrollLeft,
+      behavior: hasAutoCenteredRef.current ? "smooth" : "auto",
+    })
+
+    hasAutoCenteredRef.current = true
+  }, [selectedIndex, edgePadding, renderedPeriods.length, stops.length])
+
+  if (!stops.length) {
+    return (
+      <div className="mb-6 flex h-16 items-center justify-center px-4 text-sm text-slate-500">
+        Δεν υπάρχει διαθέσιμο ιστορικό εισαγωγών.
+      </div>
+    )
+  }
+
   return (
     <div className="mb-6">
       <div className="flex items-start gap-2">
@@ -122,36 +164,29 @@ export function ExcelPeriodTimeline({
           <ChevronLeft className="h-4 w-4" />
         </Button>
 
-        <div className="min-w-0 flex-1 overflow-x-auto">
+        <div ref={scrollContainerRef} className="min-w-0 flex-1 overflow-x-auto">
           <div className="mx-auto w-fit min-w-full">
-            <div className="flex items-start pr-1">
+            <div
+              className="inline-flex items-center py-2 transition-transform duration-300 ease-out"
+              style={{ paddingLeft: edgePadding, paddingRight: edgePadding }}
+            >
               {renderedPeriods.map(({ periodKey, stop, stopIndex }, index) => {
                 const isSelectable = stopIndex !== null
                 const isActive = stopIndex !== null && stopIndex === selectedIndex
                 const isPast = stopIndex !== null && stopIndex < selectedIndex
                 const isLast = index === renderedPeriods.length - 1
+                const nextStopIndex = renderedPeriods[index + 1]?.stopIndex ?? null
+                const isConnectorActive = nextStopIndex !== null && nextStopIndex <= selectedIndex
                 const { month, year } = formatPeriodLabel(periodKey)
 
                 return (
-                  <div key={periodKey} className="relative w-[6.75rem] shrink-0">
-                    {index > 0 && (
-                      <span
-                        className={cn(
-                          "absolute left-0 right-1/2 top-[6px] h-px",
-                          isPast ? "bg-emerald-300" : "bg-slate-200"
-                        )}
-                      />
-                    )}
-                    {!isLast && (
-                      <span
-                        className={cn(
-                          "absolute left-1/2 right-0 top-[6px] h-px",
-                          isActive || isPast ? "bg-emerald-300" : "bg-slate-200"
-                        )}
-                      />
-                    )}
-
+                  <div key={periodKey} className="flex items-center">
                     <button
+                      ref={(node) => {
+                        if (isActive) {
+                          activeButtonRef.current = node
+                        }
+                      }}
                       type="button"
                       onClick={() => {
                         if (stopIndex === null) return
@@ -164,39 +199,36 @@ export function ExcelPeriodTimeline({
                       }
                       disabled={!isSelectable}
                       className={cn(
-                        "group relative z-10 flex w-full flex-col items-center text-center",
-                        isActive && "text-blue-700",
-                        isPast && "text-emerald-700",
-                        !isSelectable && "cursor-default text-slate-400",
-                        isSelectable && !isActive && !isPast && "text-slate-500 hover:text-slate-700"
+                        "group relative z-10 shrink-0 text-center transition-all duration-300 ease-out",
+                        isActive && "-translate-y-1",
+                        !isSelectable && "cursor-default"
                       )}
                       aria-pressed={isActive}
                       aria-label={isSelectable ? `${month} ${year}` : `${month} ${year} (χωρίς δεδομένα)`}
                     >
-                      <span className="flex h-4 items-center justify-center bg-white px-2">
-                        <span
-                          className={cn(
-                            "h-3 w-3 rounded-full border-2 transition-colors",
-                            isActive && "border-blue-600 bg-blue-600",
-                            isPast && "border-emerald-600 bg-emerald-600",
-                            !isSelectable && "border-slate-200 bg-white",
-                            isSelectable && !isActive && !isPast && "border-slate-300 bg-white group-hover:border-slate-400"
-                          )}
-                        />
-                      </span>
                       <span
                         className={cn(
-                          "mt-2 inline-flex min-h-[3.25rem] min-w-[5.5rem] flex-col items-center justify-center rounded-xl border px-3 py-2 transition-colors",
-                          isActive && "border-blue-200 bg-blue-50 text-blue-700",
-                          isPast && "border-emerald-200 bg-emerald-50 text-emerald-700",
-                          !isSelectable && "border-slate-200 bg-slate-50 text-slate-400",
-                          isSelectable && !isActive && !isPast && "border-slate-200 bg-white text-slate-600 group-hover:border-slate-300"
+                          "inline-flex min-h-[4.25rem] w-[8.75rem] flex-col items-center justify-center rounded-2xl border px-4 py-3 shadow-sm transition-all duration-300 ease-out",
+                          isActive && "border-blue-200 bg-blue-50 text-blue-700 shadow-md shadow-blue-100/60",
+                          isPast && "border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-100/60",
+                          !isSelectable && "border-slate-200 bg-slate-50 text-slate-400 shadow-none",
+                          isSelectable && !isActive && !isPast && "border-slate-200 bg-white text-slate-600 group-hover:border-slate-300 group-hover:bg-slate-50"
                         )}
                       >
-                        <span className="text-[11px] font-semibold leading-none">{month}</span>
-                        <span className="mt-1 text-[11px] font-medium leading-none opacity-80">{year}</span>
+                        <span className="text-sm font-semibold leading-tight">{month}</span>
+                        <span className="mt-1 text-sm font-medium leading-tight opacity-80">{year}</span>
                       </span>
                     </button>
+
+                    {!isLast && (
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "mx-6 h-[2px] w-20 shrink-0 rounded-full transition-colors duration-300 ease-out",
+                          isConnectorActive ? "bg-emerald-300" : "bg-slate-200"
+                        )}
+                      />
+                    )}
                   </div>
                 )
               })}

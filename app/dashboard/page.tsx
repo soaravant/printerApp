@@ -42,7 +42,7 @@ import { IncomeFilters } from "@/components/income-filters"
 // Firestore
 import { fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite, fetchPrintJobsSince, fetchLaminationJobsSince, fetchIncomeSince, fetchUsers, useExcelImportHistory } from "@/lib/firebase-queries"
 import { FIREBASE_COLLECTIONS } from "@/lib/firebase-schema"
-import { getPrintTypeLabel, isManagedEntityRole, normalizeGreek, normalizeUserRoleLabel, roundMoney } from "@/lib/utils"
+import { getPrintTypeLabel, isExcelPrintImportType, isManagedEntityRole, normalizeGreek, normalizeUserRoleLabel, roundMoney } from "@/lib/utils"
 import { coerceToDate, computeDebtsAndBankForUser } from "@/lib/debt-projection"
 import { getSnapshot, saveSnapshot, makeScopeKey, mergeById, sortByTimestampDesc } from "@/lib/snapshot-store"
 import { loadRemoteSnapshot } from "@/lib/remote-snapshot"
@@ -74,6 +74,13 @@ type ProjectedDashboardState = {
     laminationBank: number
   }
 }
+
+type HoveredPrintJob = {
+  rawType: FirebasePrintJob["type"] | "combined"
+  isExcelImport: boolean
+}
+
+type ExcelPrintStatKey = "bw" | "color" | "adjustment"
 
 const PrintJobsTable = dynamic(() => import("@/components/print-jobs-table"), {
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση εκτυπώσεων...</div>,
@@ -385,7 +392,7 @@ export default function DashboardPage() {
   const [hasMoreIncome, setHasMoreIncome] = useState<boolean>(false)
 
   // Hover state for highlighting statistics
-  const [hoveredPrintJob, setHoveredPrintJob] = useState<{ deviceName: string; printType: string } | null>(null)
+  const [hoveredPrintJob, setHoveredPrintJob] = useState<HoveredPrintJob | null>(null)
   const [hoveredLaminationJob, setHoveredLaminationJob] = useState<{ machine: string; type: string } | null>(null)
 
   // Bank reset confirmation states
@@ -813,13 +820,15 @@ export default function DashboardPage() {
         filteredPJ = filteredPJ.filter((item) => {
           switch (printTypeFilter) {
             case "a4BW":
-              return item.type === "A4BW"
+              return item.type === "A4BW" || item.type === "ExcelBWImport"
             case "a4Color":
-              return item.type === "A4Color"
+              return item.type === "A4Color" || item.type === "ExcelColorImport"
             case "a3BW":
               return item.type === "A3BW"
             case "a3Color":
               return item.type === "A3Color"
+            case "excelAdjustment":
+              return item.type === "ExcelAdjustmentImport"
             case "rizochartoA3":
               return item.type === "RizochartoA3"
             case "rizochartoA4":
@@ -1148,7 +1157,7 @@ export default function DashboardPage() {
     return [...new Set(timelinePrintJobs.map((job) => job.deviceName).filter(Boolean))]
   }, [timelinePrintJobs])
   const uniqueDevices = useMemo(() => {
-    return ["Canon Color", "Canon B/W", "Brother", "Κυδωνιών"].filter(device => allDevices.includes(device))
+    return [...allDevices].sort((left, right) => left.localeCompare(right, "el"))
   }, [allDevices])
 
   if (!user) {
@@ -1249,67 +1258,30 @@ export default function DashboardPage() {
   const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
 
   // Calculate print statistics
-  const calculatePrintStatistics = (hoveredJob?: { deviceName: string; printType: string } | null) => {
+  const calculatePrintStatistics = () => {
     const stats = {
-      canonBW: {
-        a4BW: 0
-      },
-      canonColour: {
-        a4BW: 0,
-        a4Colour: 0,
-        a3BW: 0,
-        a3Colour: 0,
-        a4Total: 0,
-        a3Total: 0,
-        total: 0
-      },
-      brother: {
-        a4BW: 0
-      },
-      kydonion: {
-        a4BW: 0,
-        total: 0
-      },
-      total: 0
+      bwPages: 0,
+      colorPages: 0,
+      adjustmentCost: 0,
+      totalPages: 0,
+      totalCharges: 0,
     }
 
-    filteredPrintJobs.forEach(job => {
-      if (job.deviceName === "Canon B/W") {
-        if (job.type === "A4BW") {
-          stats.canonBW.a4BW += job.quantity
-          stats.total += job.quantity
-        }
-      } else if (job.deviceName === "Canon Color") {
-        if (job.type === "A4BW") {
-          stats.canonColour.a4BW += job.quantity
-        } else if (job.type === "A4Color") {
-          stats.canonColour.a4Colour += job.quantity
-        } else if (job.type === "A3BW") {
-          stats.canonColour.a3BW += job.quantity
-        } else if (job.type === "A3Color") {
-          stats.canonColour.a3Colour += job.quantity
-        }
-      } else if (job.deviceName === "Brother") {
-        if (job.type === "A4BW") {
-          stats.brother.a4BW += job.quantity
-          stats.total += job.quantity
-        }
-      } else if (job.deviceName === "Κυδωνιών") {
-        if (job.type === "A4BW") {
-          stats.kydonion.a4BW += job.quantity
-          stats.total += job.quantity
-        }
+    filteredPrintJobs.forEach((job) => {
+      if (!isExcelPrintImportType(job.type)) return
+
+      if (job.type === "ExcelBWImport") {
+        stats.bwPages += job.quantity
+        stats.totalPages += job.quantity
+      } else if (job.type === "ExcelColorImport") {
+        stats.colorPages += job.quantity
+        stats.totalPages += job.quantity
+      } else if (job.type === "ExcelAdjustmentImport") {
+        stats.adjustmentCost = roundMoney(stats.adjustmentCost + job.totalCost)
       }
+
+      stats.totalCharges = roundMoney(stats.totalCharges + job.totalCost)
     })
-
-    // Calculate totals after all jobs are processed
-    stats.canonColour.a4Total = stats.canonColour.a4BW + stats.canonColour.a4Colour
-    stats.canonColour.a3Total = stats.canonColour.a3BW + stats.canonColour.a3Colour
-    stats.canonColour.total = stats.canonColour.a4Total + stats.canonColour.a3Total
-    stats.kydonion.total = stats.kydonion.a4BW
-
-    // Calculate overall total
-    stats.total = stats.canonBW.a4BW + stats.canonColour.total + stats.brother.a4BW + stats.kydonion.total
 
     return stats
   }
@@ -1346,13 +1318,67 @@ export default function DashboardPage() {
     return stats
   }
 
-  const printStats = calculatePrintStatistics(hoveredPrintJob)
+  const printStats = calculatePrintStatistics()
   const laminationStats = calculateLaminationStatistics(hoveredLaminationJob)
 
   // Helper functions to determine if a statistic should be highlighted
-  const isPrintStatHighlighted = (deviceName: string, printType: string) => {
-    if (!hoveredPrintJob) return false
-    return hoveredPrintJob.deviceName === deviceName && hoveredPrintJob.printType === printType
+  const getHoveredPrintStatKey = (hoveredJob: HoveredPrintJob | null): ExcelPrintStatKey | null => {
+    if (!hoveredJob?.isExcelImport) return null
+
+    switch (hoveredJob.rawType) {
+      case "ExcelBWImport":
+        return "bw"
+      case "ExcelColorImport":
+        return "color"
+      case "ExcelAdjustmentImport":
+        return "adjustment"
+      default:
+        return null
+    }
+  }
+
+  const hoveredPrintStatKey = getHoveredPrintStatKey(hoveredPrintJob)
+
+  const isPrintStatHighlighted = (statKey: ExcelPrintStatKey) => {
+    return hoveredPrintStatKey === statKey
+  }
+
+  const isPrintPagesTotalHighlighted = hoveredPrintStatKey === "bw" || hoveredPrintStatKey === "color"
+  const isPrintChargesTotalHighlighted = hoveredPrintStatKey !== null
+  const printStatValueClass = (highlighted: boolean) =>
+    highlighted ? "text-blue-600 bg-blue-100 rounded px-2 py-1" : "text-black"
+
+  const renderPrintStatValue = (value: string | number, highlighted: boolean, sizeClass = "text-2xl") => (
+    <div className={`${sizeClass} font-bold inline-flex items-center justify-center ${printStatValueClass(highlighted)}`}>
+      {value}
+    </div>
+  )
+
+  const renderPrintStatCard = ({
+    title,
+    subtitle,
+    value,
+    highlighted = false,
+  }: {
+    title: string
+    subtitle: string
+    value: string | number
+    highlighted?: boolean
+  }) => {
+    return (
+      <div className="bg-white rounded-lg border border-blue-200 shadow-sm">
+        <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+          <div className="flex items-center gap-2">
+            <Printer className="h-5 w-5 text-blue-700" />
+            <h3 className="text-sm font-semibold text-blue-900">{title}</h3>
+          </div>
+        </div>
+        <div className="p-4 text-center">
+          <div className="text-sm text-gray-600 mb-2">{subtitle}</div>
+          {renderPrintStatValue(value, highlighted)}
+        </div>
+      </div>
+    )
   }
 
   const isLaminationStatHighlighted = (machine: string, type: string) => {
@@ -2212,148 +2238,47 @@ export default function DashboardPage() {
 
                 {/* Print Statistics Cards */}
                 <div className="mt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                    {/* Canon Color Statistics */}
-                    <div className="md:col-span-4 bg-white rounded-lg border border-blue-200 shadow-sm">
-                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
-                        <div className="flex items-center gap-2">
-                          <Printer className="h-5 w-5 text-blue-700" />
-                          <h3 className="text-sm font-semibold text-blue-900">Canon Color</h3>
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <div className="grid grid-cols-4 grid-rows-2 gap-2 text-center">
-                          {/* Row 1 */}
-                          <div>
-                            <div className="text-xs text-gray-600">A4 B/W</div>
-                            <div className={`text-lg font-bold ${isPrintStatHighlighted("Canon Color", "A4 Ασπρόμαυρο")
-                              ? "text-blue-600 bg-blue-100 rounded px-1"
-                              : "text-black"
-                              }`}>
-                              {printStats.canonColour.a4BW}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-600">A4 Colour</div>
-                            <div className={`text-lg font-bold ${isPrintStatHighlighted("Canon Color", "A4 Έγχρωμο")
-                              ? "text-blue-600 bg-blue-100 rounded px-1"
-                              : "text-black"
-                              }`}>
-                              {printStats.canonColour.a4Colour}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-600">A4 Total</div>
-                            <div className="text-lg font-bold text-black">{printStats.canonColour.a4Total}</div>
-                          </div>
-                          <div className="row-span-2 flex flex-col items-center justify-center">
-                            <div className="text-xs text-gray-600">Total</div>
-                            <div className="text-xl font-bold text-black">{printStats.canonColour.total}</div>
-                          </div>
-
-                          {/* Row 2 */}
-                          <div>
-                            <div className="text-xs text-gray-600">A3 B/W</div>
-                            <div className={`text-lg font-bold ${isPrintStatHighlighted("Canon Color", "A3 Ασπρόμαυρο")
-                              ? "text-blue-600 bg-blue-100 rounded px-1"
-                              : "text-black"
-                              }`}>
-                              {printStats.canonColour.a3BW}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-600">A3 Colour</div>
-                            <div className={`text-lg font-bold ${isPrintStatHighlighted("Canon Color", "A3 Έγχρωμο")
-                              ? "text-blue-600 bg-blue-100 rounded px-1"
-                              : "text-black"
-                              }`}>
-                              {printStats.canonColour.a3Colour}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-600">A3 Total</div>
-                            <div className="text-lg font-bold text-black">{printStats.canonColour.a3Total}</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Canon B/W Statistics */}
-                    <div className="md:col-span-2 bg-white rounded-lg border border-blue-200 shadow-sm">
-                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
-                        <div className="flex items-center gap-2">
-                          <Printer className="h-5 w-5 text-blue-700" />
-                          <h3 className="text-sm font-semibold text-blue-900">Canon B/W</h3>
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <div className="text-center">
-                          <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
-                          <div className={`text-xl font-bold ${isPrintStatHighlighted("Canon B/W", "A4 Ασπρόμαυρο")
-                            ? "text-blue-600 bg-blue-100 rounded px-1"
-                            : "text-black"
-                            }`}>
-                            {printStats.canonBW.a4BW}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Brother Statistics */}
-                    <div className="md:col-span-2 bg-white rounded-lg border border-blue-200 shadow-sm">
-                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
-                        <div className="flex items-center gap-2">
-                          <Printer className="h-5 w-5 text-blue-700" />
-                          <h3 className="text-sm font-semibold text-blue-900">Brother</h3>
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <div className="text-center">
-                          <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
-                          <div className={`text-xl font-bold ${isPrintStatHighlighted("Brother", "A4 Ασπρόμαυρο")
-                            ? "text-blue-600 bg-blue-100 rounded px-1"
-                            : "text-black"
-                            }`}>
-                            {printStats.brother.a4BW}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Κυδωνιών Statistics */}
-                    <div className="md:col-span-2 bg-white rounded-lg border border-blue-200 shadow-sm">
-                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
-                        <div className="flex items-center gap-2">
-                          <Printer className="h-5 w-5 text-blue-700" />
-                          <h3 className="text-sm font-semibold text-blue-900">Κυδωνιών</h3>
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <div className="text-center">
-                          <div className="text-sm text-gray-600 mb-1">A4 B/W</div>
-                          <div className={`text-xl font-bold ${isPrintStatHighlighted("Κυδωνιών", "A4 Ασπρόμαυρο")
-                            ? "text-blue-600 bg-blue-100 rounded px-1"
-                            : "text-black"
-                            }`}>
-                            {printStats.kydonion.a4BW}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Total Print Statistics */}
-                    <div className="md:col-span-2 bg-white rounded-lg border border-blue-200 shadow-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    {renderPrintStatCard({
+                      title: "Excel Ασπρόμαυρο",
+                      subtitle: "A4 Ασπρόμαυρο",
+                      value: printStats.bwPages,
+                      highlighted: isPrintStatHighlighted("bw"),
+                    })}
+                    {renderPrintStatCard({
+                      title: "Excel Έγχρωμο",
+                      subtitle: "A4 Έγχρωμο",
+                      value: printStats.colorPages,
+                      highlighted: isPrintStatHighlighted("color"),
+                    })}
+                    {renderPrintStatCard({
+                      title: "Προσαρμογή Excel",
+                      subtitle: "Χρέωση από Excel",
+                      value: formatPrice(printStats.adjustmentCost),
+                      highlighted: isPrintStatHighlighted("adjustment"),
+                    })}
+                    <div className="bg-white rounded-lg border border-blue-200 shadow-sm">
                       <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                         <div className="flex items-center gap-2">
                           <BarChart3 className="h-5 w-5 text-blue-700" />
-                          <h3 className="text-sm font-semibold text-blue-900">Σύνολο</h3>
+                          <h3 className="text-sm font-semibold text-blue-900">Σύνολο Σελίδων</h3>
                         </div>
                       </div>
-                      <div className="p-4">
-                        <div className="text-center">
-                          <div className="text-sm text-gray-600 mb-1">Συνολικές Εκτυπώσεις</div>
-                          <div className="text-2xl font-bold text-black">{printStats.total}</div>
+                      <div className="p-4 text-center">
+                        <div className="text-sm text-gray-600 mb-2">Μόνο από εισαγωγές Excel</div>
+                        {renderPrintStatValue(printStats.totalPages, isPrintPagesTotalHighlighted)}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg border border-blue-200 shadow-sm">
+                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="h-5 w-5 text-blue-700" />
+                          <h3 className="text-sm font-semibold text-blue-900">Σύνολο Χρεώσεων</h3>
                         </div>
+                      </div>
+                      <div className="p-4 text-center">
+                        <div className="text-sm text-gray-600 mb-2">Μόνο από εισαγωγές Excel</div>
+                        {renderPrintStatValue(formatPrice(printStats.totalCharges), isPrintChargesTotalHighlighted)}
                       </div>
                     </div>
                   </div>

@@ -7,7 +7,7 @@ import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { sortData, toggleSort, type SortConfig } from "@/lib/sort-utils"
 import { useState, useEffect } from "react"
 import type { FirebasePrintJob } from "@/lib/firebase-schema"
-import { getPrintTypeLabel } from "@/lib/utils"
+import { getPrintTypeLabel, isExcelPrintImportType } from "@/lib/utils"
 
 // Shared column definition for consistent widths
 function PrintJobsColGroup({ userRole }: { userRole: string }) {
@@ -30,7 +30,7 @@ interface PrintJobsTableProps {
   pageSize: number
   onPageChange: (page: number) => void
   userRole: string
-  onRowHover?: (hoveredJob: { deviceName: string; printType: string } | null) => void
+  onRowHover?: (hoveredJob: { rawType: FirebasePrintJob["type"]; isExcelImport: boolean } | null) => void
   printTypeFilter?: string // New prop for filtering expanded rows
   hasMore?: boolean
 }
@@ -70,6 +70,18 @@ const filterRowsByType = (rows: any[], printTypeFilter: string) => {
     return rows
   }
   
+  if (printTypeFilter === "a4BW") {
+    return rows.filter(row => row.type === "A4BW" || row.type === "ExcelBWImport")
+  }
+
+  if (printTypeFilter === "a4Color") {
+    return rows.filter(row => row.type === "A4Color" || row.type === "ExcelColorImport")
+  }
+
+  if (printTypeFilter === "excelAdjustment") {
+    return rows.filter(row => row.type === "ExcelAdjustmentImport")
+  }
+
   return rows.filter(row => row.type === targetType)
 }
 
@@ -181,7 +193,7 @@ export default function PrintJobsTable({ data, page, pageSize, onPageChange, use
                 <TableRow 
                   key={row.rowId}
                   className="hover:bg-blue-50 cursor-pointer transition-colors duration-200"
-                  onMouseEnter={() => onRowHover?.({ deviceName: row.deviceName, printType: row.printType })}
+                  onMouseEnter={() => onRowHover?.({ rawType: row.type, isExcelImport: isExcelPrintImportType(row.type) })}
                   onMouseLeave={() => onRowHover?.(null)}
                 >
                   <TableCell className="text-center">{row.timestamp.toLocaleString("el-GR")}</TableCell>

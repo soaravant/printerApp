@@ -176,6 +176,10 @@ export function getPrintTypeLabel(type: string): string {
   }
 }
 
+export function isExcelPrintImportType(type: string): boolean {
+  return type === "ExcelBWImport" || type === "ExcelColorImport" || type === "ExcelAdjustmentImport"
+}
+
 /**
  * Calculates the total cost for a print job with proper rounding.
  * 

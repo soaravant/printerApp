@@ -17,6 +17,7 @@ exports.isManagedEntityRole = isManagedEntityRole;
 exports.getUserRolePluralLabel = getUserRolePluralLabel;
 exports.getUserRoleObjectLabel = getUserRoleObjectLabel;
 exports.getPrintTypeLabel = getPrintTypeLabel;
+exports.isExcelPrintImportType = isExcelPrintImportType;
 exports.calculatePrintJobTotal = calculatePrintJobTotal;
 exports.calculatePrintCost = calculatePrintCost;
 const clsx_1 = require("clsx");
@@ -179,6 +180,9 @@ function getPrintTypeLabel(type) {
         default:
             return type;
     }
+}
+function isExcelPrintImportType(type) {
+    return type === "ExcelBWImport" || type === "ExcelColorImport" || type === "ExcelAdjustmentImport";
 }
 /**
  * Calculates the total cost for a print job with proper rounding.

@@ -142,24 +142,45 @@ function loadServerModules() {
 function bufferToArrayBuffer(buffer) {
     return Uint8Array.from(buffer).buffer;
 }
-function periodMidpointDate(periodKey) {
+function periodSettlementTimestamp(periodKey) {
     const [yearPart, monthPart] = periodKey.split("-");
     const year = Number(yearPart);
     const month = Number(monthPart);
-    return new Date(Date.UTC(year, month - 1, 20, 12, 0, 0));
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+        return new Date();
+    }
+    return new Date(Date.UTC(year, month, 0, 12, 0, 0));
 }
-function buildIncomeAmount(periodIndex, userIndex) {
-    return 20 + ((periodIndex * 7 + userIndex * 11) % 8) * 5;
+function getOpeningOutstandingTotal(user) {
+    const openingPrintDebt = roundMoney(Number(user.openingPrintDebt || 0));
+    const openingLaminationDebt = roundMoney(Number(user.openingLaminationDebt || 0));
+    const totalCredit = roundMoney(Math.max(0, -openingPrintDebt) + Math.max(0, -openingLaminationDebt));
+    return roundMoney(Math.max(0, openingPrintDebt) + Math.max(0, openingLaminationDebt) - totalCredit);
 }
-function pickIncomeRecipients(users, periodIndex) {
-    const eligibleUsers = users
-        .filter((user) => user.accessLevel === "Χρήστης")
-        .filter((user) => user.userRole === "Ναός" || user.userRole === "Ομάδα" || user.userRole === "Άτομο")
-        .sort((left, right) => left.username.localeCompare(right.username));
-    if (eligibleUsers.length === 0)
-        return [];
-    const recipientCount = Math.min(8, eligibleUsers.length);
-    return Array.from({ length: recipientCount }, (_, offset) => eligibleUsers[(periodIndex * 5 + offset) % eligibleUsers.length]);
+function getIncomeCadenceMonths(user) {
+    return user.userRole === "Άτομο" ? 3 : 4;
+}
+function getRollingIncomeRatio(user) {
+    switch (user.userRole) {
+        case "Άτομο":
+            return 0.52;
+        case "Ομάδα":
+            return 0.48;
+        case "Ναός":
+            return 0.44;
+        case "Τομέας":
+            return 0.42;
+        default:
+            return 0.45;
+    }
+}
+function buildSettlementPayment(outstanding, userIndex, periodIndex, isLastPeriod) {
+    const residualPattern = isLastPeriod ? [0, 0.25, 0.5, 0.75] : [0, 0.4, 0.8, 1.2];
+    const residual = residualPattern[(userIndex + periodIndex) % residualPattern.length];
+    if (outstanding <= residual + 2) {
+        return roundMoney(outstanding);
+    }
+    return roundMoney(Math.max(0, outstanding - residual));
 }
 async function generateExcelPairs() {
     const result = (0, child_process_1.spawnSync)(process.execPath, [path_1.default.join(REPO_ROOT, "scripts", "generate-excel-import-test-pairs.js")], {
@@ -179,25 +200,90 @@ async function fetchAllUsers() {
     const snap = await db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.USERS).get();
     return snap.docs.map((doc) => doc.data());
 }
-async function createDummyIncomeForPeriod(periodKey, periodIndex) {
+async function createDummyIncomeHistory(periodKeys) {
     const db = (0, firebase_admin_1.default)();
-    const users = await fetchAllUsers();
-    const recipients = pickIncomeRecipients(users, periodIndex);
-    const timestamp = periodMidpointDate(periodKey);
-    const batch = db.batch();
-    recipients.forEach((user, userIndex) => {
-        const income = {
-            incomeId: `dummy-income-${periodKey}-${user.uid}`,
-            uid: user.uid,
-            username: user.username,
-            userDisplayName: user.displayName,
-            amount: buildIncomeAmount(periodIndex, userIndex),
-            timestamp,
-            createdAt: new Date(),
-        };
-        batch.set(db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.INCOME).doc(income.incomeId), income);
+    const [users, printSnap, laminationSnap] = await Promise.all([
+        fetchAllUsers(),
+        db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.PRINT_JOBS).get(),
+        db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.LAMINATION_JOBS).get(),
+    ]);
+    const printJobs = printSnap.docs.map((doc) => doc.data());
+    const laminationJobs = laminationSnap.docs.map((doc) => doc.data());
+    const periodSet = new Set(periodKeys);
+    const chargesByUserAndPeriod = new Map();
+    const addCharge = (uid, periodKey, amount) => {
+        var _a;
+        if (!periodSet.has(periodKey) || amount <= 0)
+            return;
+        const userCharges = (_a = chargesByUserAndPeriod.get(uid)) !== null && _a !== void 0 ? _a : new Map();
+        userCharges.set(periodKey, roundMoney((userCharges.get(periodKey) || 0) + amount));
+        chargesByUserAndPeriod.set(uid, userCharges);
+    };
+    for (const job of printJobs) {
+        const timestamp = coerceToDate(job.timestamp);
+        if (!timestamp)
+            continue;
+        addCharge(job.uid, timestamp.toISOString().slice(0, 7), Number(job.totalCost || 0));
+    }
+    for (const job of laminationJobs) {
+        const timestamp = coerceToDate(job.timestamp);
+        if (!timestamp)
+            continue;
+        addCharge(job.uid, timestamp.toISOString().slice(0, 7), Number(job.totalCost || 0));
+    }
+    const eligibleUsers = users
+        .filter((user) => user.accessLevel === "Χρήστης")
+        .sort((left, right) => left.username.localeCompare(right.username));
+    const incomesToCreate = [];
+    eligibleUsers.forEach((user, userIndex) => {
+        let runningOutstanding = getOpeningOutstandingTotal(user);
+        const cadence = getIncomeCadenceMonths(user);
+        const cadenceOffset = userIndex % cadence;
+        periodKeys.forEach((periodKey, periodIndex) => {
+            var _a;
+            const periodCharge = roundMoney(((_a = chargesByUserAndPeriod.get(user.uid)) === null || _a === void 0 ? void 0 : _a.get(periodKey)) || 0);
+            runningOutstanding = roundMoney(runningOutstanding + periodCharge);
+            if (runningOutstanding <= 0.01)
+                return;
+            const isLastPeriod = periodIndex === periodKeys.length - 1;
+            const shouldSettle = isLastPeriod || (periodIndex + cadenceOffset + 1) % cadence === 0;
+            const variableRatio = getRollingIncomeRatio(user) + (((userIndex + periodIndex) % 2) * 0.06);
+            const paymentAmount = shouldSettle
+                ? buildSettlementPayment(runningOutstanding, userIndex, periodIndex, isLastPeriod)
+                : roundMoney(Math.min(runningOutstanding, Math.max(8, runningOutstanding * variableRatio, periodCharge * 0.95)));
+            if (paymentAmount < 4)
+                return;
+            const timestamp = periodSettlementTimestamp(periodKey);
+            const splitPayment = shouldSettle && paymentAmount >= 24;
+            const paymentChunks = splitPayment
+                ? [roundMoney(paymentAmount * 0.45), roundMoney(paymentAmount - roundMoney(paymentAmount * 0.45))]
+                : [paymentAmount];
+            paymentChunks.forEach((amount, paymentIndex) => {
+                if (amount <= 0)
+                    return;
+                incomesToCreate.push({
+                    incomeId: `dummy-income-${periodKey}-${user.uid}-${paymentIndex + 1}`,
+                    uid: user.uid,
+                    username: user.username,
+                    userDisplayName: user.displayName,
+                    amount,
+                    timestamp,
+                    createdAt: new Date(),
+                });
+            });
+            runningOutstanding = roundMoney(runningOutstanding - paymentAmount);
+        });
     });
-    await batch.commit();
+    const batchSize = 400;
+    for (let index = 0; index < incomesToCreate.length; index += batchSize) {
+        const batch = db.batch();
+        const chunk = incomesToCreate.slice(index, index + batchSize);
+        chunk.forEach((income) => {
+            batch.set(db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.INCOME).doc(income.incomeId), income);
+        });
+        await batch.commit();
+    }
+    console.log(`Created ${incomesToCreate.length} income rows across ${eligibleUsers.length} users`);
 }
 async function recomputeAllUsersAndBank() {
     const db = (0, firebase_admin_1.default)();
@@ -282,10 +368,8 @@ async function main() {
             actor: ADMIN_ACTOR,
         });
     }
-    for (const [index, pair] of manifest.pairs.entries()) {
-        console.log(`Creating income for ${pair.periodKey} (${index + 1}/${manifest.pairs.length})...`);
-        await createDummyIncomeForPeriod(pair.periodKey, index);
-    }
+    console.log("Creating denser income history...");
+    await createDummyIncomeHistory(manifest.pairs.map((pair) => pair.periodKey));
     console.log("Recomputing balances and bank totals...");
     await recomputeAllUsersAndBank();
 }
