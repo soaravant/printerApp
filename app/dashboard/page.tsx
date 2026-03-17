@@ -1264,7 +1264,6 @@ export default function DashboardPage() {
       colorPages: 0,
       adjustmentCost: 0,
       totalPages: 0,
-      totalCharges: 0,
     }
 
     filteredPrintJobs.forEach((job) => {
@@ -1279,8 +1278,6 @@ export default function DashboardPage() {
       } else if (job.type === "ExcelAdjustmentImport") {
         stats.adjustmentCost = roundMoney(stats.adjustmentCost + job.totalCost)
       }
-
-      stats.totalCharges = roundMoney(stats.totalCharges + job.totalCost)
     })
 
     return stats
@@ -1344,7 +1341,6 @@ export default function DashboardPage() {
   }
 
   const isPrintPagesTotalHighlighted = hoveredPrintStatKey === "bw" || hoveredPrintStatKey === "color"
-  const isPrintChargesTotalHighlighted = hoveredPrintStatKey !== null
   const printStatValueClass = (highlighted: boolean) =>
     highlighted ? "text-blue-600 bg-blue-100 rounded px-2 py-1" : "text-black"
 
@@ -2238,7 +2234,7 @@ export default function DashboardPage() {
 
                 {/* Print Statistics Cards */}
                 <div className="mt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {renderPrintStatCard({
                       title: "Excel Ασπρόμαυρο",
                       subtitle: "A4 Ασπρόμαυρο",
@@ -2267,18 +2263,6 @@ export default function DashboardPage() {
                       <div className="p-4 text-center">
                         <div className="text-sm text-gray-600 mb-2">Μόνο από εισαγωγές Excel</div>
                         {renderPrintStatValue(printStats.totalPages, isPrintPagesTotalHighlighted)}
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-lg border border-blue-200 shadow-sm">
-                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
-                        <div className="flex items-center gap-2">
-                          <BarChart3 className="h-5 w-5 text-blue-700" />
-                          <h3 className="text-sm font-semibold text-blue-900">Σύνολο Χρεώσεων</h3>
-                        </div>
-                      </div>
-                      <div className="p-4 text-center">
-                        <div className="text-sm text-gray-600 mb-2">Μόνο από εισαγωγές Excel</div>
-                        {renderPrintStatValue(formatPrice(printStats.totalCharges), isPrintChargesTotalHighlighted)}
                       </div>
                     </div>
                   </div>

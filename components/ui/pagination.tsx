@@ -122,7 +122,7 @@ const SimplePagination = ({
 }) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const canGoPrev = page > 1
-  const canGoNext = hasMore ?? (page < totalPages)
+  const canGoNext = page < totalPages || Boolean(hasMore)
   
   return (
     <div className="flex gap-2 justify-end items-center mt-2">
