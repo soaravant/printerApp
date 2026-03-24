@@ -26,13 +26,12 @@ import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import dynamic from "next/dynamic"
 import { useState, useEffect, useRef, useMemo, useDeferredValue, useTransition } from "react"
-import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download, RotateCcw, Filter, FileText, BarChart3 } from "lucide-react"
+import { Printer, CreditCard, TrendingUp, Receipt, Calendar, Settings, X, Download, RotateCcw, Filter, BarChart3 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 // Note: Load XLSX only on demand to avoid adding it to the main bundle
 let XLSX: any
 import React from "react"
 
-import { ExcelImportWizard } from "@/components/excel-import-wizard"
 import { ExcelPeriodTimeline } from "@/components/excel-period-timeline"
 import { PrintFilters } from "@/components/print-filters"
 import { LaminationFilters } from "@/components/lamination-filters"
@@ -126,7 +125,31 @@ function collapseImportHistoryByPeriod(history: FirebaseExcelImportRunSummary[])
     })
   }
 
-  return Array.from(latestByPeriod.values()).sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+  return Array.from(latestByPeriod.values()).sort((left, right) => left.periodKey.localeCompare(right.periodKey))
+}
+
+function getPeriodKeyDateRange(periodKey: string | null | undefined) {
+  if (!periodKey) return null
+  const [yearPart, monthPart] = String(periodKey).split("-")
+  const year = Number(yearPart)
+  const month = Number(monthPart)
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return null
+
+  return {
+    start: new Date(year, month - 1, 1, 0, 0, 0, 0),
+    end: new Date(year, month, 0, 23, 59, 59, 999),
+  }
+}
+
+function isPeriodKeyWithinSelectedRange(
+  periodKey: string | null | undefined,
+  startPeriodKey: string | null,
+  endPeriodKey: string | null,
+) {
+  if (!periodKey) return false
+  if (startPeriodKey && periodKey < startPeriodKey) return false
+  if (endPeriodKey && periodKey > endPeriodKey) return false
+  return true
 }
 
 function projectDashboardState(params: {
@@ -134,19 +157,25 @@ function projectDashboardState(params: {
   printJobs: FirebasePrintJob[]
   laminationJobs: FirebaseLaminationJob[]
   income: FirebaseIncome[]
-  cutoff: Date | null
+  start: Date | null
+  end: Date | null
+  startPeriodKey: string | null
+  endPeriodKey: string | null
 }): ProjectedDashboardState {
-  const cutoffMs = params.cutoff?.getTime() ?? null
-  const isWithinCutoff = (value: unknown) => {
-    if (cutoffMs === null) return true
+  const startMs = params.start?.getTime() ?? null
+  const endMs = params.end?.getTime() ?? null
+  const isWithinRange = (value: unknown) => {
     const date = coerceToDate(value as any)
     if (!date) return false
-    return date.getTime() <= cutoffMs
+    const timestamp = date.getTime()
+    if (startMs !== null && timestamp < startMs) return false
+    if (endMs !== null && timestamp > endMs) return false
+    return true
   }
 
-  const visiblePrintJobs = params.printJobs.filter((job) => isWithinCutoff(job.timestamp))
-  const visibleLaminationJobs = params.laminationJobs.filter((job) => isWithinCutoff(job.timestamp))
-  const visibleIncome = params.income.filter((entry) => isWithinCutoff(entry.timestamp))
+  const visiblePrintJobs = params.printJobs.filter((job) => isWithinRange(job.timestamp))
+  const visibleLaminationJobs = params.laminationJobs.filter((job) => isWithinRange(job.timestamp))
+  const visibleIncome = params.income.filter((entry) => isWithinRange(entry.timestamp))
   const eventsByUid = new Map<string, Array<{ kind: "print" | "lamination" | "income"; amount: number; timestamp: Date }>>()
   const incomeByUid = new Map<string, FirebaseIncome[]>()
 
@@ -188,17 +217,17 @@ function projectDashboardState(params: {
         Number(currentUser.openingPrintDebt || 0) !== 0 ||
         Number(currentUser.openingLaminationDebt || 0) !== 0 ||
         Boolean(currentUser.openingDebtSource)
-      const openingBalancesAreActive =
-        hasOpeningBalance && (!openingDebtImportedAt || cutoffMs === null || openingDebtImportedAt.getTime() <= cutoffMs)
+      const openingBalancesAreActive = hasOpeningBalance && (
+        isPeriodKeyWithinSelectedRange(currentUser.openingDebtSource ?? null, params.startPeriodKey, params.endPeriodKey) ||
+        (!currentUser.openingDebtSource && isWithinRange(openingDebtImportedAt))
+      )
       const userEvents = eventsByUid.get(currentUser.uid) ?? []
-      const userExistsAtCutoff =
-        cutoffMs === null ||
-        !createdAt ||
-        createdAt.getTime() <= cutoffMs ||
+      const userExistsInRange =
+        (createdAt ? isWithinRange(createdAt) : false) ||
         userEvents.length > 0 ||
         openingBalancesAreActive
 
-      if (!userExistsAtCutoff) return null
+      if (!userExistsInRange) return null
 
       const { debts, bank } = computeDebtsAndBankForUser(userEvents, {
         printDebt: openingBalancesAreActive ? Number(currentUser.openingPrintDebt || 0) : 0,
@@ -400,9 +429,9 @@ export default function DashboardPage() {
   const [showLaminationBankResetDialog, setShowLaminationBankResetDialog] = useState(false)
   const [showTotalBankResetDialog, setShowTotalBankResetDialog] = useState(false)
 
-  // Excel Wizard Dialog state
-  const [isExcelWizardOpen, setIsExcelWizardOpen] = useState(false)
-  const [selectedTimelineImportId, setSelectedTimelineImportId] = useState<string | null>(null)
+  // Excel timeline range state
+  const [timelineStartPeriodKey, setTimelineStartPeriodKey] = useState<string | null>(null)
+  const [timelineEndPeriodKey, setTimelineEndPeriodKey] = useState<string | null>(null)
 
   const { data: cachedUsers } = useUsers()
   const { data: excelImportHistory = [] } = useExcelImportHistory()
@@ -420,14 +449,22 @@ export default function DashboardPage() {
   }, [uidFilter])
 
   const timelineStops = useMemo(() => collapseImportHistoryByPeriod(excelImportHistory), [excelImportHistory])
-  const selectedTimelineIndex = useMemo(
-    () => timelineStops.findIndex((stop) => stop.importId === selectedTimelineImportId),
-    [timelineStops, selectedTimelineImportId]
+  const timelineStartIndex = useMemo(
+    () => timelineStops.findIndex((stop) => stop.periodKey === timelineStartPeriodKey),
+    [timelineStops, timelineStartPeriodKey]
   )
-  const activeTimelineIndex = selectedTimelineIndex >= 0 ? selectedTimelineIndex : Math.max(0, timelineStops.length - 1)
-  const selectedTimelineStop =
-    selectedTimelineIndex >= 0 ? timelineStops[selectedTimelineIndex] : (timelineStops[timelineStops.length - 1] ?? null)
-  const selectedTimelineCutoff = selectedTimelineStop ? (selectedTimelineStop.completedAt || selectedTimelineStop.createdAt) : null
+  const timelineEndIndex = useMemo(
+    () => timelineStops.findIndex((stop) => stop.periodKey === timelineEndPeriodKey),
+    [timelineStops, timelineEndPeriodKey]
+  )
+  const activeTimelineStartIndex = timelineStartIndex >= 0 ? timelineStartIndex : 0
+  const activeTimelineEndIndex = timelineEndIndex >= 0 ? timelineEndIndex : Math.max(0, timelineStops.length - 1)
+  const normalizedTimelineStartIndex = Math.min(activeTimelineStartIndex, activeTimelineEndIndex)
+  const normalizedTimelineEndIndex = Math.max(activeTimelineStartIndex, activeTimelineEndIndex)
+  const selectedTimelineStartStop = timelineStops[normalizedTimelineStartIndex] ?? null
+  const selectedTimelineEndStop = timelineStops[normalizedTimelineEndIndex] ?? null
+  const selectedTimelineStart = getPeriodKeyDateRange(selectedTimelineStartStop?.periodKey ?? null)?.start ?? null
+  const selectedTimelineEnd = getPeriodKeyDateRange(selectedTimelineEndStop?.periodKey ?? null)?.end ?? null
 
   const projectedDashboardState = useMemo(
     () =>
@@ -436,9 +473,12 @@ export default function DashboardPage() {
         printJobs,
         laminationJobs,
         income,
-        cutoff: selectedTimelineCutoff,
+        start: selectedTimelineStart,
+        end: selectedTimelineEnd,
+        startPeriodKey: selectedTimelineStartStop?.periodKey ?? null,
+        endPeriodKey: selectedTimelineEndStop?.periodKey ?? null,
       }),
-    [allUsers, printJobs, laminationJobs, income, selectedTimelineCutoff]
+    [allUsers, printJobs, laminationJobs, income, selectedTimelineStart, selectedTimelineEnd, selectedTimelineStartStop, selectedTimelineEndStop]
   )
 
   const timelineUsers = projectedDashboardState.users
@@ -456,21 +496,39 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!timelineStops.length) {
-      setSelectedTimelineImportId(null)
+      setTimelineStartPeriodKey(null)
+      setTimelineEndPeriodKey(null)
       return
     }
-    const selectedStillExists = timelineStops.some((stop) => stop.importId === selectedTimelineImportId)
-    if (!selectedTimelineImportId || !selectedStillExists) {
-      setSelectedTimelineImportId(timelineStops[timelineStops.length - 1].importId)
+    const oldestPeriodKey = timelineStops[0].periodKey
+    const latestPeriodKey = timelineStops[timelineStops.length - 1].periodKey
+    const resolvedStartIndex = timelineStops.findIndex((stop) => stop.periodKey === timelineStartPeriodKey)
+    const resolvedEndIndex = timelineStops.findIndex((stop) => stop.periodKey === timelineEndPeriodKey)
+
+    if (resolvedStartIndex < 0 && timelineStartPeriodKey !== oldestPeriodKey) {
+      setTimelineStartPeriodKey(oldestPeriodKey)
+      return
     }
-  }, [timelineStops, selectedTimelineImportId])
+
+    if (resolvedEndIndex < 0 && timelineEndPeriodKey !== latestPeriodKey) {
+      setTimelineEndPeriodKey(latestPeriodKey)
+      return
+    }
+
+    if (resolvedStartIndex > resolvedEndIndex && resolvedEndIndex >= 0) {
+      const clampedStartKey = timelineStops[resolvedEndIndex].periodKey
+      if (timelineStartPeriodKey !== clampedStartKey) {
+        setTimelineStartPeriodKey(clampedStartKey)
+      }
+    }
+  }, [timelineStops, timelineStartPeriodKey, timelineEndPeriodKey])
 
   useEffect(() => {
     setPrintJobsPage(1)
     setLaminationJobsPage(1)
     setIncomePage(1)
     setDebtPage(1)
-  }, [selectedTimelineImportId])
+  }, [timelineStartPeriodKey, timelineEndPeriodKey])
 
   // Load snapshots first, then optionally enable/resume prefetch
   useEffect(() => {
@@ -1168,10 +1226,10 @@ export default function DashboardPage() {
     )
   }
 
-  // Calculate totals based on user debt fields
+  // Calculate totals based on projected users and timeline jobs
   const allUsersData = timelineUsers
 
-  // For the top 3 cards, show personal debts for Υπεύθυνος and Χρήστης users
+  // For the top 3 cards, show personal charges for Υπεύθυνος and Χρήστης users
   const personalDebtUsers = user.accessLevel === "Διαχειριστής"
     ? allUsersData
     : allUsersData.filter(u => u.uid === user.uid) // Both Υπεύθυνος and Χρήστης see only their personal data
@@ -1190,31 +1248,60 @@ export default function DashboardPage() {
       })
       : allUsersData.filter(u => u.uid === user.uid) // Regular users (Χρήστης) see only their personal data
 
-  const printUnpaid = personalDebtUsers.reduce((sum, u) => sum + (u.printDebt || 0), 0)
-  const laminationUnpaid = personalDebtUsers.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
-  // Use users' totalDebt directly so negative credit is reflected in the summary
-  const totalUnpaid = personalDebtUsers.reduce(
-    (sum, u) => sum + (typeof u.totalDebt === "number" ? u.totalDebt : (u.printDebt || 0) + (u.laminationDebt || 0)),
-    0
-  )
+  const isOpeningBalanceInSelectedRange = (currentUser: FirebaseUser) => {
+    if (isPeriodKeyWithinSelectedRange(
+      currentUser.openingDebtSource ?? null,
+      selectedTimelineStartStop?.periodKey ?? null,
+      selectedTimelineEndStop?.periodKey ?? null,
+    )) {
+      return true
+    }
+
+    if (currentUser.openingDebtSource) return false
+
+    const openingDebtImportedAt = coerceToDate(currentUser.openingDebtImportedAt ?? null)
+    if (!openingDebtImportedAt) return false
+    if (selectedTimelineStart && openingDebtImportedAt.getTime() < selectedTimelineStart.getTime()) return false
+    if (selectedTimelineEnd && openingDebtImportedAt.getTime() > selectedTimelineEnd.getTime()) return false
+    return true
+  }
+
+  const sumChargesForUsers = (
+    users: FirebaseUser[],
+    jobs: Array<{ uid: string; totalCost: number }>,
+    openingBalanceKey: "openingPrintDebt" | "openingLaminationDebt",
+  ) => {
+    const userIds = new Set(users.map((currentUser) => currentUser.uid))
+    const openingCharges = users.reduce((sum, currentUser) => {
+      if (!isOpeningBalanceInSelectedRange(currentUser)) return sum
+      return sum + Math.max(0, Number(currentUser[openingBalanceKey] || 0))
+    }, 0)
+    const jobCharges = jobs.reduce((sum, job) => {
+      if (!userIds.has(job.uid)) return sum
+      return sum + Number(job.totalCost || 0)
+    }, 0)
+
+    return roundMoney(openingCharges + jobCharges)
+  }
+
+  const printCharged = sumChargesForUsers(personalDebtUsers, timelinePrintJobs, "openingPrintDebt")
+  const laminationCharged = sumChargesForUsers(personalDebtUsers, timelineLaminationJobs, "openingLaminationDebt")
+  const totalCharged = roundMoney(printCharged + laminationCharged)
 
   // Calculate totals without filters for percentage calculations
-  const totalPrintUnpaid = allUsersData.reduce((sum, u) => sum + (u.printDebt || 0), 0)
-  const totalLaminationUnpaid = allUsersData.reduce((sum, u) => sum + (u.laminationDebt || 0), 0)
+  const totalPrintCharged = sumChargesForUsers(allUsersData, timelinePrintJobs, "openingPrintDebt")
+  const totalLaminationCharged = sumChargesForUsers(allUsersData, timelineLaminationJobs, "openingLaminationDebt")
 
   // Check if any filters are applied
   const hasFilters = searchTerm ||
     statusFilter !== "all" ||
     userFilter !== "all"
 
-  // Calculate percentages for debt cards
-  // Each type shows percentage of its own total (without filters)
-  const printUnpaidPercentage = totalPrintUnpaid > 0 ? (printUnpaid / totalPrintUnpaid) * 100 : 0
-  const laminationUnpaidPercentage = totalLaminationUnpaid > 0 ? (laminationUnpaid / totalLaminationUnpaid) * 100 : 0
-
-  // Calculate total percentage (combined debts)
-  const totalCombinedUnpaid = totalPrintUnpaid + totalLaminationUnpaid
-  const totalUnpaidPercentage = totalCombinedUnpaid > 0 ? (totalUnpaid / totalCombinedUnpaid) * 100 : 0
+  // Calculate percentages for summary cards
+  const printChargedPercentage = totalPrintCharged > 0 ? (printCharged / totalPrintCharged) * 100 : 0
+  const laminationChargedPercentage = totalLaminationCharged > 0 ? (laminationCharged / totalLaminationCharged) * 100 : 0
+  const totalCombinedCharged = totalPrintCharged + totalLaminationCharged
+  const totalChargedPercentage = totalCombinedCharged > 0 ? (totalCharged / totalCombinedCharged) * 100 : 0
 
   const currentMonth = new Date().toISOString().slice(0, 7)
   const currentMonthPrintJobs = timelinePrintJobs.filter((j) => j.timestamp.toISOString().slice(0, 7) === currentMonth)
@@ -1227,6 +1314,7 @@ export default function DashboardPage() {
   const laminationBank: number = useFirestore ? timelineBank.laminationBank : 0
   const totalBank = printBank + laminationBank
   const showBankResetActions = user.accessLevel === "Διαχειριστής" && timelineStops.length === 0
+  const summaryCardLabel = user.accessLevel === "Διαχειριστής" ? "Χρεώσεις|Έσοδα" : "Χρεώσεις"
 
   const getLaminationTypeLabel = (type: string) => {
     switch (type) {
@@ -1362,8 +1450,8 @@ export default function DashboardPage() {
     highlighted?: boolean
   }) => {
     return (
-      <div className="bg-white rounded-lg border border-blue-200 shadow-sm">
-        <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+      <div className="bg-white rounded-lg border-2 border-blue-200 shadow-sm">
+        <div className="bg-blue-100 px-4 py-3 border-b-2 border-blue-200">
           <div className="flex items-center gap-2">
             <Printer className="h-5 w-5 text-blue-700" />
             <h3 className="text-sm font-semibold text-blue-900">{title}</h3>
@@ -1677,15 +1765,6 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-50">
         <Navigation />
 
-        {isExcelWizardOpen && (
-          <ExcelImportWizard
-            open={isExcelWizardOpen}
-            onOpenChange={setIsExcelWizardOpen}
-            onImportCompleted={(importRun) => setSelectedTimelineImportId(importRun.importId)}
-            users={allUsers}
-          />
-        )}
-
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             <div className="mb-8">
@@ -1698,20 +1777,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Add Refresh & Import Data Buttons */}
+            {/* Add Refresh Button */}
             <div className="mb-6 flex justify-end gap-3">
-              {user.accessLevel === "Διαχειριστής" && (
-                <Button
-                  onClick={() => setIsExcelWizardOpen(true)}
-                  variant="outline"
-                  size="sm"
-                  className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50"
-                  title="Εισαγωγή Δεδομένων από Excel"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Εισαγωγή Δεδομένων
-                </Button>
-              )}
               <Button
                 onClick={handleManualRefresh}
                 variant="outline"
@@ -1726,26 +1793,27 @@ export default function DashboardPage() {
 
             <ExcelPeriodTimeline
               stops={timelineStops}
-              selectedIndex={activeTimelineIndex}
-              onSelect={(index) => {
-                const nextStop = timelineStops[index]
-                if (!nextStop) return
-                setSelectedTimelineImportId(nextStop.importId)
+              startIndex={normalizedTimelineStartIndex}
+              endIndex={normalizedTimelineEndIndex}
+              onRangeChange={({ startIndex, endIndex }) => {
+                const nextStart = timelineStops[startIndex]
+                const nextEnd = timelineStops[endIndex]
+                if (!nextStart || !nextEnd) return
+                setTimelineStartPeriodKey(nextStart.periodKey)
+                setTimelineEndPeriodKey(nextEnd.periodKey)
               }}
             />
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Total Debts Card - Yellow Theme */}
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
-                <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200">
+              <div className="bg-white rounded-lg border-2 border-yellow-200 shadow-sm h-full overflow-hidden">
+                <div className="bg-yellow-100 px-6 py-4 border-b-2 border-yellow-200">
                   <div className="flex items-center justify-between">
                     <Receipt className="h-6 w-6 text-yellow-700" />
                     <div className="text-center flex-1">
                       <div className="text-lg font-semibold text-yellow-900">ΣΥΝΟΛΟ</div>
-                      <div className="text-sm font-medium text-yellow-800">
-                        {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
-                      </div>
+                      <div className="text-sm font-medium text-yellow-800">{summaryCardLabel}</div>
                     </div>
                     {showBankResetActions && (
                       <AlertDialog open={showTotalBankResetDialog} onOpenChange={setShowTotalBankResetDialog}>
@@ -1786,8 +1854,8 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className={`text-3xl font-bold ${totalUnpaid <= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {totalUnpaid > 0 ? formatPrice(totalUnpaid) : totalUnpaid < 0 ? `-${formatPrice(Math.abs(totalUnpaid))}` : formatPrice(totalUnpaid)}
+                    <div className="text-3xl font-bold text-red-600">
+                      {formatPrice(totalCharged)}
                     </div>
                     {user.accessLevel === "Διαχειριστής" && (
                       <div className="text-2xl font-bold text-green-600">
@@ -1795,22 +1863,20 @@ export default function DashboardPage() {
                       </div>
                     )}
                   </div>
-                  {hasFilters && totalUnpaidPercentage < 100 && user.accessLevel === "Διαχειριστής" && (
-                    <div className="text-sm text-gray-500 mt-3">({totalUnpaidPercentage.toFixed(1)}% του {formatPrice(totalCombinedUnpaid)})</div>
+                  {hasFilters && totalChargedPercentage < 100 && user.accessLevel === "Διαχειριστής" && (
+                    <div className="text-sm text-gray-500 mt-3">({totalChargedPercentage.toFixed(1)}% του {formatPrice(totalCombinedCharged)})</div>
                   )}
                 </div>
               </div>
 
               {/* Print Debts Card - Blue Theme */}
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
-                <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
+              <div className="bg-white rounded-lg border-2 border-blue-200 shadow-sm h-full overflow-hidden">
+                <div className="bg-blue-100 px-6 py-4 border-b-2 border-blue-200">
                   <div className="flex items-center justify-between">
                     <Printer className="h-6 w-6 text-blue-700" />
                     <div className="text-center flex-1">
                       <div className="text-lg font-semibold text-blue-900">ΤΟ. ΦΩ.</div>
-                      <div className="text-sm font-medium text-blue-800">
-                        {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
-                      </div>
+                      <div className="text-sm font-medium text-blue-800">{summaryCardLabel}</div>
                     </div>
                     {showBankResetActions && (
                       <AlertDialog open={showPrintBankResetDialog} onOpenChange={setShowPrintBankResetDialog}>
@@ -1851,8 +1917,8 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className={`text-3xl font-bold ${printUnpaid > 0 ? 'text-blue-600' : 'text-green-600'}`}>
-                      {printUnpaid > 0 ? formatPrice(printUnpaid) : printUnpaid < 0 ? `-${formatPrice(Math.abs(printUnpaid))}` : formatPrice(printUnpaid)}
+                    <div className="text-3xl font-bold text-blue-600">
+                      {formatPrice(printCharged)}
                     </div>
                     {user.accessLevel === "Διαχειριστής" && (
                       <div className="text-2xl font-bold text-green-600">
@@ -1860,22 +1926,20 @@ export default function DashboardPage() {
                       </div>
                     )}
                   </div>
-                  {hasFilters && printUnpaidPercentage < 100 && user.accessLevel === "Διαχειριστής" && (
-                    <div className="text-sm text-gray-500 mt-3">({printUnpaidPercentage.toFixed(1)}% του {formatPrice(totalPrintUnpaid)})</div>
+                  {hasFilters && printChargedPercentage < 100 && user.accessLevel === "Διαχειριστής" && (
+                    <div className="text-sm text-gray-500 mt-3">({printChargedPercentage.toFixed(1)}% του {formatPrice(totalPrintCharged)})</div>
                   )}
                 </div>
               </div>
 
               {/* Lamination Debts Card - Green Theme */}
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm h-full overflow-hidden">
-                <div className="bg-green-100 px-6 py-4 border-b border-green-200">
+              <div className="bg-white rounded-lg border-2 border-green-200 shadow-sm h-full overflow-hidden">
+                <div className="bg-green-100 px-6 py-4 border-b-2 border-green-200">
                   <div className="flex items-center justify-between">
                     <CreditCard className="h-6 w-6 text-green-700" />
                     <div className="text-center flex-1">
                       <div className="text-lg font-semibold text-green-900">ΠΛΑ. ΤΟ.</div>
-                      <div className="text-sm font-medium text-green-800">
-                        {user.accessLevel === "Διαχειριστής" ? "Χρέος|Έσοδα" : "Χρέος"}
-                      </div>
+                      <div className="text-sm font-medium text-green-800">{summaryCardLabel}</div>
                     </div>
                     {user.accessLevel === "Διαχειριστής" && (
                       <AlertDialog open={showLaminationBankResetDialog} onOpenChange={setShowLaminationBankResetDialog}>
@@ -1916,8 +1980,8 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className={`text-3xl font-bold ${laminationUnpaid > 0 ? 'text-green-600' : 'text-green-600'}`}>
-                      {laminationUnpaid > 0 ? formatPrice(laminationUnpaid) : laminationUnpaid < 0 ? `-${formatPrice(Math.abs(laminationUnpaid))}` : formatPrice(laminationUnpaid)}
+                    <div className="text-3xl font-bold text-green-600">
+                      {formatPrice(laminationCharged)}
                     </div>
                     {user.accessLevel === "Διαχειριστής" && (
                       <div className="text-2xl font-bold text-green-600">
@@ -1925,8 +1989,8 @@ export default function DashboardPage() {
                       </div>
                     )}
                   </div>
-                  {hasFilters && laminationUnpaidPercentage < 100 && user.accessLevel === "Διαχειριστής" && (
-                    <div className="text-sm text-gray-500 mt-3">({laminationUnpaidPercentage.toFixed(1)}% του {formatPrice(totalLaminationUnpaid)})</div>
+                  {hasFilters && laminationChargedPercentage < 100 && user.accessLevel === "Διαχειριστής" && (
+                    <div className="text-sm text-gray-500 mt-3">({laminationChargedPercentage.toFixed(1)}% του {formatPrice(totalLaminationCharged)})</div>
                   )}
                 </div>
               </div>
@@ -1966,8 +2030,8 @@ export default function DashboardPage() {
               {/* Right Column: Debt Table */}
               <div className="lg:col-span-3">
                 {/* Consolidated Table Card */}
-                <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden h-full flex flex-col">
-                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200 flex-shrink-0">
+                <div className="bg-white rounded-lg border-2 border-yellow-200 shadow-sm overflow-hidden h-full flex flex-col">
+                  <div className="bg-yellow-100 px-6 py-4 border-b-2 border-yellow-200 flex-shrink-0">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-3">
                         <BarChart3 className="h-6 w-6 text-yellow-700" />
@@ -2059,8 +2123,8 @@ export default function DashboardPage() {
               {/* Right Column: Income Table */}
               <div className="lg:col-span-3">
                 {/* Income Table Card */}
-                <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden h-full flex flex-col">
-                  <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200 flex-shrink-0">
+                <div className="bg-white rounded-lg border-2 border-yellow-200 shadow-sm overflow-hidden h-full flex flex-col">
+                  <div className="bg-yellow-100 px-6 py-4 border-b-2 border-yellow-200 flex-shrink-0">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-3">
                         <Receipt className="h-6 w-6 text-yellow-700" />
@@ -2162,10 +2226,10 @@ export default function DashboardPage() {
 
                   {/* Right Column: Print Table */}
                   <div className="lg:col-span-3">
-                    <div className="bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                    <div className="rounded-lg">
                       {/* Print Jobs Table */}
-                      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="bg-blue-100 px-6 py-4 border-b border-blue-200">
+                      <div className="bg-white rounded-lg border-2 border-blue-200 shadow-sm overflow-hidden">
+                        <div className="bg-blue-100 px-6 py-4 border-b-2 border-blue-200">
                           <div className="flex justify-between items-center">
                             <div className="flex items-center gap-3">
                               <Printer className="h-6 w-6 text-blue-700" />
@@ -2253,8 +2317,8 @@ export default function DashboardPage() {
                       value: formatPrice(printStats.adjustmentCost),
                       highlighted: isPrintStatHighlighted("adjustment"),
                     })}
-                    <div className="bg-white rounded-lg border border-blue-200 shadow-sm">
-                      <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                    <div className="bg-white rounded-lg border-2 border-blue-200 shadow-sm">
+                      <div className="bg-blue-100 px-4 py-3 border-b-2 border-blue-200">
                         <div className="flex items-center gap-2">
                           <BarChart3 className="h-5 w-5 text-blue-700" />
                           <h3 className="text-sm font-semibold text-blue-900">Σύνολο Σελίδων</h3>
@@ -2293,10 +2357,10 @@ export default function DashboardPage() {
 
                   {/* Right Column: Lamination Table */}
                   <div className="lg:col-span-3">
-                    <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm">
+                    <div className="rounded-lg">
                       {/* Lamination Jobs Table */}
-                      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="bg-green-100 px-6 py-4 border-b border-green-200">
+                      <div className="bg-white rounded-lg border-2 border-green-200 shadow-sm overflow-hidden">
+                        <div className="bg-green-100 px-6 py-4 border-b-2 border-green-200">
                           <div className="flex justify-between items-center">
                             <div className="flex items-center gap-3">
                               <CreditCard className="h-6 w-6 text-green-700" />
@@ -2362,8 +2426,8 @@ export default function DashboardPage() {
                 <div className="mt-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Πλαστικοποιητής Statistics */}
-                    <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm">
-                      <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                    <div className="bg-white rounded-lg border-2 border-green-200 shadow-sm overflow-hidden">
+                      <div className="bg-green-100 px-4 py-3 border-b-2 border-green-200">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-5 w-5 text-green-700" />
                           <h3 className="text-sm font-semibold text-green-900">Πλαστικοποιητής</h3>
@@ -2412,8 +2476,8 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Βιβλιοδεσία Statistics */}
-                    <div className="bg-green-50 rounded-lg border border-green-200 shadow-sm">
-                      <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                    <div className="bg-white rounded-lg border-2 border-green-200 shadow-sm overflow-hidden">
+                      <div className="bg-green-100 px-4 py-3 border-b-2 border-green-200">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-5 w-5 text-green-700" />
                           <h3 className="text-sm font-semibold text-green-900">Βιβλιοδεσία</h3>

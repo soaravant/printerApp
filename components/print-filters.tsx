@@ -45,8 +45,8 @@ export const PrintFilters: React.FC<PrintFiltersProps> = ({
     return () => clearTimeout(t)
   }, [localSearch, setSearchTerm])
   return (
-    <div className="bg-white rounded-lg border border-blue-200 shadow-sm overflow-hidden h-full flex flex-col">
-      <div className="bg-blue-100 px-6 py-4 border-b border-blue-200 flex-shrink-0">
+    <div className="bg-white rounded-lg border-2 border-blue-200 shadow-sm overflow-hidden h-full flex flex-col">
+      <div className="bg-blue-100 px-6 py-4 border-b-2 border-blue-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-blue-50 p-2 rounded-lg">

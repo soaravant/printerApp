@@ -27,8 +27,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { SearchableSelect } from "@/components/searchable-select"
 import { GreekDatePicker } from "@/components/ui/greek-date-picker"
+import { ExcelImportWizard } from "@/components/excel-import-wizard"
+import { getMissingManagedEntityUsers } from "@/lib/managed-entities"
 import { useState, useEffect } from "react"
-import { Plus, CreditCard, Users, Building, Printer, RotateCcw, Euro, Eye, EyeOff } from "lucide-react"
+import { Plus, CreditCard, Users, Building, Printer, RotateCcw, Euro, Eye, EyeOff, FileText } from "lucide-react"
 import type { FirebaseUser, FirebaseLaminationJob, FirebaseIncome, FirebasePrintJob } from "@/lib/firebase-schema"
 import { FIREBASE_COLLECTIONS } from "@/lib/firebase-schema"
 import { getSnapshot, saveSnapshot, makeScopeKey, mergeById, sortByTimestampDesc } from "@/lib/snapshot-store"
@@ -518,6 +520,10 @@ export default function AdminPage() {
     }
   }
 
+  const checkManagedEntityUsersCoverage = () => {
+    return getMissingManagedEntityUsers(users)
+  }
+
   const handleAddUser = async () => {
     if (!newUser.username || !newUser.password || !newUser.displayName) {
       toast({
@@ -753,34 +759,41 @@ export default function AdminPage() {
             </div>
 
             <Tabs defaultValue="users" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 bg-white mb-8 p-2 h-16">
+              <TabsList className="mb-8 grid h-auto w-full grid-cols-2 gap-2 bg-white p-2 md:grid-cols-5">
                 <TabsTrigger
                   value="users"
-                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-yellow-500 data-[state=active]:text-yellow-700 data-[state=active]:bg-transparent hover:bg-yellow-50 hover:text-yellow-700 transition-colors text-base font-medium py-3"
+                  className="flex items-center justify-center gap-3 border-b-2 border-transparent py-3 text-sm font-medium transition-colors data-[state=active]:border-yellow-500 data-[state=active]:bg-transparent data-[state=active]:text-yellow-700 hover:bg-yellow-50 hover:text-yellow-700 md:text-base"
                 >
                   <Users className="h-5 w-5" />
                   Χρήστες
                 </TabsTrigger>
                 <TabsTrigger
                   value="printing"
-                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:text-blue-700 data-[state=active]:bg-transparent hover:bg-blue-50 hover:text-blue-700 transition-colors text-base font-medium py-3"
+                  className="flex items-center justify-center gap-3 border-b-2 border-transparent py-3 text-sm font-medium transition-colors data-[state=active]:border-blue-500 data-[state=active]:bg-transparent data-[state=active]:text-blue-700 hover:bg-blue-50 hover:text-blue-700 md:text-base"
                 >
                   <Printer className="h-5 w-5" />
                   Χρέωση ΤΟ. ΦΩ.
                 </TabsTrigger>
                 <TabsTrigger
                   value="lamination"
-                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-green-500 data-[state=active]:text-green-700 data-[state=active]:bg-transparent hover:bg-green-50 hover:text-green-700 transition-colors text-base font-medium py-3"
+                  className="flex items-center justify-center gap-3 border-b-2 border-transparent py-3 text-sm font-medium transition-colors data-[state=active]:border-green-500 data-[state=active]:bg-transparent data-[state=active]:text-green-700 hover:bg-green-50 hover:text-green-700 md:text-base"
                 >
                   <CreditCard className="h-5 w-5" />
                   Χρέωση ΠΛΑ. ΤΟ.
                 </TabsTrigger>
                 <TabsTrigger
                   value="debt-reduction"
-                  className="flex items-center gap-3 border-b-2 border-transparent data-[state=active]:border-yellow-500 data-[state=active]:text-yellow-700 data-[state=active]:bg-transparent hover:bg-yellow-50 hover:text-yellow-700 transition-colors text-base font-medium py-3"
+                  className="flex items-center justify-center gap-3 border-b-2 border-transparent py-3 text-sm font-medium transition-colors data-[state=active]:border-yellow-500 data-[state=active]:bg-transparent data-[state=active]:text-yellow-700 hover:bg-yellow-50 hover:text-yellow-700 md:text-base"
                 >
                   <Euro className="h-5 w-5" />
                   Ξεχρέωση
+                </TabsTrigger>
+                <TabsTrigger
+                  value="excel-import"
+                  className="flex items-center justify-center gap-3 border-b-2 border-transparent py-3 text-sm font-medium transition-colors data-[state=active]:border-slate-500 data-[state=active]:bg-transparent data-[state=active]:text-slate-800 hover:bg-slate-50 hover:text-slate-800 md:text-base"
+                >
+                  <FileText className="h-5 w-5" />
+                  Εισαγωγή Excel
                 </TabsTrigger>
 
               </TabsList>
@@ -1192,15 +1205,69 @@ export default function AdminPage() {
                 </Card>
               </TabsContent>
 
+              <TabsContent value="excel-import" className="mt-8">
+                <ExcelImportWizard users={users} />
+              </TabsContent>
+
               <TabsContent value="users" className="mt-8">
                 {/* Compliance Warnings - Only show when there are issues */}
                 {(() => {
                   const compliance = checkResponsiblePersonsCompliance()
                   const teamIssues = checkTeamAssignments()
+                  const managedEntityCoverage = checkManagedEntityUsersCoverage()
 
-                  if (compliance.hasIssues || teamIssues.hasIssues) {
+                  if (compliance.hasIssues || teamIssues.hasIssues || managedEntityCoverage.hasIssues) {
                     return (
                       <div className="mb-6 space-y-4">
+                        {managedEntityCoverage.hasIssues && (
+                          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="text-sm font-medium text-red-800">
+                                  Προσοχή: Λείπουν λογαριασμοί Ομάδας / Ναού / Τομέα
+                                </h3>
+                                <div className="mt-2 text-sm text-red-700">
+                                  {managedEntityCoverage.missingTeams.length > 0 && (
+                                    <div className="mb-2">
+                                      <strong>Ομάδες χωρίς λογαριασμό:</strong>
+                                      <ul className="ml-4 mt-1">
+                                        {managedEntityCoverage.missingTeams.map((name) => (
+                                          <li key={name}>• {name}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {managedEntityCoverage.missingTomeis.length > 0 && (
+                                    <div className="mb-2">
+                                      <strong>Τομείς χωρίς λογαριασμό:</strong>
+                                      <ul className="ml-4 mt-1">
+                                        {managedEntityCoverage.missingTomeis.map((name) => (
+                                          <li key={name}>• {name}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {managedEntityCoverage.missingNaoi.length > 0 && (
+                                    <div>
+                                      <strong>Ναοί χωρίς λογαριασμό:</strong>
+                                      <ul className="ml-4 mt-1">
+                                        {managedEntityCoverage.missingNaoi.map((name) => (
+                                          <li key={name}>• {name}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {compliance.hasIssues && (
                           <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                             <div className="flex items-start gap-3">

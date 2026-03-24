@@ -43,8 +43,8 @@ export const LaminationFilters: React.FC<LaminationFiltersProps> = ({
     return () => clearTimeout(t)
   }, [localSearch, setSearchTerm])
   return (
-    <div className="bg-white rounded-lg border border-green-200 shadow-sm overflow-hidden h-full flex flex-col">
-      <div className="bg-green-100 px-6 py-4 border-b border-green-200 flex-shrink-0">
+    <div className="bg-white rounded-lg border-2 border-green-200 shadow-sm overflow-hidden h-full flex flex-col">
+      <div className="bg-green-100 px-6 py-4 border-b-2 border-green-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-green-50 p-2 rounded-lg">

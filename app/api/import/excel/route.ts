@@ -5,6 +5,7 @@ import {
   ExcelImportServerError,
   getLatestCompletedExcelImportSummary,
   getLatestExcelImportSummary,
+  listCompletedExcelImportSummaries,
   runExcelImport,
   verifyExcelImportAdmin,
 } from "@/lib/server/excel-import"
@@ -36,11 +37,16 @@ export async function GET(req: NextRequest) {
     }
 
     await verifyExcelImportAdmin(token)
-    const [latestImport, rollbackCandidateImport] = await Promise.all([
+    const [latestImport, rollbackCandidateImport, completedImports] = await Promise.all([
       getLatestExcelImportSummary(),
       getLatestCompletedExcelImportSummary(),
+      listCompletedExcelImportSummaries(),
     ])
-    return NextResponse.json({ latestImport, rollbackCandidateImport })
+    return NextResponse.json({
+      latestImport,
+      rollbackCandidateImport,
+      completedImportPeriods: Array.from(new Set(completedImports.map((item) => item.periodKey))),
+    })
   } catch (error) {
     return errorResponse(error)
   }

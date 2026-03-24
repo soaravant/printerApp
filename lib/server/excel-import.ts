@@ -66,6 +66,11 @@ type ResolvedImportRow = ExcelPreviewRow & {
   matchedExistingUser: boolean
 }
 
+type SyntheticPeriodDoc = {
+  ref: DocumentReference
+  importId: string | null
+}
+
 export class ExcelImportServerError extends Error {
   status: number
 
@@ -174,6 +179,36 @@ async function getExistingDocsMap(refs: DocumentReference[]) {
     })
   }
   return result
+}
+
+async function getCurrentSyntheticPeriodDocs(periodKey: string) {
+  const db = getAdminDb()
+  const [printSnap, laminationSnap] = await Promise.all([
+    db.collection(FIREBASE_COLLECTIONS.PRINT_JOBS).where("importPeriod", "==", periodKey).get(),
+    db.collection(FIREBASE_COLLECTIONS.LAMINATION_JOBS).where("importPeriod", "==", periodKey).get(),
+  ])
+
+  const printDocs = printSnap.docs
+    .filter((doc) => Boolean(asRecord(doc.data()).isSyntheticImport))
+    .map((doc) => {
+      const data = asRecord(doc.data())
+      return {
+        ref: doc.ref,
+        importId: typeof data.importId === "string" ? data.importId : null,
+      } satisfies SyntheticPeriodDoc
+    })
+
+  const laminationDocs = laminationSnap.docs
+    .filter((doc) => Boolean(asRecord(doc.data()).isSyntheticImport))
+    .map((doc) => {
+      const data = asRecord(doc.data())
+      return {
+        ref: doc.ref,
+        importId: typeof data.importId === "string" ? data.importId : null,
+      } satisfies SyntheticPeriodDoc
+    })
+
+  return { printDocs, laminationDocs }
 }
 
 async function getImportRestoreSnapshots(importId: string) {
@@ -371,11 +406,15 @@ export async function runExcelImport(params: {
 }) {
   const db = getAdminDb()
   const parsed = parseExcelImportFiles(params.photoBuffer, params.laminationBuffer)
-  const users = await loadAllUsers()
-  const latestCompletedImport = await getLatestCompletedExcelImportSummary()
+  const [users, completedImports] = await Promise.all([
+    loadAllUsers(),
+    listCompletedExcelImportSummaries(),
+  ])
+  const latestCompletedImport = completedImports.length > 0 ? completedImports[completedImports.length - 1] : null
   const plan = buildExcelImportPlan(parsed, users, {
     allowCreateUsers: params.allowCreateUsers,
     latestCompletedImportPeriodKey: latestCompletedImport?.periodKey ?? null,
+    completedImportPeriodKeys: Array.from(new Set(completedImports.map((item) => item.periodKey))),
   })
   const importableRows = plan.rows.filter((row) => row.canImport)
 
@@ -418,9 +457,29 @@ export async function runExcelImport(params: {
   const importEventTimestamp = getImportEventTimestamp(parsed.period.endDate)
   const importId = `excel-${parsed.period.key}-${now.getTime()}`
   const importRef = db.collection(FIREBASE_COLLECTIONS.EXCEL_IMPORTS).doc(importId)
+  const samePeriodCompletedImports = completedImports.filter((item) => item.periodKey === parsed.period.key)
+  const currentSyntheticPeriodDocs = await getCurrentSyntheticPeriodDocs(parsed.period.key)
+  const currentSyntheticImportIds = new Set(
+    [...currentSyntheticPeriodDocs.printDocs, ...currentSyntheticPeriodDocs.laminationDocs]
+      .map((doc) => doc.importId)
+      .filter((value): value is string => Boolean(value))
+  )
+  const activeSamePeriodImportId =
+    samePeriodCompletedImports
+      .filter((item) => currentSyntheticImportIds.has(item.importId))
+      .map((item) => item.importId)
+      .pop() ??
+    samePeriodCompletedImports.map((item) => item.importId).pop() ??
+    null
+  const activeSamePeriodSnapshots = activeSamePeriodImportId
+    ? await getImportRestoreSnapshots(activeSamePeriodImportId)
+    : null
+  const activeSamePeriodUserRestores = new Map(
+    (activeSamePeriodSnapshots?.userRestores ?? []).map((restore) => [restore.uid, restore])
+  )
 
-  const printRefs: DocumentReference[] = []
-  const laminationRefs: DocumentReference[] = []
+  const printRefs = new Map<string, DocumentReference>()
+  const laminationRefs = new Map<string, DocumentReference>()
   const userRestores = new Map<string, UserRestoreRecord>()
   const mutationOperations: BatchOperation[] = []
   const createdUserIds = new Set<string>()
@@ -438,12 +497,14 @@ export async function runExcelImport(params: {
     })
 
     const ids = getSyntheticImportDocumentIds(row.username, parsed.period.key)
-    printRefs.push(
-      db.collection(FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printBw),
-      db.collection(FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printColor),
-      db.collection(FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printAdjustment)
-    )
-    laminationRefs.push(db.collection(FIREBASE_COLLECTIONS.LAMINATION_JOBS).doc(ids.lamination))
+    const printBwRef = db.collection(FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printBw)
+    const printColorRef = db.collection(FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printColor)
+    const printAdjustmentRef = db.collection(FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printAdjustment)
+    const laminationRef = db.collection(FIREBASE_COLLECTIONS.LAMINATION_JOBS).doc(ids.lamination)
+    printRefs.set(printBwRef.id, printBwRef)
+    printRefs.set(printColorRef.id, printColorRef)
+    printRefs.set(printAdjustmentRef.id, printAdjustmentRef)
+    laminationRefs.set(laminationRef.id, laminationRef)
 
     const userRef = db.collection(FIREBASE_COLLECTIONS.USERS).doc(row.dbUserUid)
     if (!existingUser) {
@@ -465,7 +526,7 @@ export async function runExcelImport(params: {
         },
       })
     }
-    if (!existingUser?.openingDebtSource) {
+    if (!existingUser?.openingDebtSource || existingUser.openingDebtSource === parsed.period.key) {
       mutationOperations.push({
         kind: "set",
         ref: userRef,
@@ -482,7 +543,7 @@ export async function runExcelImport(params: {
     const printJobs = createSyntheticPrintJobs(row, parsed.period.key, importId, importEventTimestamp, now)
     const printJobsById = new Map(printJobs.map((job) => [job.jobId, job]))
     for (const jobId of [ids.printBw, ids.printColor, ids.printAdjustment]) {
-      const ref = db.collection(FIREBASE_COLLECTIONS.PRINT_JOBS).doc(jobId)
+      const ref = printRefs.get(jobId)!
       const job = printJobsById.get(jobId)
       if (job) {
         mutationOperations.push({ kind: "set", ref, data: job as unknown as Record<string, unknown> })
@@ -493,21 +554,67 @@ export async function runExcelImport(params: {
 
     const laminationJobs = createSyntheticLaminationJobs(row, parsed.period.key, importId, importEventTimestamp, now)
     const laminationJob = laminationJobs[0] ?? null
-    const laminationRef = db.collection(FIREBASE_COLLECTIONS.LAMINATION_JOBS).doc(ids.lamination)
+    const laminationTargetRef = laminationRefs.get(ids.lamination)!
     if (laminationJob) {
       mutationOperations.push({
         kind: "set",
-        ref: laminationRef,
+        ref: laminationTargetRef,
         data: laminationJob as unknown as Record<string, unknown>,
       })
     } else {
-      mutationOperations.push({ kind: "delete", ref: laminationRef })
+      mutationOperations.push({ kind: "delete", ref: laminationTargetRef })
     }
   }
 
+  for (const doc of currentSyntheticPeriodDocs.printDocs) {
+    printRefs.set(doc.ref.id, doc.ref)
+    if (!mutationOperations.some((operation) => operation.ref.id === doc.ref.id)) {
+      mutationOperations.push({ kind: "delete", ref: doc.ref })
+    }
+  }
+
+  for (const doc of currentSyntheticPeriodDocs.laminationDocs) {
+    laminationRefs.set(doc.ref.id, doc.ref)
+    if (!mutationOperations.some((operation) => operation.ref.id === doc.ref.id)) {
+      mutationOperations.push({ kind: "delete", ref: doc.ref })
+    }
+  }
+
+  const resolvedUserIds = new Set(resolvedRows.map((row) => row.dbUserUid))
+  const openingBaselineUsersToRestore = users.filter(
+    (user) => user.openingDebtSource === parsed.period.key && !resolvedUserIds.has(user.uid)
+  )
+
+  for (const user of openingBaselineUsersToRestore) {
+    userRestores.set(user.uid, {
+      existedBefore: true,
+      previousOpeningPrintDebt:
+        typeof user.openingPrintDebt === "number" ? user.openingPrintDebt : null,
+      previousOpeningLaminationDebt:
+        typeof user.openingLaminationDebt === "number" ? user.openingLaminationDebt : null,
+      previousOpeningDebtSource: user.openingDebtSource ?? null,
+      previousOpeningDebtImportedAt: user.openingDebtImportedAt ?? null,
+    })
+
+    const priorRestore = activeSamePeriodUserRestores.get(user.uid)
+    if (!priorRestore) continue
+
+    mutationOperations.push({
+      kind: "set",
+      ref: db.collection(FIREBASE_COLLECTIONS.USERS).doc(user.uid),
+      data: {
+        openingPrintDebt: restoreFieldOrDelete(priorRestore.previousOpeningPrintDebt),
+        openingLaminationDebt: restoreFieldOrDelete(priorRestore.previousOpeningLaminationDebt),
+        openingDebtSource: restoreFieldOrDelete(priorRestore.previousOpeningDebtSource),
+        openingDebtImportedAt: restoreFieldOrDelete(priorRestore.previousOpeningDebtImportedAt),
+      },
+      options: { merge: true },
+    })
+  }
+
   const [existingPrintDocs, existingLaminationDocs] = await Promise.all([
-    getExistingDocsMap(printRefs),
-    getExistingDocsMap(laminationRefs),
+    getExistingDocsMap(Array.from(printRefs.values())),
+    getExistingDocsMap(Array.from(laminationRefs.values())),
   ])
 
   const metadataOperations: BatchOperation[] = [
@@ -543,7 +650,7 @@ export async function runExcelImport(params: {
     })
   }
 
-  for (const ref of printRefs) {
+  for (const ref of printRefs.values()) {
     const snapshot = existingPrintDocs.get(ref.id)
     metadataOperations.push({
       kind: "set",
@@ -555,7 +662,7 @@ export async function runExcelImport(params: {
     })
   }
 
-  for (const ref of laminationRefs) {
+  for (const ref of laminationRefs.values()) {
     const snapshot = existingLaminationDocs.get(ref.id)
     metadataOperations.push({
       kind: "set",

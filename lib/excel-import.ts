@@ -25,23 +25,18 @@ const TEAM_NAMES = new Set([
   "Καρποφόροι",
   "Ολόφωτοι",
   "Νικητές",
-  "Νικηφόροι Jr",
-  "Καθαριότητας",
-  "Λατρευτικός",
-  "Καλλιτεχνικός",
-  "Αθλητικός",
-  "Βιβλιοθήκης",
-  "Μουσικός",
-  "Φωτογραφικός",
-  "Εκδοτικός",
-  "Υπολογιστών",
-  "Φαρμακείου",
-  "Αγάπης",
-  "Ψυχαγωγικός",
-  "Μήνυμα - Διαγωνισμός",
-  "Μήνυμα - Έντυπο",
-  "Audio",
-  "Εργαστηρίου",
+  "Νικηφόροι",
+  "Φλόγα",
+  "Σύμψυχοι",
+])
+
+const EXCEL_DISPLAY_NAME_ALIASES = new Map<string, string>([
+  ["νικηφοροι jr", "Νικηφόροι"],
+  ["φλογ α", "Φλόγα"],
+])
+
+const EXCEL_NAME_FALLBACK_CODES = new Map<string, string>([
+  ["συμψυχοι", "117"],
 ])
 
 const DATE_RANGE_PATTERN = /(\d{1,2}\/\d{1,2}\/\d{4})\s*-\s*(\d{1,2}\/\d{1,2}\/\d{4})/
@@ -243,6 +238,28 @@ function isNumericCode(value: unknown): value is string | number {
   return /^\d+$/.test(String(value).trim())
 }
 
+function normalizeExcelAliasKey(value: string) {
+  return normalizeGreek(value)
+    .replace(/[().,/-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function canonicalizeExcelDisplayName(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return ""
+  return EXCEL_DISPLAY_NAME_ALIASES.get(normalizeExcelAliasKey(trimmed)) ?? trimmed
+}
+
+function resolveExcelCode(rawCode: unknown, rawDisplayName: string) {
+  if (isNumericCode(rawCode)) {
+    return String(rawCode).trim()
+  }
+
+  const canonicalName = canonicalizeExcelDisplayName(rawDisplayName)
+  return EXCEL_NAME_FALLBACK_CODES.get(normalizeExcelAliasKey(canonicalName)) ?? null
+}
+
 function sameMoney(left: number, right: number): boolean {
   return Math.abs(roundMoney(left) - roundMoney(right)) <= 0.01
 }
@@ -325,6 +342,14 @@ function validateHeaders(sheet: XLSX.WorkSheet, expected: Record<string, string>
   return errors
 }
 
+function matchesHeaders(sheet: XLSX.WorkSheet, expected: Record<string, string>) {
+  return Object.entries(expected).every(([cellAddress, expectedValue]) => {
+    const cellValue = String(sheet[cellAddress]?.v ?? "").replace(/\s+/g, " ").trim()
+    const normalizedExpectedValue = expectedValue.replace(/\s+/g, " ").trim()
+    return cellValue === normalizedExpectedValue
+  })
+}
+
 export function parsePhotocopierWorkbook(buffer: ArrayBuffer): ParsedPhotocopierWorkbook {
   const workbook = readWorkbook(buffer)
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
@@ -334,12 +359,27 @@ export function parsePhotocopierWorkbook(buffer: ArrayBuffer): ParsedPhotocopier
   const parsedRows: ParsedPhotocopierRow[] = []
   const seenCodes = new Set<string>()
 
-  rows.forEach((row, index) => {
-    if (!isNumericCode(row.C)) return
+  if (matchesHeaders(sheet, LAMINATION_HEADERS) && !matchesHeaders(sheet, PHOTO_HEADERS)) {
+    return {
+      rows: [],
+      errors: [
+        "Το αρχείο που μπήκε στο βήμα ΦΩΤΟΤΥΠΙΚΟ φαίνεται να είναι το template του ΠΛΑΣΤΙΚΟΠΟΙΗΤΗΣ.xlsx. Βάλτε το στο δεύτερο βήμα.",
+      ],
+      warnings,
+      period: buildPeriodInfo(rows),
+      totals: {
+        newPrintCharge: 0,
+        finalPrintDebt: 0,
+      },
+    }
+  }
 
+  rows.forEach((row, index) => {
     const rowNumber = index + 1
-    const code = String(row.C).trim()
-    const displayName = getCellString(row, "B")
+    const displayName = canonicalizeExcelDisplayName(getCellString(row, "B"))
+    const code = resolveExcelCode(row.C, displayName)
+    if (!code) return
+
     const oldPrintDebt = getCellNumber(row, "D")
     const bw2520Count = getCellNumber(row, "E")
     const color3330Count = getCellNumber(row, "F")
@@ -419,9 +459,25 @@ export function parseLaminationWorkbook(buffer: ArrayBuffer): ParsedLaminationWo
   const rowsByNumber = new Map<number, ParsedLaminationRow>()
   let comparableRowCount = 0
 
+  if (matchesHeaders(sheet, PHOTO_HEADERS) && !matchesHeaders(sheet, LAMINATION_HEADERS)) {
+    return {
+      rowsByNumber,
+      comparableRowCount: 0,
+      errors: [
+        "Το αρχείο που μπήκε στο βήμα ΠΛΑΣΤΙΚΟΠΟΙΗΤΗΣ φαίνεται να είναι το template του ΦΩΤΟΤΥΠΙΚΟ.xlsx. Βάλτε το στο πρώτο βήμα.",
+      ],
+      warnings,
+      period: buildPeriodInfo(rows),
+      totals: {
+        newLaminationCharge: 0,
+        finalLaminationDebt: 0,
+      },
+    }
+  }
+
   rows.forEach((row, index) => {
     const rowNumber = index + 1
-    const displayName = getCellString(row, "B")
+    const displayName = canonicalizeExcelDisplayName(getCellString(row, "B"))
     const oldLaminationDebt = getCellNumber(row, "C")
     const laminationCharge40 = getCellNumber(row, "D")
     const laminationKydoniaCharge = getCellNumber(row, "E")
@@ -605,7 +661,7 @@ export function parseExcelImportFiles(
 }
 
 export function inferUserRoleFromExcelName(name: string): FirebaseUser["userRole"] {
-  const trimmedName = name.trim()
+  const trimmedName = canonicalizeExcelDisplayName(name)
   if (trimmedName.startsWith("Ι.Ν.")) return "Ναός"
   if (TEAM_NAMES.has(trimmedName)) return "Ομάδα"
   return "Άτομο"
@@ -626,11 +682,18 @@ export function buildExcelImportPlan(
       | "openingDebtSource"
     >
   >,
-  options?: { allowCreateUsers?: boolean; latestCompletedImportPeriodKey?: string | null }
+  options?: {
+    allowCreateUsers?: boolean
+    latestCompletedImportPeriodKey?: string | null
+    completedImportPeriodKeys?: string[] | null
+  }
 ): ExcelImportPlan {
   const allowCreateUsers = Boolean(options?.allowCreateUsers)
   const latestCompletedImportPeriodKey = options?.latestCompletedImportPeriodKey ?? null
+  const completedImportPeriodKeys = new Set(options?.completedImportPeriodKeys ?? [])
+  const hasExistingCompletedImportForPeriod = completedImportPeriodKeys.has(parsed.period.key)
   const isLatestPeriodReimport = latestCompletedImportPeriodKey === parsed.period.key
+  const isPeriodReimport = hasExistingCompletedImportForPeriod || isLatestPeriodReimport
   const usersByUsername = new Map(
     users
       .filter((user) => user.username)
@@ -668,7 +731,7 @@ export function buildExcelImportPlan(
     if (
       matchedUser &&
       hasPriorExcelBaseline &&
-      !isLatestPeriodReimport &&
+      !isPeriodReimport &&
       !sameMoney(expectedCurrentTotalDebt, currentTotalDebt)
     ) {
       warnings.push({
@@ -684,7 +747,7 @@ export function buildExcelImportPlan(
     if (
       matchedUser &&
       hasPriorExcelBaseline &&
-      !isLatestPeriodReimport &&
+      !isPeriodReimport &&
       sameMoney(expectedCurrentTotalDebt, currentTotalDebt) &&
       (
         !sameMoney(expectedCurrentState.printDebt, currentPrintDebt) ||
@@ -742,11 +805,28 @@ export function buildExcelImportPlan(
     )
   }
 
+  const planWarnings = [...parsed.warnings]
+  if (hasExistingCompletedImportForPeriod) {
+    planWarnings.unshift(
+      `Υπάρχει ήδη καταχωρημένη εισαγωγή για την περίοδο ${parsed.period.label}. Αν προχωρήσετε, τα υπάρχοντα δεδομένα της ίδιας περιόδου θα αντικατασταθούν.`
+    )
+  }
+
+  const openingBalanceReplacementCount = rows.filter((row) => {
+    const matchedUser = usersByUsername.get(row.username)
+    return matchedUser?.openingDebtSource === parsed.period.key
+  }).length
+  if (openingBalanceReplacementCount > 0) {
+    planWarnings.push(
+      `Για ${openingBalanceReplacementCount} χρήστες η περίοδος αυτή είναι η αρχική βάση χρέους. Τα opening balances τους θα ενημερωθούν με τα νέα στοιχεία του Excel.`
+    )
+  }
+
   return {
     period: parsed.period,
     rows,
     blockingErrors,
-    warnings: parsed.warnings,
+    warnings: planWarnings,
     totals: {
       importableRows: rows.filter((row) => row.canImport).length,
       missingUsers: rows.filter((row) => row.matchStatus === "missing").length,

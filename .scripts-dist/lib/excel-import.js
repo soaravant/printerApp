@@ -64,23 +64,16 @@ const TEAM_NAMES = new Set([
     "Καρποφόροι",
     "Ολόφωτοι",
     "Νικητές",
-    "Νικηφόροι Jr",
-    "Καθαριότητας",
-    "Λατρευτικός",
-    "Καλλιτεχνικός",
-    "Αθλητικός",
-    "Βιβλιοθήκης",
-    "Μουσικός",
-    "Φωτογραφικός",
-    "Εκδοτικός",
-    "Υπολογιστών",
-    "Φαρμακείου",
-    "Αγάπης",
-    "Ψυχαγωγικός",
-    "Μήνυμα - Διαγωνισμός",
-    "Μήνυμα - Έντυπο",
-    "Audio",
-    "Εργαστηρίου",
+    "Νικηφόροι",
+    "Φλόγα",
+    "Σύμψυχοι",
+]);
+const EXCEL_DISPLAY_NAME_ALIASES = new Map([
+    ["νικηφοροι jr", "Νικηφόροι"],
+    ["φλογ α", "Φλόγα"],
+]);
+const EXCEL_NAME_FALLBACK_CODES = new Map([
+    ["συμψυχοι", "117"],
 ]);
 const DATE_RANGE_PATTERN = /(\d{1,2}\/\d{1,2}\/\d{4})\s*-\s*(\d{1,2}\/\d{1,2}\/\d{4})/;
 const LOW_ROW_WARNING_THRESHOLD = 100;
@@ -124,6 +117,27 @@ function isNumericCode(value) {
     if (value === null || value === undefined || value === "")
         return false;
     return /^\d+$/.test(String(value).trim());
+}
+function normalizeExcelAliasKey(value) {
+    return (0, utils_1.normalizeGreek)(value)
+        .replace(/[().,/-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+function canonicalizeExcelDisplayName(value) {
+    var _a;
+    const trimmed = value.trim();
+    if (!trimmed)
+        return "";
+    return (_a = EXCEL_DISPLAY_NAME_ALIASES.get(normalizeExcelAliasKey(trimmed))) !== null && _a !== void 0 ? _a : trimmed;
+}
+function resolveExcelCode(rawCode, rawDisplayName) {
+    var _a;
+    if (isNumericCode(rawCode)) {
+        return String(rawCode).trim();
+    }
+    const canonicalName = canonicalizeExcelDisplayName(rawDisplayName);
+    return (_a = EXCEL_NAME_FALLBACK_CODES.get(normalizeExcelAliasKey(canonicalName))) !== null && _a !== void 0 ? _a : null;
 }
 function sameMoney(left, right) {
     return Math.abs((0, utils_1.roundMoney)(left) - (0, utils_1.roundMoney)(right)) <= 0.01;
@@ -208,11 +222,11 @@ function parsePhotocopierWorkbook(buffer) {
     const parsedRows = [];
     const seenCodes = new Set();
     rows.forEach((row, index) => {
-        if (!isNumericCode(row.C))
-            return;
         const rowNumber = index + 1;
-        const code = String(row.C).trim();
-        const displayName = getCellString(row, "B");
+        const displayName = canonicalizeExcelDisplayName(getCellString(row, "B"));
+        const code = resolveExcelCode(row.C, displayName);
+        if (!code)
+            return;
         const oldPrintDebt = getCellNumber(row, "D");
         const bw2520Count = getCellNumber(row, "E");
         const color3330Count = getCellNumber(row, "F");
@@ -281,7 +295,7 @@ function parseLaminationWorkbook(buffer) {
     let comparableRowCount = 0;
     rows.forEach((row, index) => {
         const rowNumber = index + 1;
-        const displayName = getCellString(row, "B");
+        const displayName = canonicalizeExcelDisplayName(getCellString(row, "B"));
         const oldLaminationDebt = getCellNumber(row, "C");
         const laminationCharge40 = getCellNumber(row, "D");
         const laminationKydoniaCharge = getCellNumber(row, "E");
@@ -417,7 +431,7 @@ function parseExcelImportFiles(photoBuffer, laminationBuffer) {
     };
 }
 function inferUserRoleFromExcelName(name) {
-    const trimmedName = name.trim();
+    const trimmedName = canonicalizeExcelDisplayName(name);
     if (trimmedName.startsWith("Ι.Ν."))
         return "Ναός";
     if (TEAM_NAMES.has(trimmedName))

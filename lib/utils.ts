@@ -1,6 +1,8 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
+import { OFFICIAL_TEAM_NAMES, isOfficialTeamName } from "@/lib/managed-entities"
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -229,7 +231,10 @@ export const getDynamicFilterOptions = (users: any[]) => {
 
   users.forEach(user => {
     // Extract teams from user data
-    if (user.team) {
+    if (user.userRole === "Ομάδα" && isOfficialTeamName(user.displayName)) {
+      teams.add(user.displayName)
+    }
+    if (isOfficialTeamName(user.team)) {
       teams.add(user.team)
     }
     
@@ -243,53 +248,26 @@ export const getDynamicFilterOptions = (users: any[]) => {
       tomeis.add(user.displayName)
     }
     
+  })
+
+  users.forEach(user => {
     // Also extract from memberOf arrays for individual users
     if (user.memberOf && Array.isArray(user.memberOf)) {
       user.memberOf.forEach((member: string) => {
-        if (member.includes("Ναός") || member.includes("Τμήμα")) {
+        if (naoi.has(member) || member.includes("Ναός") || member.includes("Τμήμα")) {
           naoi.add(member)
-        } else if (member.includes("Τομέας")) {
+        } else if (tomeis.has(member) || member.includes("Τομέας")) {
           tomeis.add(member)
-        } else {
-          // Assume it's a team if it doesn't contain "Ναός"/legacy "Τμήμα" or "Τομέας"
+        } else if (isOfficialTeamName(member)) {
+          // Only expose the agreed team list in filters even if legacy data contains extra names.
           teams.add(member)
         }
       })
     }
   })
 
-  // Define the specific order for teams
-  const teamOrder = [
-    "Ομάδα 1",
-    "Ομάδα 2",
-    "Ομάδα 3",
-    "Ομάδα 4",
-    "Ομάδα 5",
-    "Ομάδα 6",
-    "Ομάδα 7",
-    "Ομάδα 8",
-  ]
-
-  // Sort teams according to the predefined order, with any additional teams at the end
-  const sortedTeams = Array.from(teams).sort((a, b) => {
-    const aIndex = teamOrder.indexOf(a)
-    const bIndex = teamOrder.indexOf(b)
-    
-    // If both teams are in the predefined order, sort by their position
-    if (aIndex !== -1 && bIndex !== -1) {
-      return aIndex - bIndex
-    }
-    
-    // If only one team is in the predefined order, prioritize it
-    if (aIndex !== -1) return -1
-    if (bIndex !== -1) return 1
-    
-    // If neither team is in the predefined order, sort alphabetically
-    return a.localeCompare(b)
-  })
-
   return {
-    teams: sortedTeams,
+    teams: OFFICIAL_TEAM_NAMES.filter((team) => teams.has(team)),
     naoi: Array.from(naoi).sort(),
     tomeis: Array.from(tomeis).sort()
   }

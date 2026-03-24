@@ -131,9 +131,13 @@ async function seedUsers(createdAt) {
     const data = db_population_data_json_1.default;
     assertUniqueCodes(data);
     const teamNames = data.teams.map((entry) => entry.name);
+    const tomeasNames = (data.tomeis || []).map((entry) => entry.name);
     const responsibleAssignments = buildResponsibleAssignments(data);
     const personUsers = data.users.map((entry, index) => buildSeedUser(entry, "Άτομο", createdAt, {
-        memberOf: teamNames.length > 0 ? [teamNames[index % teamNames.length]] : [],
+        memberOf: [
+            ...(teamNames.length > 0 ? [teamNames[index % teamNames.length]] : []),
+            ...(tomeasNames.length > 0 ? [tomeasNames[index % tomeasNames.length]] : []),
+        ],
     }));
     const teamUsers = data.teams.map((entry) => buildSeedUser(entry, "Ομάδα", createdAt));
     const naosUsers = data.naos.map((entry) => buildSeedUser(entry, "Ναός", createdAt));

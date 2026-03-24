@@ -210,6 +210,9 @@ const getDynamicFilterOptions = (users) => {
     const tomeis = new Set();
     users.forEach(user => {
         // Extract teams from user data
+        if (user.userRole === "Ομάδα" && user.displayName) {
+            teams.add(user.displayName);
+        }
         if (user.team) {
             teams.add(user.team);
         }
@@ -221,17 +224,19 @@ const getDynamicFilterOptions = (users) => {
         if (user.userRole === "Τομέας") {
             tomeis.add(user.displayName);
         }
+    });
+    users.forEach(user => {
         // Also extract from memberOf arrays for individual users
         if (user.memberOf && Array.isArray(user.memberOf)) {
             user.memberOf.forEach((member) => {
-                if (member.includes("Ναός") || member.includes("Τμήμα")) {
+                if (naoi.has(member) || member.includes("Ναός") || member.includes("Τμήμα")) {
                     naoi.add(member);
                 }
-                else if (member.includes("Τομέας")) {
+                else if (tomeis.has(member) || member.includes("Τομέας")) {
                     tomeis.add(member);
                 }
                 else {
-                    // Assume it's a team if it doesn't contain "Ναός"/legacy "Τμήμα" or "Τομέας"
+                    // Fall back to team for historical memberOf values that are plain names.
                     teams.add(member);
                 }
             });
@@ -239,14 +244,14 @@ const getDynamicFilterOptions = (users) => {
     });
     // Define the specific order for teams
     const teamOrder = [
-        "Ομάδα 1",
-        "Ομάδα 2",
-        "Ομάδα 3",
-        "Ομάδα 4",
-        "Ομάδα 5",
-        "Ομάδα 6",
-        "Ομάδα 7",
-        "Ομάδα 8",
+        "Ενωμένοι",
+        "Σποριάδες",
+        "Καρποφόροι",
+        "Ολόφωτοι",
+        "Νικητές",
+        "Νικηφόροι",
+        "Φλόγα",
+        "Σύμψυχοι",
     ];
     // Sort teams according to the predefined order, with any additional teams at the end
     const sortedTeams = Array.from(teams).sort((a, b) => {

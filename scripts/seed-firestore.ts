@@ -6,6 +6,7 @@ if (existsSync(".env.local")) config({ path: ".env.local" })
 else config()
 
 import populationData from "../db-population-data.json"
+import { OFFICIAL_TEAM_NAMES } from "../lib/managed-entities"
 import { Timestamp } from "../lib/firebase-schema"
 import getAdminDb from "./utils/firebase-admin"
 import {
@@ -58,6 +59,24 @@ function assertUniqueCodes(data: PopulationData) {
 
   if (duplicates.length > 0) {
     throw new Error(`Duplicate Excel codes detected:\n${duplicates.join("\n")}`)
+  }
+}
+
+function assertOfficialTeams(data: PopulationData) {
+  const actualTeamNames = data.teams.map((entry) => entry.name)
+  const missingTeams = OFFICIAL_TEAM_NAMES.filter((name) => !actualTeamNames.includes(name))
+  const extraTeams = actualTeamNames.filter((name) => !OFFICIAL_TEAM_NAMES.includes(name))
+
+  if (missingTeams.length > 0 || extraTeams.length > 0) {
+    throw new Error(
+      [
+        "Team population data does not match the official team list.",
+        missingTeams.length > 0 ? `Missing: ${missingTeams.join(", ")}` : null,
+        extraTeams.length > 0 ? `Unexpected: ${extraTeams.join(", ")}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    )
   }
 }
 
@@ -167,12 +186,17 @@ async function seedUsers(createdAt: Date) {
   const db = getAdminDb()
   const data = populationData as PopulationData
   assertUniqueCodes(data)
+  assertOfficialTeams(data)
   const teamNames = data.teams.map((entry) => entry.name)
+  const tomeasNames = (data.tomeis || []).map((entry) => entry.name)
   const responsibleAssignments = buildResponsibleAssignments(data)
 
   const personUsers = data.users.map((entry, index) =>
     buildSeedUser(entry, "Άτομο", createdAt, {
-      memberOf: teamNames.length > 0 ? [teamNames[index % teamNames.length]] : [],
+      memberOf: [
+        ...(teamNames.length > 0 ? [teamNames[index % teamNames.length]] : []),
+        ...(tomeasNames.length > 0 ? [tomeasNames[index % tomeasNames.length]] : []),
+      ],
     })
   )
   const teamUsers = data.teams.map((entry) => buildSeedUser(entry, "Ομάδα", createdAt))

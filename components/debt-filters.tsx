@@ -57,10 +57,25 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
   resetDebtPage,
 }) => {
   const { user } = useAuth()
+  const { teams, tomeis, naoi } = getDynamicFilterOptions(users as any[])
+  const membershipLabel = roleFilter === "Τομέας"
+    ? "Τομέας"
+    : isNaosLikeRole(roleFilter)
+      ? "Ναός"
+      : roleFilter === "Άτομο" || roleFilter === "all"
+        ? "Ομάδα / Τομέας"
+        : "Ομάδα"
+  const membershipOptions = roleFilter === "Τομέας"
+    ? tomeis
+    : isNaosLikeRole(roleFilter)
+      ? naoi
+      : roleFilter === "Άτομο" || roleFilter === "all"
+        ? [...teams, ...tomeis]
+        : teams
 
   return (
-    <div className="bg-white rounded-lg border border-yellow-200 shadow-sm overflow-hidden mb-4 h-full flex flex-col">
-      <div className="bg-yellow-100 px-6 py-4 border-b border-yellow-200 flex-shrink-0">
+    <div className="bg-white rounded-lg border-2 border-yellow-200 shadow-sm overflow-hidden mb-4 h-full flex flex-col">
+      <div className="bg-yellow-100 px-6 py-4 border-b-2 border-yellow-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-yellow-50 p-2 rounded-lg">
@@ -117,14 +132,8 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
           {/* Team Filter - Only for Admin users */}
           {user?.accessLevel === "Διαχειριστής" && (
             <div>
-              <Label htmlFor="debtTeam" className="text-gray-700">Ομάδα</Label>
-              <Select value={teamFilter} onValueChange={(value) => {
-                // Reset role filter to "all" if current role is "Ναός" or "Τομέας" and a specific team is selected
-                if ((isNaosLikeRole(roleFilter) || roleFilter === "Τομέας") && value !== "all") {
-                  setRoleFilter("all");
-                }
-                setTeamFilter(value);
-              }}>
+              <Label htmlFor="debtTeam" className="text-gray-700">{membershipLabel}</Label>
+              <Select value={teamFilter} onValueChange={setTeamFilter}>
                 <SelectTrigger className="border-gray-200 focus:border-yellow-500">
                   <SelectValue />
                 </SelectTrigger>
@@ -135,12 +144,9 @@ export const DebtFilters: React.FC<DebtFiltersProps> = ({
                     }
                   `}</style>
                   <SelectItem value="all">Όλες</SelectItem>
-                  {(() => {
-                    const { teams } = getDynamicFilterOptions(users as any[])
-                    return teams.map((team) => (
-                      <SelectItem key={team} value={team}>{team}</SelectItem>
-                    ))
-                  })()}
+                  {membershipOptions.map((option) => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
