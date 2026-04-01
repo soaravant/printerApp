@@ -7,6 +7,7 @@ exports.formatGreekDate = formatGreekDate;
 exports.formatGreekDateTime = formatGreekDateTime;
 exports.toLocalISOString = toLocalISOString;
 exports.roundMoney = roundMoney;
+exports.getDebtFilterComparableValue = getDebtFilterComparableValue;
 exports.addMoney = addMoney;
 exports.multiplyMoney = multiplyMoney;
 exports.subtractMoney = subtractMoney;
@@ -22,6 +23,7 @@ exports.calculatePrintJobTotal = calculatePrintJobTotal;
 exports.calculatePrintCost = calculatePrintCost;
 const clsx_1 = require("clsx");
 const tailwind_merge_1 = require("tailwind-merge");
+const managed_entities_1 = require("@/lib/managed-entities");
 function cn(...inputs) {
     return (0, tailwind_merge_1.twMerge)((0, clsx_1.clsx)(inputs));
 }
@@ -77,6 +79,9 @@ function toLocalISOString(date) {
  */
 function roundMoney(value) {
     return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+function getDebtFilterComparableValue(value) {
+    return Math.max(0, roundMoney(Number(value || 0)));
 }
 /**
  * Adds multiple money values together with proper rounding to prevent precision errors.
@@ -210,10 +215,10 @@ const getDynamicFilterOptions = (users) => {
     const tomeis = new Set();
     users.forEach(user => {
         // Extract teams from user data
-        if (user.userRole === "Ομάδα" && user.displayName) {
+        if (user.userRole === "Ομάδα" && (0, managed_entities_1.isOfficialTeamName)(user.displayName)) {
             teams.add(user.displayName);
         }
-        if (user.team) {
+        if ((0, managed_entities_1.isOfficialTeamName)(user.team)) {
             teams.add(user.team);
         }
         // Extract naoi from user data (legacy "Τμήμα" is still treated as "Ναός")
@@ -235,42 +240,15 @@ const getDynamicFilterOptions = (users) => {
                 else if (tomeis.has(member) || member.includes("Τομέας")) {
                     tomeis.add(member);
                 }
-                else {
-                    // Fall back to team for historical memberOf values that are plain names.
+                else if ((0, managed_entities_1.isOfficialTeamName)(member)) {
+                    // Only expose the agreed team list in filters even if legacy data contains extra names.
                     teams.add(member);
                 }
             });
         }
     });
-    // Define the specific order for teams
-    const teamOrder = [
-        "Ενωμένοι",
-        "Σποριάδες",
-        "Καρποφόροι",
-        "Ολόφωτοι",
-        "Νικητές",
-        "Νικηφόροι",
-        "Φλόγα",
-        "Σύμψυχοι",
-    ];
-    // Sort teams according to the predefined order, with any additional teams at the end
-    const sortedTeams = Array.from(teams).sort((a, b) => {
-        const aIndex = teamOrder.indexOf(a);
-        const bIndex = teamOrder.indexOf(b);
-        // If both teams are in the predefined order, sort by their position
-        if (aIndex !== -1 && bIndex !== -1) {
-            return aIndex - bIndex;
-        }
-        // If only one team is in the predefined order, prioritize it
-        if (aIndex !== -1)
-            return -1;
-        if (bIndex !== -1)
-            return 1;
-        // If neither team is in the predefined order, sort alphabetically
-        return a.localeCompare(b);
-    });
     return {
-        teams: sortedTeams,
+        teams: managed_entities_1.OFFICIAL_TEAM_NAMES.filter((team) => teams.has(team)),
         naoi: Array.from(naoi).sort(),
         tomeis: Array.from(tomeis).sort()
     };

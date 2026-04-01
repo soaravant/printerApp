@@ -12,6 +12,7 @@ if ((0, fs_1.existsSync)(".env.local"))
 else
     (0, dotenv_1.config)();
 const db_population_data_json_1 = __importDefault(require("../db-population-data.json"));
+const managed_entities_1 = require("../lib/managed-entities");
 const firebase_admin_1 = __importDefault(require("./utils/firebase-admin"));
 const firebase_schema_1 = require("../lib/firebase-schema");
 const ts = (date) => date;
@@ -37,6 +38,20 @@ function assertUniqueCodes(data) {
     }
     if (duplicates.length > 0) {
         throw new Error(`Duplicate Excel codes detected:\n${duplicates.join("\n")}`);
+    }
+}
+function assertOfficialTeams(data) {
+    const actualTeamNames = data.teams.map((entry) => entry.name);
+    const missingTeams = managed_entities_1.OFFICIAL_TEAM_NAMES.filter((name) => !actualTeamNames.includes(name));
+    const extraTeams = actualTeamNames.filter((name) => !managed_entities_1.OFFICIAL_TEAM_NAMES.includes(name));
+    if (missingTeams.length > 0 || extraTeams.length > 0) {
+        throw new Error([
+            "Team population data does not match the official team list.",
+            missingTeams.length > 0 ? `Missing: ${missingTeams.join(", ")}` : null,
+            extraTeams.length > 0 ? `Unexpected: ${extraTeams.join(", ")}` : null,
+        ]
+            .filter(Boolean)
+            .join("\n"));
     }
 }
 function buildAdminUser(createdAt) {
@@ -130,6 +145,7 @@ async function seedUsers(createdAt) {
     const db = (0, firebase_admin_1.default)();
     const data = db_population_data_json_1.default;
     assertUniqueCodes(data);
+    assertOfficialTeams(data);
     const teamNames = data.teams.map((entry) => entry.name);
     const tomeasNames = (data.tomeis || []).map((entry) => entry.name);
     const responsibleAssignments = buildResponsibleAssignments(data);

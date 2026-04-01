@@ -213,6 +213,14 @@ function validateHeaders(sheet, expected, workbookLabel) {
     }
     return errors;
 }
+function matchesHeaders(sheet, expected) {
+    return Object.entries(expected).every(([cellAddress, expectedValue]) => {
+        var _a, _b;
+        const cellValue = String((_b = (_a = sheet[cellAddress]) === null || _a === void 0 ? void 0 : _a.v) !== null && _b !== void 0 ? _b : "").replace(/\s+/g, " ").trim();
+        const normalizedExpectedValue = expectedValue.replace(/\s+/g, " ").trim();
+        return cellValue === normalizedExpectedValue;
+    });
+}
 function parsePhotocopierWorkbook(buffer) {
     const workbook = readWorkbook(buffer);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -221,6 +229,20 @@ function parsePhotocopierWorkbook(buffer) {
     const warnings = [];
     const parsedRows = [];
     const seenCodes = new Set();
+    if (matchesHeaders(sheet, LAMINATION_HEADERS) && !matchesHeaders(sheet, PHOTO_HEADERS)) {
+        return {
+            rows: [],
+            errors: [
+                "Το αρχείο που μπήκε στο βήμα ΦΩΤΟΤΥΠΙΚΟ φαίνεται να είναι το template του ΠΛΑΣΤΙΚΟΠΟΙΗΤΗΣ.xlsx. Βάλτε το στο δεύτερο βήμα.",
+            ],
+            warnings,
+            period: buildPeriodInfo(rows),
+            totals: {
+                newPrintCharge: 0,
+                finalPrintDebt: 0,
+            },
+        };
+    }
     rows.forEach((row, index) => {
         const rowNumber = index + 1;
         const displayName = canonicalizeExcelDisplayName(getCellString(row, "B"));
@@ -293,6 +315,21 @@ function parseLaminationWorkbook(buffer) {
     const warnings = [];
     const rowsByNumber = new Map();
     let comparableRowCount = 0;
+    if (matchesHeaders(sheet, PHOTO_HEADERS) && !matchesHeaders(sheet, LAMINATION_HEADERS)) {
+        return {
+            rowsByNumber,
+            comparableRowCount: 0,
+            errors: [
+                "Το αρχείο που μπήκε στο βήμα ΠΛΑΣΤΙΚΟΠΟΙΗΤΗΣ φαίνεται να είναι το template του ΦΩΤΟΤΥΠΙΚΟ.xlsx. Βάλτε το στο πρώτο βήμα.",
+            ],
+            warnings,
+            period: buildPeriodInfo(rows),
+            totals: {
+                newLaminationCharge: 0,
+                finalLaminationDebt: 0,
+            },
+        };
+    }
     rows.forEach((row, index) => {
         const rowNumber = index + 1;
         const displayName = canonicalizeExcelDisplayName(getCellString(row, "B"));
@@ -439,10 +476,13 @@ function inferUserRoleFromExcelName(name) {
     return "Άτομο";
 }
 function buildExcelImportPlan(parsed, users, options) {
-    var _a;
+    var _a, _b;
     const allowCreateUsers = Boolean(options === null || options === void 0 ? void 0 : options.allowCreateUsers);
     const latestCompletedImportPeriodKey = (_a = options === null || options === void 0 ? void 0 : options.latestCompletedImportPeriodKey) !== null && _a !== void 0 ? _a : null;
+    const completedImportPeriodKeys = new Set((_b = options === null || options === void 0 ? void 0 : options.completedImportPeriodKeys) !== null && _b !== void 0 ? _b : []);
+    const hasExistingCompletedImportForPeriod = completedImportPeriodKeys.has(parsed.period.key);
     const isLatestPeriodReimport = latestCompletedImportPeriodKey === parsed.period.key;
+    const isPeriodReimport = hasExistingCompletedImportForPeriod || isLatestPeriodReimport;
     const usersByUsername = new Map(users
         .filter((user) => user.username)
         .map((user) => [String(user.username).trim(), user]));
@@ -474,7 +514,7 @@ function buildExcelImportPlan(parsed, users, options) {
         }
         if (matchedUser &&
             hasPriorExcelBaseline &&
-            !isLatestPeriodReimport &&
+            !isPeriodReimport &&
             !sameMoney(expectedCurrentTotalDebt, currentTotalDebt)) {
             warnings.push({
                 code: "continuity-mismatch",
@@ -486,7 +526,7 @@ function buildExcelImportPlan(parsed, users, options) {
         }
         if (matchedUser &&
             hasPriorExcelBaseline &&
-            !isLatestPeriodReimport &&
+            !isPeriodReimport &&
             sameMoney(expectedCurrentTotalDebt, currentTotalDebt) &&
             (!sameMoney(expectedCurrentState.printDebt, currentPrintDebt) ||
                 !sameMoney(expectedCurrentState.laminationDebt, currentLaminationDebt))) {
@@ -531,11 +571,22 @@ function buildExcelImportPlan(parsed, users, options) {
     if (continuityMismatches.length > 0) {
         blockingErrors.push(`Βρέθηκαν ${continuityMismatches.length} γραμμές όπου οι παλιές οφειλές του Excel δεν συμφωνούν με την τρέχουσα βάση.`);
     }
+    const planWarnings = [...parsed.warnings];
+    if (hasExistingCompletedImportForPeriod) {
+        planWarnings.unshift(`Υπάρχει ήδη καταχωρημένη εισαγωγή για την περίοδο ${parsed.period.label}. Αν προχωρήσετε, τα υπάρχοντα δεδομένα της ίδιας περιόδου θα αντικατασταθούν.`);
+    }
+    const openingBalanceReplacementCount = rows.filter((row) => {
+        const matchedUser = usersByUsername.get(row.username);
+        return (matchedUser === null || matchedUser === void 0 ? void 0 : matchedUser.openingDebtSource) === parsed.period.key;
+    }).length;
+    if (openingBalanceReplacementCount > 0) {
+        planWarnings.push(`Για ${openingBalanceReplacementCount} χρήστες η περίοδος αυτή είναι η αρχική βάση χρέους. Τα opening balances τους θα ενημερωθούν με τα νέα στοιχεία του Excel.`);
+    }
     return {
         period: parsed.period,
         rows,
         blockingErrors,
-        warnings: parsed.warnings,
+        warnings: planWarnings,
         totals: {
             importableRows: rows.filter((row) => row.canImport).length,
             missingUsers: rows.filter((row) => row.matchStatus === "missing").length,

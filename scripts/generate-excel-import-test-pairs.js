@@ -15,6 +15,10 @@ const NAME_ALIASES = new Map([
 ])
 
 const FALLBACK_CODES = new Map([["συμψυχοι", 117]])
+const MONTHLY_CHARGE_TARGETS = [28, 29, 31, 30, 32, 34, 33, 35, 36, 34, 37, 38, 39]
+const PRINT_CHARGE_SHARE = 0.78
+const LAMINATION_CHARGE_SHARE = 0.22
+const DATA_START_ROW = 4
 
 function roundMoney(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
@@ -151,29 +155,6 @@ function buildPeriodMeta(periodKey) {
   }
 }
 
-function monthDistanceFromLatest(latestPeriodKey, targetPeriodKey) {
-  const [latestYear, latestMonth] = latestPeriodKey.split("-").map(Number)
-  const [targetYear, targetMonth] = targetPeriodKey.split("-").map(Number)
-  return (latestYear - targetYear) * 12 + (latestMonth - targetMonth)
-}
-
-function buildHistoryWeights(count) {
-  if (count <= 0) return []
-  const rawWeights = Array.from({ length: count }, (_, index) => count - index)
-  const total = rawWeights.reduce((sum, value) => sum + value, 0)
-  return rawWeights.map((value) => value / total)
-}
-
-function computeBackfillFactor(openingDebt, latestCharge, maxWeight) {
-  const numericOpeningDebt = Math.max(0, roundMoney(openingDebt))
-  const numericLatestCharge = roundMoney(latestCharge)
-  if (numericOpeningDebt <= 0 || numericLatestCharge <= 0) return 0
-
-  const ratio = numericOpeningDebt / numericLatestCharge
-  const maxFactor = maxWeight > 0 ? 0.85 / maxWeight : ratio
-  return Math.max(0, Math.min(ratio, maxFactor))
-}
-
 function scaleMoney(base, factor) {
   if (!factor || !base) return 0
   return roundMoney(base * factor)
@@ -254,39 +235,59 @@ function applyPeriodToTemplate(photoSheet, laminationSheet, periodMeta) {
   setCellValue(laminationSheet, "A14", periodMeta.label)
 }
 
-function writeDerivedPeriodPair(periodMeta, latestPeriodKey, historyWeights, sourceRows, openingStateByRow) {
+function clearSheetDataRows(photoSheet, laminationSheet, photoRowCount, laminationRowCount) {
+  for (let rowNumber = DATA_START_ROW; rowNumber <= photoRowCount; rowNumber += 1) {
+    for (const column of ["D", "E", "F", "G", "H", "I", "J", "K", "L", "M"]) {
+      setCellValue(photoSheet, `${column}${rowNumber}`, 0)
+    }
+  }
+
+  for (let rowNumber = DATA_START_ROW; rowNumber <= laminationRowCount; rowNumber += 1) {
+    for (const column of ["C", "D", "E", "F"]) {
+      setCellValue(laminationSheet, `${column}${rowNumber}`, 0)
+    }
+  }
+}
+
+function getMonthlyChargeTarget(periodIndex) {
+  return MONTHLY_CHARGE_TARGETS[Math.min(periodIndex, MONTHLY_CHARGE_TARGETS.length - 1)]
+}
+
+function buildSourceTotals(sourceRows) {
+  return sourceRows.reduce(
+    (totals, row) => ({
+      printCharge: roundMoney(totals.printCharge + row.latestPhotoCharge),
+      laminationCharge: roundMoney(totals.laminationCharge + row.latestLaminationCharge),
+    }),
+    { printCharge: 0, laminationCharge: 0 }
+  )
+}
+
+function writeDerivedPeriodPair(periodMeta, periodIndex, sourceRows, sourceTotals, rowCounts, openingStateByRow) {
   const photoWorkbook = readWorkbook(PHOTO_SOURCE)
   const laminationWorkbook = readWorkbook(LAMINATION_SOURCE)
   const photoSheet = photoWorkbook.Sheets[photoWorkbook.SheetNames[0]]
   const laminationSheet = laminationWorkbook.Sheets[laminationWorkbook.SheetNames[0]]
-  const distance = monthDistanceFromLatest(latestPeriodKey, periodMeta.key)
-  const historyWeight = historyWeights[distance - 1]
-  const maxWeight = historyWeights[0] || 1
-
-  if (!historyWeight) {
-    throw new Error(`Missing history weight for ${periodMeta.key} (distance ${distance}).`)
-  }
+  const totalChargeTarget = getMonthlyChargeTarget(periodIndex)
+  const printChargeTarget = roundMoney(totalChargeTarget * PRINT_CHARGE_SHARE)
+  const laminationChargeTarget = roundMoney(totalChargeTarget * LAMINATION_CHARGE_SHARE)
+  const printFactor = sourceTotals.printCharge > 0 ? printChargeTarget / sourceTotals.printCharge : 0
+  const laminationFactor = sourceTotals.laminationCharge > 0 ? laminationChargeTarget / sourceTotals.laminationCharge : 0
 
   applyPeriodToTemplate(photoSheet, laminationSheet, periodMeta)
+  clearSheetDataRows(photoSheet, laminationSheet, rowCounts.photoRowCount, rowCounts.laminationRowCount)
 
   sourceRows.forEach((row) => {
-    const openingState = openingStateByRow.get(row.rowNumber)
-    if (!openingState) return
-
-    const photoBackfillFactor = computeBackfillFactor(row.latestPhotoOldDebt, row.latestPhotoCharge, maxWeight)
-    const laminationBackfillFactor = computeBackfillFactor(
-      row.latestLaminationOldDebt,
-      row.latestLaminationCharge,
-      maxWeight
-    )
-
-    const photoUsage = derivePhotoUsage(row, photoBackfillFactor * historyWeight)
-    const laminationUsage = deriveLaminationUsage(row, laminationBackfillFactor * historyWeight)
-
-    const photoFinalDebt = openingState.nextPhotoOpening
-    const laminationFinalDebt = openingState.nextLaminationOpening
-    const photoOldDebt = roundMoney(photoFinalDebt - photoUsage.newPrintCharge)
-    const laminationOldDebt = roundMoney(laminationFinalDebt - laminationUsage.newLaminationCharge)
+    const openingState = openingStateByRow.get(row.rowNumber) || {
+      nextPhotoOpening: 0,
+      nextLaminationOpening: 0,
+    }
+    const photoUsage = derivePhotoUsage(row, printFactor)
+    const laminationUsage = deriveLaminationUsage(row, laminationFactor)
+    const photoOldDebt = openingState.nextPhotoOpening
+    const laminationOldDebt = openingState.nextLaminationOpening
+    const photoFinalDebt = roundMoney(photoOldDebt + photoUsage.newPrintCharge)
+    const laminationFinalDebt = roundMoney(laminationOldDebt + laminationUsage.newLaminationCharge)
 
     setCellValue(photoSheet, `D${row.rowNumber}`, photoOldDebt)
     setCellValue(photoSheet, `E${row.rowNumber}`, photoUsage.bw2520Count)
@@ -305,8 +306,8 @@ function writeDerivedPeriodPair(periodMeta, latestPeriodKey, historyWeights, sou
     setCellValue(laminationSheet, `F${row.rowNumber}`, laminationFinalDebt)
 
     openingStateByRow.set(row.rowNumber, {
-      nextPhotoOpening: photoOldDebt,
-      nextLaminationOpening: laminationOldDebt,
+      nextPhotoOpening: photoFinalDebt,
+      nextLaminationOpening: laminationFinalDebt,
     })
   })
 
@@ -319,25 +320,9 @@ function writeDerivedPeriodPair(periodMeta, latestPeriodKey, historyWeights, sou
     periodKey: periodMeta.key,
     photoPath,
     laminationPath,
-  }
-}
-
-function copyLatestSourcePair(latestPeriodKey) {
-  const photoPath = path.join(OUTPUT_DIR, `${latestPeriodKey}-ΦΩΤΟΤΥΠΙΚΟ.xlsx`)
-  const laminationPath = path.join(OUTPUT_DIR, `${latestPeriodKey}-ΠΛΑΣΤΙΚΟΠΟΙΗΤΗΣ.xlsx`)
-  fs.copyFileSync(PHOTO_SOURCE, photoPath)
-  fs.copyFileSync(LAMINATION_SOURCE, laminationPath)
-
-  return {
-    periodKey: latestPeriodKey,
-    photoPath,
-    laminationPath,
-  }
-}
-
-function assertPeriodRange(startPeriodKey, latestPeriodKey) {
-  if (monthDistanceFromLatest(latestPeriodKey, startPeriodKey) < 0) {
-    throw new Error(`Start period ${startPeriodKey} is after latest source period ${latestPeriodKey}.`)
+    totalChargeTarget,
+    printChargeTarget,
+    laminationChargeTarget,
   }
 }
 
@@ -357,19 +342,19 @@ function main() {
     )
   }
 
-  assertPeriodRange(TARGET_START_PERIOD_KEY, photoPeriod.key)
-
   const periods = buildMonthlyPeriods(TARGET_START_PERIOD_KEY, photoPeriod.key)
-  const latestPeriodKey = photoPeriod.key
-  const priorPeriods = periods.slice(0, -1)
-  const historyWeights = buildHistoryWeights(priorPeriods.length)
   const sourceRows = buildSourceState(photoRows, laminationRows)
+  const sourceTotals = buildSourceTotals(sourceRows)
+  const rowCounts = {
+    photoRowCount: photoRows.length,
+    laminationRowCount: laminationRows.length,
+  }
   const openingStateByRow = new Map(
     sourceRows.map((row) => [
       row.rowNumber,
       {
-        nextPhotoOpening: row.latestPhotoOldDebt,
-        nextLaminationOpening: row.latestLaminationOldDebt,
+        nextPhotoOpening: 0,
+        nextLaminationOpening: 0,
       },
     ])
   )
@@ -377,25 +362,9 @@ function main() {
   fs.rmSync(OUTPUT_DIR, { recursive: true, force: true })
   fs.mkdirSync(OUTPUT_DIR, { recursive: true })
 
-  const pairsByPeriod = new Map()
-  pairsByPeriod.set(latestPeriodKey, copyLatestSourcePair(latestPeriodKey))
-
-  priorPeriods
-    .slice()
-    .reverse()
-    .forEach((period) => {
-      const periodMeta = buildPeriodMeta(period.key)
-      const pair = writeDerivedPeriodPair(periodMeta, latestPeriodKey, historyWeights, sourceRows, openingStateByRow)
-      pairsByPeriod.set(period.key, pair)
-    })
-
-  const orderedPairs = periods.map((period) => {
-    const pair = pairsByPeriod.get(period.key)
-    if (!pair) {
-      throw new Error(`Missing generated pair for ${period.key}.`)
-    }
-    return pair
-  })
+  const orderedPairs = periods.map((period, periodIndex) =>
+    writeDerivedPeriodPair(buildPeriodMeta(period.key), periodIndex, sourceRows, sourceTotals, rowCounts, openingStateByRow)
+  )
 
   const manifestPath = path.join(OUTPUT_DIR, "manifest.json")
   fs.writeFileSync(
@@ -403,9 +372,9 @@ function main() {
     JSON.stringify(
       {
         createdAt: new Date().toISOString(),
-        mode: "backfill-from-latest-source",
+        mode: "scaled-monthly-fixture",
         startPeriodKey: TARGET_START_PERIOD_KEY,
-        latestPeriodKey,
+        latestPeriodKey: photoPeriod.key,
         sourceFiles: {
           photo: PHOTO_SOURCE,
           lamination: LAMINATION_SOURCE,
@@ -422,7 +391,7 @@ function main() {
       {
         outputDir: OUTPUT_DIR,
         startPeriodKey: TARGET_START_PERIOD_KEY,
-        latestPeriodKey,
+        latestPeriodKey: photoPeriod.key,
         generatedPairCount: orderedPairs.length,
         manifestPath,
       },

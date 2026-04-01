@@ -5,6 +5,7 @@
 
 # next.js
 /.next/
+/.next.stale-*/
 /out/
 
 # production
@@ -21,6 +22,14 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# local tooling artifacts
+/.playwright-cli/
+/output/
+
+# local Excel fixtures and generated pairs
+/generated-excel-import-pairs/
+/*.xlsx
 
 # typescript
 *.tsbuildinfo

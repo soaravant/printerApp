@@ -151,36 +151,21 @@ function periodSettlementTimestamp(periodKey) {
     }
     return new Date(Date.UTC(year, month, 0, 12, 0, 0));
 }
-function getOpeningOutstandingTotal(user) {
-    const openingPrintDebt = roundMoney(Number(user.openingPrintDebt || 0));
-    const openingLaminationDebt = roundMoney(Number(user.openingLaminationDebt || 0));
-    const totalCredit = roundMoney(Math.max(0, -openingPrintDebt) + Math.max(0, -openingLaminationDebt));
-    return roundMoney(Math.max(0, openingPrintDebt) + Math.max(0, openingLaminationDebt) - totalCredit);
-}
-function getIncomeCadenceMonths(user) {
-    return user.userRole === "Άτομο" ? 3 : 4;
-}
-function getRollingIncomeRatio(user) {
+function getMonthlyIncomeRatio(user, userIndex, periodIndex) {
+    const pattern = [0.42, 0.44, 0.45, 0.47];
+    const patternValue = pattern[(userIndex + periodIndex) % pattern.length];
     switch (user.userRole) {
         case "Άτομο":
-            return 0.52;
+            return patternValue;
         case "Ομάδα":
-            return 0.48;
+            return Math.min(0.48, patternValue + 0.01);
         case "Ναός":
-            return 0.44;
+            return Math.max(0.41, patternValue - 0.01);
         case "Τομέας":
-            return 0.42;
+            return Math.max(0.4, patternValue - 0.02);
         default:
-            return 0.45;
+            return 0.44;
     }
-}
-function buildSettlementPayment(outstanding, userIndex, periodIndex, isLastPeriod) {
-    const residualPattern = isLastPeriod ? [0, 0.25, 0.5, 0.75] : [0, 0.4, 0.8, 1.2];
-    const residual = residualPattern[(userIndex + periodIndex) % residualPattern.length];
-    if (outstanding <= residual + 2) {
-        return roundMoney(outstanding);
-    }
-    return roundMoney(Math.max(0, outstanding - residual));
 }
 async function generateExcelPairs() {
     const result = (0, child_process_1.spawnSync)(process.execPath, [path_1.default.join(REPO_ROOT, "scripts", "generate-excel-import-test-pairs.js")], {
@@ -232,29 +217,20 @@ async function createDummyIncomeHistory(periodKeys) {
         addCharge(job.uid, timestamp.toISOString().slice(0, 7), Number(job.totalCost || 0));
     }
     const eligibleUsers = users
-        .filter((user) => user.accessLevel === "Χρήστης")
+        .filter((user) => user.accessLevel !== "Διαχειριστής")
         .sort((left, right) => left.username.localeCompare(right.username));
     const incomesToCreate = [];
     eligibleUsers.forEach((user, userIndex) => {
-        let runningOutstanding = getOpeningOutstandingTotal(user);
-        const cadence = getIncomeCadenceMonths(user);
-        const cadenceOffset = userIndex % cadence;
         periodKeys.forEach((periodKey, periodIndex) => {
             var _a;
             const periodCharge = roundMoney(((_a = chargesByUserAndPeriod.get(user.uid)) === null || _a === void 0 ? void 0 : _a.get(periodKey)) || 0);
-            runningOutstanding = roundMoney(runningOutstanding + periodCharge);
-            if (runningOutstanding <= 0.01)
+            if (periodCharge <= 0.01)
                 return;
-            const isLastPeriod = periodIndex === periodKeys.length - 1;
-            const shouldSettle = isLastPeriod || (periodIndex + cadenceOffset + 1) % cadence === 0;
-            const variableRatio = getRollingIncomeRatio(user) + (((userIndex + periodIndex) % 2) * 0.06);
-            const paymentAmount = shouldSettle
-                ? buildSettlementPayment(runningOutstanding, userIndex, periodIndex, isLastPeriod)
-                : roundMoney(Math.min(runningOutstanding, Math.max(8, runningOutstanding * variableRatio, periodCharge * 0.95)));
-            if (paymentAmount < 4)
+            const paymentAmount = roundMoney(periodCharge * getMonthlyIncomeRatio(user, userIndex, periodIndex));
+            if (paymentAmount < 0.01)
                 return;
             const timestamp = periodSettlementTimestamp(periodKey);
-            const splitPayment = shouldSettle && paymentAmount >= 24;
+            const splitPayment = paymentAmount >= 8;
             const paymentChunks = splitPayment
                 ? [roundMoney(paymentAmount * 0.45), roundMoney(paymentAmount - roundMoney(paymentAmount * 0.45))]
                 : [paymentAmount];
@@ -271,7 +247,6 @@ async function createDummyIncomeHistory(periodKeys) {
                     createdAt: new Date(),
                 });
             });
-            runningOutstanding = roundMoney(runningOutstanding - paymentAmount);
         });
     });
     const batchSize = 400;

@@ -41,7 +41,7 @@ import { IncomeFilters } from "@/components/income-filters"
 // Firestore
 import { fetchIncomeFor, fetchLaminationJobsFor, fetchPrintJobsFor, useUsers, usePrintJobsInfinite, useLaminationJobsInfinite, useIncomeInfinite, fetchPrintJobsSince, fetchLaminationJobsSince, fetchIncomeSince, fetchUsers, useExcelImportHistory } from "@/lib/firebase-queries"
 import { FIREBASE_COLLECTIONS } from "@/lib/firebase-schema"
-import { getPrintTypeLabel, isExcelPrintImportType, isManagedEntityRole, normalizeGreek, normalizeUserRoleLabel, roundMoney } from "@/lib/utils"
+import { getDebtFilterComparableValue, getPrintTypeLabel, isExcelPrintImportType, isManagedEntityRole, isNaosLikeRole, normalizeGreek, normalizeUserRoleLabel, roundMoney } from "@/lib/utils"
 import { coerceToDate, computeDebtsAndBankForUser } from "@/lib/debt-projection"
 import { getSnapshot, saveSnapshot, makeScopeKey, mergeById, sortByTimestampDesc } from "@/lib/snapshot-store"
 import { loadRemoteSnapshot } from "@/lib/remote-snapshot"
@@ -80,6 +80,22 @@ type HoveredPrintJob = {
 }
 
 type ExcelPrintStatKey = "bw" | "color" | "adjustment"
+
+function getDisplayTotalDebt(userLike: {
+  printDebt?: number | null
+  laminationDebt?: number | null
+  totalDebt?: number | null
+}) {
+  const hasCategoryDebt =
+    typeof userLike.printDebt === "number" ||
+    typeof userLike.laminationDebt === "number"
+
+  if (hasCategoryDebt) {
+    return roundMoney(Number(userLike.printDebt || 0) + Number(userLike.laminationDebt || 0))
+  }
+
+  return roundMoney(Number(userLike.totalDebt || 0))
+}
 
 const PrintJobsTable = dynamic(() => import("@/components/print-jobs-table"), {
   loading: () => <div className="w-full flex justify-center items-center py-8">Φόρτωση εκτυπώσεων...</div>,
@@ -296,7 +312,9 @@ export default function DashboardPage() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100])
   const [priceRangeInputs, setPriceRangeInputs] = useState<[string, string]>(["0", "100"])
   const [roleFilter, setRoleFilter] = useState("all")
-  const [teamFilter, setTeamFilter] = useState("all")
+  const [groupFilter, setGroupFilter] = useState("all")
+  const [sectorFilter, setSectorFilter] = useState("all")
+  const [naosFilter, setNaosFilter] = useState("all")
   const [responsibleForFilter, setResponsibleForFilter] = useState("all")
 
   // Income filtering states
@@ -701,7 +719,7 @@ export default function DashboardPage() {
         : timelineUsers.filter(u => u.uid === user.uid)
     const amounts = visibleUsers
       .filter(u => u.accessLevel !== "Διαχειριστής")
-      .map(u => typeof u.totalDebt === "number" ? u.totalDebt : (u.printDebt || 0) + (u.laminationDebt || 0))
+      .map(u => getDebtFilterComparableValue(getDisplayTotalDebt(u)))
     if (amounts.length > 0) {
       const minDebt = Math.floor(Math.min(...amounts))
       const maxDebt = Math.ceil(Math.max(...amounts))
@@ -1042,7 +1060,7 @@ export default function DashboardPage() {
     if (timelineUsers.length > 0) {
       const userDebtAmounts = timelineUsers
         .filter(userData => userData.accessLevel !== "Διαχειριστής")
-        .map(user => user.totalDebt || 0);
+        .map(user => getDebtFilterComparableValue(getDisplayTotalDebt(user)));
 
       if (userDebtAmounts.length > 0) {
         const actualMinDebt = Math.floor(Math.min(...userDebtAmounts));
@@ -1065,7 +1083,9 @@ export default function DashboardPage() {
     }
 
     setRoleFilter("all")
-    setTeamFilter("all")
+    setGroupFilter("all")
+    setSectorFilter("all")
+    setNaosFilter("all")
     setResponsibleForFilter("all")
   }
 
@@ -1248,6 +1268,45 @@ export default function DashboardPage() {
       })
       : allUsersData.filter(u => u.uid === user.uid) // Regular users (Χρήστης) see only their personal data
 
+  const matchesAdminDebtMembershipFilters = (userData: FirebaseUser) => {
+    if (user.accessLevel !== "Διαχειριστής") return true
+
+    const normalizedRole = normalizeUserRoleLabel(userData.userRole)
+    const memberships = Array.isArray(userData.memberOf) ? userData.memberOf : []
+
+    if (groupFilter !== "all") {
+      if (normalizedRole === "Άτομο") {
+        if (!memberships.includes(groupFilter)) return false
+      } else if (normalizedRole === "Ομάδα") {
+        if (userData.displayName !== groupFilter) return false
+      } else {
+        return false
+      }
+    }
+
+    if (sectorFilter !== "all") {
+      if (normalizedRole === "Άτομο") {
+        if (!memberships.includes(sectorFilter)) return false
+      } else if (normalizedRole === "Τομέας") {
+        if (userData.displayName !== sectorFilter) return false
+      } else {
+        return false
+      }
+    }
+
+    if (naosFilter !== "all") {
+      if (normalizedRole === "Άτομο") {
+        if (!memberships.includes(naosFilter)) return false
+      } else if (isNaosLikeRole(userData.userRole)) {
+        if (userData.displayName !== naosFilter) return false
+      } else {
+        return false
+      }
+    }
+
+    return true
+  }
+
   const isOpeningBalanceInSelectedRange = (currentUser: FirebaseUser) => {
     if (isPeriodKeyWithinSelectedRange(
       currentUser.openingDebtSource ?? null,
@@ -1287,6 +1346,19 @@ export default function DashboardPage() {
   const printCharged = sumChargesForUsers(personalDebtUsers, timelinePrintJobs, "openingPrintDebt")
   const laminationCharged = sumChargesForUsers(personalDebtUsers, timelineLaminationJobs, "openingLaminationDebt")
   const totalCharged = roundMoney(printCharged + laminationCharged)
+  const currentDebtTotals = personalDebtUsers.reduce((totals, currentUser) => {
+    totals.print = roundMoney(totals.print + Number(currentUser.printDebt || 0))
+    totals.lamination = roundMoney(totals.lamination + Number(currentUser.laminationDebt || 0))
+    totals.total = roundMoney(totals.total + getDisplayTotalDebt(currentUser))
+    return totals
+  }, {
+    print: 0,
+    lamination: 0,
+    total: 0,
+  })
+  const printCurrentDebt = currentDebtTotals.print
+  const laminationCurrentDebt = currentDebtTotals.lamination
+  const totalCurrentDebt = currentDebtTotals.total
 
   // Calculate totals without filters for percentage calculations
   const totalPrintCharged = sumChargesForUsers(allUsersData, timelinePrintJobs, "openingPrintDebt")
@@ -1314,7 +1386,7 @@ export default function DashboardPage() {
   const laminationBank: number = useFirestore ? timelineBank.laminationBank : 0
   const totalBank = printBank + laminationBank
   const showBankResetActions = user.accessLevel === "Διαχειριστής" && timelineStops.length === 0
-  const summaryCardLabel = user.accessLevel === "Διαχειριστής" ? "Χρεώσεις|Έσοδα" : "Χρεώσεις"
+  const summaryCardLabel = "Χρέος|Έσοδα"
 
   const getLaminationTypeLabel = (type: string) => {
     switch (type) {
@@ -1344,6 +1416,10 @@ export default function DashboardPage() {
   }
 
   const formatPrice = (price: number) => `€${price.toFixed(2).replace('.', ',')}`
+  const formatBalance = (amount: number) => {
+    const roundedAmount = roundMoney(amount)
+    return roundedAmount < 0 ? `-${formatPrice(Math.abs(roundedAmount))}` : formatPrice(roundedAmount)
+  }
 
   // Calculate print statistics
   const calculatePrintStatistics = () => {
@@ -1500,12 +1576,8 @@ export default function DashboardPage() {
             return // Skip this team if it doesn't match the role filter
           }
 
-          // Apply team filter for admin users to team entries
-          if (user?.accessLevel === "Διαχειριστής" && teamFilter !== "all") {
-            // For teams, check if the team name matches the selected team filter
-            if (teamEntity.displayName !== teamFilter) {
-              return // Skip this team if it doesn't match the team filter
-            }
+          if (!matchesAdminDebtMembershipFilters(teamEntity)) {
+            return
           }
 
           // Apply responsibleFor filter to team entries
@@ -1519,7 +1591,7 @@ export default function DashboardPage() {
           // Use the team's own debt values, not the sum of member debts
           const teamPrintDebt = teamEntity.printDebt || 0
           const teamLaminationDebt = teamEntity.laminationDebt || 0
-          const teamTotalDebt = teamEntity.totalDebt || 0
+          const teamTotalDebt = getDisplayTotalDebt(teamEntity)
 
           // Apply debt status filter to team entries
           if (debtFilter !== "all") {
@@ -1548,8 +1620,10 @@ export default function DashboardPage() {
           }
 
           // Apply price range filter to team entries
+          const teamComparableDebt = getDebtFilterComparableValue(teamTotalDebt)
+
           if (priceRange[0] !== 0 || priceRange[1] !== 100) {
-            if (teamTotalDebt < priceRange[0] || teamTotalDebt > priceRange[1]) {
+            if (teamComparableDebt < priceRange[0] || teamComparableDebt > priceRange[1]) {
               return // Skip this team if it doesn't match the price range filter
             }
           }
@@ -1604,19 +1678,8 @@ export default function DashboardPage() {
         return
       }
 
-      // Apply team filter for admin users
-      if (user?.accessLevel === "Διαχειριστής" && teamFilter !== "all") {
-        // For individual users, check if they belong to the selected team
-        if (userData.userRole === "Άτομο") {
-          if (!userData.memberOf?.includes(teamFilter)) {
-            return
-          }
-        } else {
-          // For groups, check if the group name matches the selected team
-          if (userData.displayName !== teamFilter) {
-            return
-          }
-        }
+      if (!matchesAdminDebtMembershipFilters(userData)) {
+        return
       }
 
       // Apply responsibleFor filter
@@ -1704,7 +1767,7 @@ export default function DashboardPage() {
 
       const printDebt = userData.printDebt || 0
       const laminationDebt = userData.laminationDebt || 0
-      const totalDebt = userData.totalDebt || 0
+      const totalDebt = getDisplayTotalDebt(userData)
 
       // Apply debt status filter
       if (debtFilter !== "all") {
@@ -1733,8 +1796,10 @@ export default function DashboardPage() {
       }
 
       // Apply price range filter
+      const comparableDebt = getDebtFilterComparableValue(totalDebt)
+
       if (priceRange[0] !== 0 || priceRange[1] !== 100) {
-        if (totalDebt < priceRange[0] || totalDebt > priceRange[1]) {
+        if (comparableDebt < priceRange[0] || comparableDebt > priceRange[1]) {
           return // Skip this user if it doesn't match the price range filter
         }
       }
@@ -1854,8 +1919,8 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className="text-3xl font-bold text-red-600">
-                      {formatPrice(totalCharged)}
+                    <div className={`text-3xl font-bold ${totalCurrentDebt > 0 ? "text-red-600" : "text-green-600"}`}>
+                      {formatBalance(totalCurrentDebt)}
                     </div>
                     {user.accessLevel === "Διαχειριστής" && (
                       <div className="text-2xl font-bold text-green-600">
@@ -1917,8 +1982,14 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className="text-3xl font-bold text-blue-600">
-                      {formatPrice(printCharged)}
+                    <div
+                      className={`text-3xl font-bold rounded-lg px-3 py-1 border-2 ${
+                        printCurrentDebt > 0
+                          ? "text-red-600 border-blue-400"
+                          : "text-green-600 border-transparent"
+                      }`}
+                    >
+                      {formatBalance(printCurrentDebt)}
                     </div>
                     {user.accessLevel === "Διαχειριστής" && (
                       <div className="text-2xl font-bold text-green-600">
@@ -1980,8 +2051,14 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div className="text-3xl font-bold text-green-600">
-                      {formatPrice(laminationCharged)}
+                    <div
+                      className={`text-3xl font-bold rounded-lg px-3 py-1 border-2 ${
+                        laminationCurrentDebt > 0
+                          ? "text-red-600 border-green-400"
+                          : "text-green-600 border-transparent"
+                      }`}
+                    >
+                      {formatBalance(laminationCurrentDebt)}
                     </div>
                     {user.accessLevel === "Διαχειριστής" && (
                       <div className="text-2xl font-bold text-green-600">
@@ -2014,8 +2091,12 @@ export default function DashboardPage() {
                     setPriceRangeInputs={setPriceRangeInputs}
                     roleFilter={roleFilter}
                     setRoleFilter={setRoleFilter}
-                    teamFilter={teamFilter}
-                    setTeamFilter={setTeamFilter}
+                    groupFilter={groupFilter}
+                    setGroupFilter={setGroupFilter}
+                    sectorFilter={sectorFilter}
+                    setSectorFilter={setSectorFilter}
+                    naosFilter={naosFilter}
+                    setNaosFilter={setNaosFilter}
                     responsibleForFilter={responsibleForFilter}
                     setResponsibleForFilter={setResponsibleForFilter}
                     priceDistribution={{ min: 0, max: 100 }}

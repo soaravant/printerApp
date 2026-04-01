@@ -135,6 +135,32 @@ async function getExistingDocsMap(refs) {
     }
     return result;
 }
+async function getCurrentSyntheticPeriodDocs(periodKey) {
+    const db = (0, firebase_admin_1.getAdminDb)();
+    const [printSnap, laminationSnap] = await Promise.all([
+        db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.PRINT_JOBS).where("importPeriod", "==", periodKey).get(),
+        db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.LAMINATION_JOBS).where("importPeriod", "==", periodKey).get(),
+    ]);
+    const printDocs = printSnap.docs
+        .filter((doc) => Boolean(asRecord(doc.data()).isSyntheticImport))
+        .map((doc) => {
+        const data = asRecord(doc.data());
+        return {
+            ref: doc.ref,
+            importId: typeof data.importId === "string" ? data.importId : null,
+        };
+    });
+    const laminationDocs = laminationSnap.docs
+        .filter((doc) => Boolean(asRecord(doc.data()).isSyntheticImport))
+        .map((doc) => {
+        const data = asRecord(doc.data());
+        return {
+            ref: doc.ref,
+            importId: typeof data.importId === "string" ? data.importId : null,
+        };
+    });
+    return { printDocs, laminationDocs };
+}
 async function getImportRestoreSnapshots(importId) {
     const db = (0, firebase_admin_1.getAdminDb)();
     const importRef = db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.EXCEL_IMPORTS).doc(importId);
@@ -295,14 +321,18 @@ async function listCompletedExcelImportSummaries() {
         .filter((summary) => summary.status === "completed");
 }
 async function runExcelImport(params) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     const db = (0, firebase_admin_1.getAdminDb)();
     const parsed = (0, excel_import_1.parseExcelImportFiles)(params.photoBuffer, params.laminationBuffer);
-    const users = await loadAllUsers();
-    const latestCompletedImport = await getLatestCompletedExcelImportSummary();
+    const [users, completedImports] = await Promise.all([
+        loadAllUsers(),
+        listCompletedExcelImportSummaries(),
+    ]);
+    const latestCompletedImport = completedImports.length > 0 ? completedImports[completedImports.length - 1] : null;
     const plan = (0, excel_import_1.buildExcelImportPlan)(parsed, users, {
         allowCreateUsers: params.allowCreateUsers,
         latestCompletedImportPeriodKey: (_a = latestCompletedImport === null || latestCompletedImport === void 0 ? void 0 : latestCompletedImport.periodKey) !== null && _a !== void 0 ? _a : null,
+        completedImportPeriodKeys: Array.from(new Set(completedImports.map((item) => item.periodKey))),
     });
     const importableRows = plan.rows.filter((row) => row.canImport);
     importRowSchema.array().parse(importableRows.map((row) => ({
@@ -340,23 +370,42 @@ async function runExcelImport(params) {
     const importEventTimestamp = getImportEventTimestamp(parsed.period.endDate);
     const importId = `excel-${parsed.period.key}-${now.getTime()}`;
     const importRef = db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.EXCEL_IMPORTS).doc(importId);
-    const printRefs = [];
-    const laminationRefs = [];
+    const samePeriodCompletedImports = completedImports.filter((item) => item.periodKey === parsed.period.key);
+    const currentSyntheticPeriodDocs = await getCurrentSyntheticPeriodDocs(parsed.period.key);
+    const currentSyntheticImportIds = new Set([...currentSyntheticPeriodDocs.printDocs, ...currentSyntheticPeriodDocs.laminationDocs]
+        .map((doc) => doc.importId)
+        .filter((value) => Boolean(value)));
+    const activeSamePeriodImportId = (_c = (_b = samePeriodCompletedImports
+        .filter((item) => currentSyntheticImportIds.has(item.importId))
+        .map((item) => item.importId)
+        .pop()) !== null && _b !== void 0 ? _b : samePeriodCompletedImports.map((item) => item.importId).pop()) !== null && _c !== void 0 ? _c : null;
+    const activeSamePeriodSnapshots = activeSamePeriodImportId
+        ? await getImportRestoreSnapshots(activeSamePeriodImportId)
+        : null;
+    const activeSamePeriodUserRestores = new Map(((_d = activeSamePeriodSnapshots === null || activeSamePeriodSnapshots === void 0 ? void 0 : activeSamePeriodSnapshots.userRestores) !== null && _d !== void 0 ? _d : []).map((restore) => [restore.uid, restore]));
+    const printRefs = new Map();
+    const laminationRefs = new Map();
     const userRestores = new Map();
     const mutationOperations = [];
     const createdUserIds = new Set();
     for (const row of resolvedRows) {
-        const existingUser = (_b = usersByUsername.get(row.username)) !== null && _b !== void 0 ? _b : null;
+        const existingUser = (_e = usersByUsername.get(row.username)) !== null && _e !== void 0 ? _e : null;
         userRestores.set(row.dbUserUid, {
             existedBefore: Boolean(existingUser),
             previousOpeningPrintDebt: typeof (existingUser === null || existingUser === void 0 ? void 0 : existingUser.openingPrintDebt) === "number" ? existingUser.openingPrintDebt : null,
             previousOpeningLaminationDebt: typeof (existingUser === null || existingUser === void 0 ? void 0 : existingUser.openingLaminationDebt) === "number" ? existingUser.openingLaminationDebt : null,
-            previousOpeningDebtSource: (_c = existingUser === null || existingUser === void 0 ? void 0 : existingUser.openingDebtSource) !== null && _c !== void 0 ? _c : null,
-            previousOpeningDebtImportedAt: (_d = existingUser === null || existingUser === void 0 ? void 0 : existingUser.openingDebtImportedAt) !== null && _d !== void 0 ? _d : null,
+            previousOpeningDebtSource: (_f = existingUser === null || existingUser === void 0 ? void 0 : existingUser.openingDebtSource) !== null && _f !== void 0 ? _f : null,
+            previousOpeningDebtImportedAt: (_g = existingUser === null || existingUser === void 0 ? void 0 : existingUser.openingDebtImportedAt) !== null && _g !== void 0 ? _g : null,
         });
         const ids = (0, excel_import_1.getSyntheticImportDocumentIds)(row.username, parsed.period.key);
-        printRefs.push(db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printBw), db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printColor), db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printAdjustment));
-        laminationRefs.push(db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.LAMINATION_JOBS).doc(ids.lamination));
+        const printBwRef = db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printBw);
+        const printColorRef = db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printColor);
+        const printAdjustmentRef = db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.PRINT_JOBS).doc(ids.printAdjustment);
+        const laminationRef = db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.LAMINATION_JOBS).doc(ids.lamination);
+        printRefs.set(printBwRef.id, printBwRef);
+        printRefs.set(printColorRef.id, printColorRef);
+        printRefs.set(printAdjustmentRef.id, printAdjustmentRef);
+        laminationRefs.set(laminationRef.id, laminationRef);
         const userRef = db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.USERS).doc(row.dbUserUid);
         if (!existingUser) {
             createdUserIds.add(row.dbUserUid);
@@ -377,7 +426,7 @@ async function runExcelImport(params) {
                 },
             });
         }
-        if (!(existingUser === null || existingUser === void 0 ? void 0 : existingUser.openingDebtSource)) {
+        if (!(existingUser === null || existingUser === void 0 ? void 0 : existingUser.openingDebtSource) || existingUser.openingDebtSource === parsed.period.key) {
             mutationOperations.push({
                 kind: "set",
                 ref: userRef,
@@ -393,7 +442,7 @@ async function runExcelImport(params) {
         const printJobs = (0, excel_import_1.createSyntheticPrintJobs)(row, parsed.period.key, importId, importEventTimestamp, now);
         const printJobsById = new Map(printJobs.map((job) => [job.jobId, job]));
         for (const jobId of [ids.printBw, ids.printColor, ids.printAdjustment]) {
-            const ref = db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.PRINT_JOBS).doc(jobId);
+            const ref = printRefs.get(jobId);
             const job = printJobsById.get(jobId);
             if (job) {
                 mutationOperations.push({ kind: "set", ref, data: job });
@@ -403,22 +452,59 @@ async function runExcelImport(params) {
             }
         }
         const laminationJobs = (0, excel_import_1.createSyntheticLaminationJobs)(row, parsed.period.key, importId, importEventTimestamp, now);
-        const laminationJob = (_e = laminationJobs[0]) !== null && _e !== void 0 ? _e : null;
-        const laminationRef = db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.LAMINATION_JOBS).doc(ids.lamination);
+        const laminationJob = (_h = laminationJobs[0]) !== null && _h !== void 0 ? _h : null;
+        const laminationTargetRef = laminationRefs.get(ids.lamination);
         if (laminationJob) {
             mutationOperations.push({
                 kind: "set",
-                ref: laminationRef,
+                ref: laminationTargetRef,
                 data: laminationJob,
             });
         }
         else {
-            mutationOperations.push({ kind: "delete", ref: laminationRef });
+            mutationOperations.push({ kind: "delete", ref: laminationTargetRef });
         }
     }
+    for (const doc of currentSyntheticPeriodDocs.printDocs) {
+        printRefs.set(doc.ref.id, doc.ref);
+        if (!mutationOperations.some((operation) => operation.ref.id === doc.ref.id)) {
+            mutationOperations.push({ kind: "delete", ref: doc.ref });
+        }
+    }
+    for (const doc of currentSyntheticPeriodDocs.laminationDocs) {
+        laminationRefs.set(doc.ref.id, doc.ref);
+        if (!mutationOperations.some((operation) => operation.ref.id === doc.ref.id)) {
+            mutationOperations.push({ kind: "delete", ref: doc.ref });
+        }
+    }
+    const resolvedUserIds = new Set(resolvedRows.map((row) => row.dbUserUid));
+    const openingBaselineUsersToRestore = users.filter((user) => user.openingDebtSource === parsed.period.key && !resolvedUserIds.has(user.uid));
+    for (const user of openingBaselineUsersToRestore) {
+        userRestores.set(user.uid, {
+            existedBefore: true,
+            previousOpeningPrintDebt: typeof user.openingPrintDebt === "number" ? user.openingPrintDebt : null,
+            previousOpeningLaminationDebt: typeof user.openingLaminationDebt === "number" ? user.openingLaminationDebt : null,
+            previousOpeningDebtSource: (_j = user.openingDebtSource) !== null && _j !== void 0 ? _j : null,
+            previousOpeningDebtImportedAt: (_k = user.openingDebtImportedAt) !== null && _k !== void 0 ? _k : null,
+        });
+        const priorRestore = activeSamePeriodUserRestores.get(user.uid);
+        if (!priorRestore)
+            continue;
+        mutationOperations.push({
+            kind: "set",
+            ref: db.collection(firebase_schema_1.FIREBASE_COLLECTIONS.USERS).doc(user.uid),
+            data: {
+                openingPrintDebt: restoreFieldOrDelete(priorRestore.previousOpeningPrintDebt),
+                openingLaminationDebt: restoreFieldOrDelete(priorRestore.previousOpeningLaminationDebt),
+                openingDebtSource: restoreFieldOrDelete(priorRestore.previousOpeningDebtSource),
+                openingDebtImportedAt: restoreFieldOrDelete(priorRestore.previousOpeningDebtImportedAt),
+            },
+            options: { merge: true },
+        });
+    }
     const [existingPrintDocs, existingLaminationDocs] = await Promise.all([
-        getExistingDocsMap(printRefs),
-        getExistingDocsMap(laminationRefs),
+        getExistingDocsMap(Array.from(printRefs.values())),
+        getExistingDocsMap(Array.from(laminationRefs.values())),
     ]);
     const metadataOperations = [
         {
@@ -451,7 +537,7 @@ async function runExcelImport(params) {
             data: restore,
         });
     }
-    for (const ref of printRefs) {
+    for (const ref of printRefs.values()) {
         const snapshot = existingPrintDocs.get(ref.id);
         metadataOperations.push({
             kind: "set",
@@ -462,7 +548,7 @@ async function runExcelImport(params) {
             },
         });
     }
-    for (const ref of laminationRefs) {
+    for (const ref of laminationRefs.values()) {
         const snapshot = existingLaminationDocs.get(ref.id);
         metadataOperations.push({
             kind: "set",

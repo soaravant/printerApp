@@ -66,6 +66,10 @@ export function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
+export function getDebtFilterComparableValue(value: number | null | undefined): number {
+  return Math.max(0, roundMoney(Number(value || 0)))
+}
+
 /**
  * Adds multiple money values together with proper rounding to prevent precision errors.
  * 

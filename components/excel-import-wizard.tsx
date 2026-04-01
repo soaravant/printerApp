@@ -10,7 +10,6 @@ import {
   Loader2,
   RefreshCcw,
   RotateCcw,
-  ShieldAlert,
   Undo2,
   Upload,
   X,
@@ -41,14 +40,41 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-type Step = 1 | 2 | 3
-type SyncStage = "idle" | "creating_jobs" | "updating_users" | "done" | "error"
+type SyncStage = "idle" | "starting" | "processing" | "refreshing" | "done" | "error"
+type ActiveSyncStage = Exclude<SyncStage, "idle" | "done" | "error">
+type TimelineCheckpointState = "pending" | "active" | "complete" | "error"
 
-const STEP_LABELS: Array<{ step: Step; title: string }> = [
-  { step: 1, title: "Εισαγωγή" },
-  { step: 2, title: "Έλεγχος" },
-  { step: 3, title: "Ανέβασμα" },
-]
+const UPLOAD_TIMELINE_STEPS = [
+  {
+    key: "starting",
+    title: "Έναρξη ανεβάσματος",
+    description: "Προετοιμασία αρχείων και ελέγχου πρόσβασης",
+    progress: 18,
+  },
+  {
+    key: "processing",
+    title: "Επεξεργασία Excel",
+    description: "Το σύστημα καταχωρεί τις χρεώσεις της περιόδου",
+    progress: 56,
+  },
+  {
+    key: "refreshing",
+    title: "Ανανέωση δεδομένων",
+    description: "Γίνεται refresh σε χρήστες, κινήσεις και dashboard",
+    progress: 84,
+  },
+  {
+    key: "done",
+    title: "Ολοκλήρωση",
+    description: "Η εισαγωγή ολοκληρώθηκε επιτυχώς",
+    progress: 100,
+  },
+] as const satisfies ReadonlyArray<{
+  key: Exclude<SyncStage, "idle" | "error">
+  title: string
+  description: string
+  progress: number
+}>
 
 function formatMoney(value: number) {
   return `€${value.toFixed(2).replace(".", ",")}`
@@ -83,10 +109,12 @@ function formatServerDate(value: unknown) {
 
 function syncStageLabel(stage: SyncStage) {
   switch (stage) {
-    case "creating_jobs":
-      return "Καταχώρηση χρεώσεων"
-    case "updating_users":
-      return "Ενημέρωση χρηστών"
+    case "starting":
+      return "Έναρξη ανεβάσματος"
+    case "processing":
+      return "Επεξεργασία Excel"
+    case "refreshing":
+      return "Ανανέωση δεδομένων"
     case "done":
       return "Ολοκληρώθηκε"
     case "error":
@@ -94,6 +122,16 @@ function syncStageLabel(stage: SyncStage) {
     default:
       return "Έτοιμο"
   }
+}
+
+async function waitForNextPaint() {
+  await new Promise<void>((resolve) => {
+    if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+      resolve()
+      return
+    }
+    window.requestAnimationFrame(() => resolve())
+  })
 }
 
 async function getAdminToken() {
@@ -121,7 +159,6 @@ export function ExcelImportWizard({
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const { triggerRefresh } = useRefresh()
-  const [currentStep, setCurrentStep] = useState<Step>(1)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [laminationFile, setLaminationFile] = useState<File | null>(null)
   const [photoValidation, setPhotoValidation] = useState<ParsedPhotocopierWorkbook | null>(null)
@@ -139,6 +176,7 @@ export function ExcelImportWizard({
   const [completedImportPeriods, setCompletedImportPeriods] = useState<string[]>([])
   const photoInputRef = useRef<HTMLInputElement>(null)
   const laminationInputRef = useRef<HTMLInputElement>(null)
+  const lastActiveSyncStageRef = useRef<ActiveSyncStage | null>(null)
 
   const plan: ExcelImportPlan | null = useMemo(() => {
     if (!importPreview) return null
@@ -171,6 +209,20 @@ export function ExcelImportWizard({
     setCompletedImportPeriods(payload.completedImportPeriods || [])
   }
 
+  const setProgressStage = (stage: SyncStage) => {
+    if (stage === "starting" || stage === "processing" || stage === "refreshing") {
+      lastActiveSyncStageRef.current = stage
+    }
+    setSyncStage(stage)
+  }
+
+  const clearUploadProgress = () => {
+    lastActiveSyncStageRef.current = null
+    setSyncStage("idle")
+    setHasUploadBeenTriggered(false)
+    setImportRun(null)
+  }
+
   const fetchImportState = async () => {
     const token = await getAdminToken()
     const response = await fetch("/api/import/excel", {
@@ -196,7 +248,6 @@ export function ExcelImportWizard({
     if (laminationInputRef.current) {
       laminationInputRef.current.value = ""
     }
-    setCurrentStep(1)
     setPhotoFile(null)
     setLaminationFile(null)
     setPhotoValidation(null)
@@ -206,9 +257,7 @@ export function ExcelImportWizard({
     setIsParsing(false)
     setIsImporting(false)
     setIsRollingBack(false)
-    setSyncStage("idle")
-    setHasUploadBeenTriggered(false)
-    setImportRun(null)
+    clearUploadProgress()
   }
 
   useEffect(() => {
@@ -262,15 +311,14 @@ export function ExcelImportWizard({
       setLaminationFile(null)
       setImportPreview(null)
       setAllowCreateUsers(false)
-      setHasUploadBeenTriggered(false)
-      setSyncStage("idle")
-      setImportRun(null)
+      clearUploadProgress()
     } catch (selectionError: unknown) {
       setError(getErrorMessage(selectionError, "Το αρχείο του φωτοτυπικού δεν είναι έγκυρο."))
       setPhotoFile(null)
       setPhotoValidation(null)
       setLaminationFile(null)
       setImportPreview(null)
+      clearUploadProgress()
     } finally {
       setIsParsing(false)
     }
@@ -291,13 +339,12 @@ export function ExcelImportWizard({
       setLaminationFile(file)
       setImportPreview(preview)
       setAllowCreateUsers(false)
-      setHasUploadBeenTriggered(false)
-      setSyncStage("idle")
-      setImportRun(null)
+      clearUploadProgress()
     } catch (selectionError: unknown) {
       setError(getErrorMessage(selectionError, "Το αρχείο του πλαστικοποιητή δεν είναι έγκυρο."))
       setLaminationFile(null)
       setImportPreview(null)
+      clearUploadProgress()
     } finally {
       setIsParsing(false)
     }
@@ -306,17 +353,19 @@ export function ExcelImportWizard({
   const executeImport = async () => {
     if (!photoFile || !laminationFile || !plan) return
 
-    setCurrentStep(3)
     setIsImporting(true)
     setError(null)
-    setSyncStage("creating_jobs")
+    setProgressStage("starting")
     try {
+      await waitForNextPaint()
       const token = await getAdminToken()
       const formData = new FormData()
       formData.append("photoFile", photoFile)
       formData.append("lamFile", laminationFile)
       formData.append("allowCreateUsers", String(allowCreateUsers))
 
+      setProgressStage("processing")
+      await waitForNextPaint()
       const response = await fetch("/api/import/excel", {
         method: "POST",
         headers: {
@@ -330,7 +379,8 @@ export function ExcelImportWizard({
         throw new Error(payload.error || "Η εισαγωγή απέτυχε.")
       }
 
-      setSyncStage("updating_users")
+      setProgressStage("refreshing")
+      await waitForNextPaint()
       await refreshDashboardState()
       setImportRun(payload.importRun)
       applyImportState({
@@ -344,9 +394,9 @@ export function ExcelImportWizard({
         // Keep the successful import result even if the follow-up refresh snapshot fails.
       }
       onImportCompleted?.(payload.importRun)
-      setSyncStage("done")
+      setProgressStage("done")
     } catch (requestError: unknown) {
-      setSyncStage("error")
+      setProgressStage("error")
       setError(getErrorMessage(requestError, "Η εισαγωγή απέτυχε."))
     } finally {
       setIsImporting(false)
@@ -390,13 +440,18 @@ export function ExcelImportWizard({
     }
   }
 
-  const isImportStepReady = Boolean(photoValidation && photoFile && importPreview && laminationFile)
-  const isUploadStepReady = Boolean(plan && plan.blockingErrors.length === 0 && users.length > 0)
+  const isImportReady = Boolean(photoValidation && photoFile && importPreview && laminationFile)
+  const blockingErrors = plan?.blockingErrors ?? []
+  const isUploadStepReady = Boolean(plan && blockingErrors.length === 0 && users.length > 0)
   const hasUploadStarted =
-    isImporting || syncStage === "creating_jobs" || syncStage === "updating_users"
+    isImporting ||
+    syncStage === "starting" ||
+    syncStage === "processing" ||
+    syncStage === "refreshing"
   const canStartUpload =
     isUploadStepReady && !isParsing && !isRollingBack && !hasUploadStarted && syncStage !== "done"
-  const showUploadProgress = hasUploadBeenTriggered || hasUploadStarted || syncStage === "error"
+  const showUploadTimeline =
+    hasUploadBeenTriggered || hasUploadStarted || syncStage === "done" || syncStage === "error"
   const replacementWarnings = useMemo(
     () => plan?.warnings.filter((warning) => warning.includes("θα αντικατασταθούν")) ?? [],
     [plan]
@@ -404,33 +459,41 @@ export function ExcelImportWizard({
   const reviewPeriodLabel = photoValidation?.period.label ?? "-"
   const reviewPhotoCharges = photoValidation ? formatMoney(photoValidation.totals.newPrintCharge) : "-"
   const reviewLaminationCharges = importPreview ? formatMoney(importPreview.totals.newLaminationCharge) : "-"
-  const reviewAlignedRows = importPreview ? String(importPreview.rows.length) : "-"
+  const reviewTotalCharges = importPreview
+    ? formatMoney(importPreview.totals.newPrintCharge + importPreview.totals.newLaminationCharge)
+    : "-"
+  const activeTimelineKey = syncStage === "error"
+    ? lastActiveSyncStageRef.current
+    : syncStage === "idle"
+      ? null
+      : syncStage
+  const activeTimelineIndex = activeTimelineKey
+    ? UPLOAD_TIMELINE_STEPS.findIndex((step) => step.key === activeTimelineKey)
+    : -1
+  const uploadProgressValue =
+    syncStage === "done"
+      ? 100
+      : activeTimelineIndex >= 0
+        ? UPLOAD_TIMELINE_STEPS[activeTimelineIndex].progress
+        : 0
 
-  const isStepDisabled = (step: Step) => {
-    if (step === currentStep) return false
-    if (isParsing || isImporting || isRollingBack) return true
-    if (step === 1) return false
-    if (step === 2) return !isImportStepReady
-    return !isUploadStepReady
-  }
+  const getTimelineCheckpointState = (
+    checkpointKey: (typeof UPLOAD_TIMELINE_STEPS)[number]["key"]
+  ): TimelineCheckpointState => {
+    const checkpointIndex = UPLOAD_TIMELINE_STEPS.findIndex((step) => step.key === checkpointKey)
+    if (checkpointIndex < 0 || activeTimelineIndex < 0) return "pending"
 
-  const handleStepSelection = (step: Step) => {
-    if (step === currentStep || isStepDisabled(step)) return
-    setError(null)
-    if (step === 1) {
-      setCurrentStep(1)
-      return
+    if (syncStage === "error") {
+      if (checkpointIndex < activeTimelineIndex) return "complete"
+      if (checkpointIndex === activeTimelineIndex) return "error"
+      return "pending"
     }
-    if (step === 2) {
-      setHasUploadBeenTriggered(false)
-      setCurrentStep(2)
-      return
+
+    if (checkpointIndex < activeTimelineIndex) return "complete"
+    if (checkpointIndex === activeTimelineIndex) {
+      return checkpointKey === "done" ? "complete" : "active"
     }
-    if (!isImporting && syncStage !== "done") {
-      setHasUploadBeenTriggered(false)
-      setSyncStage("idle")
-    }
-    setCurrentStep(3)
+    return "pending"
   }
 
   const handleStartUpload = async () => {
@@ -495,40 +558,6 @@ export function ExcelImportWizard({
         </div>
 
         <div className="space-y-5 p-5 sm:p-6">
-          <div className="grid grid-cols-3 gap-3">
-            {STEP_LABELS.map((item) => {
-              const isActive = currentStep === item.step
-              const isComplete = currentStep > item.step || (item.step === 3 && syncStage === "done")
-              const isDisabled = isStepDisabled(item.step)
-              return (
-                <button
-                  key={item.step}
-                  type="button"
-                  onClick={() => void handleStepSelection(item.step)}
-                  disabled={isDisabled}
-                  className={[
-                    "flex items-center gap-3 rounded-xl border bg-slate-50/70 px-3 py-3 text-left transition",
-                    isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-slate-300 hover:bg-slate-50",
-                  ].join(" ")}
-                >
-                  <div
-                    className={[
-                      "flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold",
-                      isComplete ? "border-emerald-500 bg-emerald-500 text-white" : "",
-                      isActive && !isComplete ? "border-blue-600 bg-blue-600 text-white" : "",
-                      !isActive && !isComplete ? "border-slate-200 bg-white text-slate-500" : "",
-                    ].join(" ")}
-                  >
-                    {isComplete ? <CheckCircle2 className="h-5 w-5" /> : item.step}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-900">{item.title}</div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
           {error && (
             <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
@@ -536,188 +565,207 @@ export function ExcelImportWizard({
             </div>
           )}
 
-          {currentStep === 1 && (
-            <div className="grid items-stretch gap-5 md:grid-cols-[1.2fr_0.8fr]">
-              <div className="grid gap-5 md:h-full md:grid-rows-2">
-                <div
-                  onClick={() => photoInputRef.current?.click()}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => void handleDrop(event, "photo")}
-                  className="flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50 px-6 py-6 text-center md:h-full md:min-h-0"
-                >
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept=".xlsx"
-                    className="hidden"
-                    onChange={(event) => void handleFileChange(event, "photo")}
-                  />
-                  <Upload className="mb-4 h-10 w-10 text-blue-600" />
-                  <div className="text-lg font-semibold text-blue-900">Ανεβάστε το ΦΩΤΟΤΥΠΙΚΟ.xlsx</div>
-                  {isParsing && !photoValidation && <Loader2 className="mt-3 h-5 w-5 animate-spin text-blue-600" />}
-                  {photoFile && (
-                    <div className="mt-4 flex items-center gap-3 rounded-xl border border-blue-200 bg-white px-4 py-3">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                      <div className="text-left">
-                        <div className="text-sm font-medium text-slate-900">{photoFile.name}</div>
-                        <div className="text-xs text-slate-500">{(photoFile.size / 1024).toFixed(1)} KB</div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          if (photoInputRef.current) {
-                            photoInputRef.current.value = ""
-                          }
-                          if (laminationInputRef.current) {
-                            laminationInputRef.current.value = ""
-                          }
-                          setPhotoFile(null)
-                          setPhotoValidation(null)
-                          setImportPreview(null)
-                          setLaminationFile(null)
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+          <div className="grid items-stretch gap-5 md:grid-cols-[1.2fr_0.8fr]">
+            <div className="grid gap-5 md:h-full md:grid-rows-2">
+              <div
+                onClick={() => photoInputRef.current?.click()}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => void handleDrop(event, "photo")}
+                className="flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50 px-6 py-6 text-center md:h-full md:min-h-0"
+              >
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept=".xlsx"
+                  className="hidden"
+                  onChange={(event) => void handleFileChange(event, "photo")}
+                />
+                <Upload className="mb-4 h-10 w-10 text-blue-600" />
+                <div className="text-lg font-semibold text-blue-900">Ανεβάστε το ΦΩΤΟΤΥΠΙΚΟ.xlsx</div>
+                {isParsing && !photoValidation && <Loader2 className="mt-3 h-5 w-5 animate-spin text-blue-600" />}
+                {photoFile && (
+                  <div className="mt-4 flex items-center gap-3 rounded-xl border border-blue-200 bg-white px-4 py-3">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                    <div className="text-left">
+                      <div className="text-sm font-medium text-slate-900">{photoFile.name}</div>
+                      <div className="text-xs text-slate-500">{(photoFile.size / 1024).toFixed(1)} KB</div>
                     </div>
-                  )}
-                </div>
-
-                <div
-                  onClick={() => {
-                    if (!photoValidation) return
-                    laminationInputRef.current?.click()
-                  }}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    if (!photoValidation) return
-                    void handleDrop(event, "lamination")
-                  }}
-                  className={[
-                    "flex min-h-[160px] flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-6 text-center md:h-full md:min-h-0",
-                    photoValidation
-                      ? "cursor-pointer border-emerald-300 bg-emerald-50"
-                      : "cursor-not-allowed border-emerald-200 bg-emerald-50/70 opacity-80",
-                  ].join(" ")}
-                >
-                  <input
-                    ref={laminationInputRef}
-                    type="file"
-                    accept=".xlsx"
-                    className="hidden"
-                    onChange={(event) => void handleFileChange(event, "lamination")}
-                  />
-                  <Upload className="mb-4 h-10 w-10 text-emerald-600" />
-                  <div className="text-lg font-semibold text-emerald-900">Ανεβάστε το ΠΛΑΣΤΙΚΟΠΟΙΗΤΗΣ.xlsx</div>
-                  {isParsing && photoValidation && !importPreview && <Loader2 className="mt-3 h-5 w-5 animate-spin text-emerald-600" />}
-                  {laminationFile && (
-                    <div className="mt-4 flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3">
-                      <FileText className="h-5 w-5 text-emerald-600" />
-                      <div className="text-left">
-                        <div className="text-sm font-medium text-slate-900">{laminationFile.name}</div>
-                        <div className="text-xs text-slate-500">{(laminationFile.size / 1024).toFixed(1)} KB</div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          if (laminationInputRef.current) {
-                            laminationInputRef.current.value = ""
-                          }
-                          setLaminationFile(null)
-                          setImportPreview(null)
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        if (photoInputRef.current) {
+                          photoInputRef.current.value = ""
+                        }
+                        if (laminationInputRef.current) {
+                          laminationInputRef.current.value = ""
+                        }
+                        setPhotoFile(null)
+                        setPhotoValidation(null)
+                        setImportPreview(null)
+                        setLaminationFile(null)
+                        clearUploadProgress()
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
-              <div className="rounded-2xl border bg-white p-5 md:h-full">
-                <div className="mb-4 text-sm font-semibold text-slate-900">Έλεγχος</div>
-                <div className="grid gap-3 text-sm md:h-[calc(100%-2rem)] md:grid-rows-4">
-                  <div
-                    className={[
-                      "flex flex-col justify-center rounded-xl px-4 py-3",
-                      hasExistingImportForSelectedPeriod
-                        ? "border border-yellow-200 bg-yellow-50"
-                        : "bg-slate-50",
-                    ].join(" ")}
-                  >
-                    <div className="flex items-center gap-2 text-slate-500">
-                      <span>Περίοδος</span>
-                      {hasExistingImportForSelectedPeriod && (
-                        <TooltipProvider delayDuration={150}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                aria-label="Προειδοποίηση αντικατάστασης δεδομένων περιόδου"
-                                className="inline-flex h-5 w-5 items-center justify-center rounded-full text-yellow-700 outline-none transition hover:text-yellow-800 focus-visible:ring-2 focus-visible:ring-yellow-300"
-                              >
-                                <AlertCircle className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-[240px] border-yellow-200 bg-yellow-50 text-yellow-950">
-                              Υπάρχουν ήδη δεδομένα για αυτή την περίοδο. Αν συνεχίσετε, θα αντικατασταθούν.
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
+              <div
+                onClick={() => {
+                  if (!photoValidation) return
+                  laminationInputRef.current?.click()
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  if (!photoValidation) return
+                  void handleDrop(event, "lamination")
+                }}
+                className={[
+                  "flex min-h-[160px] flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-6 text-center md:h-full md:min-h-0",
+                  photoValidation
+                    ? "cursor-pointer border-emerald-300 bg-emerald-50"
+                    : "cursor-not-allowed border-emerald-200 bg-emerald-50/70 opacity-80",
+                ].join(" ")}
+              >
+                <input
+                  ref={laminationInputRef}
+                  type="file"
+                  accept=".xlsx"
+                  className="hidden"
+                  onChange={(event) => void handleFileChange(event, "lamination")}
+                />
+                <Upload className="mb-4 h-10 w-10 text-emerald-600" />
+                <div className="text-lg font-semibold text-emerald-900">Ανεβάστε το ΠΛΑΣΤΙΚΟΠΟΙΗΤΗΣ.xlsx</div>
+                {isParsing && photoValidation && !importPreview && <Loader2 className="mt-3 h-5 w-5 animate-spin text-emerald-600" />}
+                {laminationFile && (
+                  <div className="mt-4 flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3">
+                    <FileText className="h-5 w-5 text-emerald-600" />
+                    <div className="text-left">
+                      <div className="text-sm font-medium text-slate-900">{laminationFile.name}</div>
+                      <div className="text-xs text-slate-500">{(laminationFile.size / 1024).toFixed(1)} KB</div>
                     </div>
-                    <div className="font-semibold text-slate-900">{reviewPeriodLabel}</div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        if (laminationInputRef.current) {
+                          laminationInputRef.current.value = ""
+                        }
+                        setLaminationFile(null)
+                        setImportPreview(null)
+                        clearUploadProgress()
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
-
-                  <div className="flex flex-col justify-center rounded-xl bg-slate-50 px-4 py-3">
-                    <div className="text-slate-500">Νέες χρεώσεις Φωτοτυπικού</div>
-                    <div className="font-semibold text-slate-900">{reviewPhotoCharges}</div>
-                  </div>
-
-                  <div className="flex flex-col justify-center rounded-xl bg-slate-50 px-4 py-3">
-                    <div className="text-slate-500">Νέες χρεώσεις Πλαστικοποιητή</div>
-                    <div className="font-semibold text-slate-900">{reviewLaminationCharges}</div>
-                  </div>
-
-                  <div className="flex flex-col justify-center rounded-xl bg-slate-50 px-4 py-3">
-                    <div className="text-slate-500">Νέα δεδομένα</div>
-                    <div className="font-semibold text-slate-900">{reviewAlignedRows}</div>
-                  </div>
-                </div>
-
-                {(photoValidation?.warnings.length || importPreview?.warnings.length) ? (
-                  <div className="mt-3 space-y-3 text-sm">
-                    {photoValidation?.warnings.length ? (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
-                        {photoValidation.warnings.join(" ")}
-                      </div>
-                    ) : null}
-                    {importPreview?.warnings.length ? (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
-                        {importPreview.warnings.join(" ")}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {isParsing ? (
-                  <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {photoValidation ? "Έλεγχος αρχείων..." : "Έλεγχος αρχείου..."}
-                  </div>
-                ) : null}
+                )}
               </div>
             </div>
-          )}
 
-          {currentStep === 2 && plan && (
-            <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border bg-white p-5 md:h-full">
+              <div className="mb-4 text-sm font-semibold text-slate-900">Σύνοψη αρχείων</div>
+              <div className="grid gap-3 text-sm md:h-[calc(100%-2rem)] md:grid-rows-4">
+                <div
+                  className={[
+                    "flex flex-col justify-center rounded-xl px-4 py-3",
+                    hasExistingImportForSelectedPeriod
+                      ? "border border-yellow-200 bg-yellow-50"
+                      : "bg-slate-50",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span>Περίοδος</span>
+                    {hasExistingImportForSelectedPeriod && (
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="Προειδοποίηση αντικατάστασης δεδομένων περιόδου"
+                              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-yellow-700 outline-none transition hover:text-yellow-800 focus-visible:ring-2 focus-visible:ring-yellow-300"
+                            >
+                              <AlertCircle className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[240px] border-yellow-200 bg-yellow-50 text-yellow-950">
+                            Υπάρχουν ήδη δεδομένα για αυτή την περίοδο. Αν συνεχίσετε, θα αντικατασταθούν.
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
+                  <div className="font-semibold text-slate-900">{reviewPeriodLabel}</div>
+                </div>
+
+                <div className="flex flex-col justify-center rounded-xl bg-slate-50 px-4 py-3">
+                  <div className="text-slate-500">Νέες χρεώσεις Φωτοτυπικού</div>
+                  <div className="font-semibold text-slate-900">{reviewPhotoCharges}</div>
+                </div>
+
+                <div className="flex flex-col justify-center rounded-xl bg-slate-50 px-4 py-3">
+                  <div className="text-slate-500">Νέες χρεώσεις Πλαστικοποιητή</div>
+                  <div className="font-semibold text-slate-900">{reviewLaminationCharges}</div>
+                </div>
+
+                <div className="flex flex-col justify-center rounded-xl bg-slate-50 px-4 py-3">
+                  <div className="text-slate-500">Νέες χρεώσεις Σύνολο</div>
+                  <div className="font-semibold text-slate-900">{reviewTotalCharges}</div>
+                </div>
+              </div>
+
+              {(photoValidation?.warnings.length || importPreview?.warnings.length) ? (
+                <div className="mt-3 space-y-3 text-sm">
+                  {photoValidation?.warnings.length ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                      {photoValidation.warnings.join(" ")}
+                    </div>
+                  ) : null}
+                  {importPreview?.warnings.length ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                      {importPreview.warnings.join(" ")}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {isParsing ? (
+                <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {photoValidation ? "Έλεγχος αρχείων..." : "Έλεγχος αρχείου..."}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {plan && (
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="space-y-1">
+                  <div className="text-lg font-semibold text-slate-900">Έλεγχος συγχώνευσης</div>
+                  <div className="text-sm text-slate-600">
+                    Τα δύο Excel διασταυρώθηκαν. Ελέγξτε τα αποτελέσματα πριν προχωρήσετε σε ανέβασμα.
+                  </div>
+                </div>
+                <div
+                  className={[
+                    "inline-flex items-center rounded-full px-3 py-1 text-sm font-medium",
+                    isUploadStepReady
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-red-100 text-red-800",
+                  ].join(" ")}
+                >
+                  {isUploadStepReady ? "Έτοιμο για ανέβασμα" : "Χρειάζεται διόρθωση"}
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl border bg-white px-4 py-4">
                   <div className="text-xs uppercase tracking-wide text-slate-500">Νέες εκτυπωτικές χρεώσεις</div>
                   <div className="mt-2 text-2xl font-semibold text-slate-900">{formatMoney(plan.totals.newPrintCharge)}</div>
@@ -726,7 +774,25 @@ export function ExcelImportWizard({
                   <div className="text-xs uppercase tracking-wide text-slate-500">Νέες χρεώσεις πλαστικοποιητή</div>
                   <div className="mt-2 text-2xl font-semibold text-slate-900">{formatMoney(plan.totals.newLaminationCharge)}</div>
                 </div>
+                <div className="rounded-2xl border bg-white px-4 py-4">
+                  <div className="text-xs uppercase tracking-wide text-slate-500">Γραμμές έτοιμες για import</div>
+                  <div className="mt-2 text-2xl font-semibold text-slate-900">{plan.totals.importableRows}</div>
+                </div>
+                <div className="rounded-2xl border bg-white px-4 py-4">
+                  <div className="text-xs uppercase tracking-wide text-slate-500">Codes που λείπουν</div>
+                  <div className="mt-2 text-2xl font-semibold text-slate-900">{plan.totals.missingUsers}</div>
+                </div>
               </div>
+
+              {blockingErrors.length > 0 && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  <div className="space-y-1">
+                    {blockingErrors.map((blockingError, index) => (
+                      <div key={`blocking-error-${index}`}>{blockingError}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {replacementWarnings.length > 0 && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -796,77 +862,126 @@ export function ExcelImportWizard({
             </div>
           )}
 
-          {currentStep === 3 && (
-            <div className="space-y-5 rounded-2xl border bg-white p-6">
-              {syncStage === "done" && importRun ? (
-                <div className="space-y-4 text-center">
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
-                    <CheckCircle2 className="h-10 w-10 text-emerald-600" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-semibold text-slate-900">Το ανέβασμα ολοκληρώθηκε</div>
-                    <div className="mt-2 text-sm text-slate-600">
-                      Περίοδος {importRun.periodLabel}. Μπορείτε να ξεκινήσετε νέα εισαγωγή.
-                    </div>
+          {plan && (
+            <div className="space-y-4 rounded-2xl border bg-white p-5 sm:p-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="space-y-2">
+                  <div className="text-lg font-semibold text-slate-900">Ανέβασμα</div>
+                  <div className="text-sm text-slate-600">
+                    {isUploadStepReady
+                      ? "Τα αρχεία πέρασαν τον έλεγχο. Μπορείτε να ξεκινήσετε το ανέβασμα."
+                      : isImportReady
+                        ? "Το ανέβασμα παραμένει κλειδωμένο μέχρι να λυθούν τα σφάλματα του ελέγχου."
+                        : "Ανεβάστε και τα δύο αρχεία για να ενεργοποιηθεί το ανέβασμα."}
                   </div>
                 </div>
-              ) : (
-                <>
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="text-lg font-semibold text-slate-900">Ολοκλήρωση Ανεβάσματος</div>
-                      <div className="text-sm text-slate-600">Το ανέβασμα ξεκινά μόνο από το κουμπί στα δεξιά.</div>
-                    </div>
-                    {canStartUpload && (
-                      <Button
-                        type="button"
-                        onClick={() => void handleStartUpload()}
-                        className="bg-yellow-500 text-slate-950 hover:bg-yellow-600"
+                {canStartUpload && (
+                  <Button
+                    type="button"
+                    onClick={() => void handleStartUpload()}
+                    className="bg-yellow-500 text-slate-950 hover:bg-yellow-600"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Ανέβασμα
+                  </Button>
+                )}
+              </div>
+
+              {isUploadStepReady && !showUploadTimeline && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                  Ο έλεγχος ολοκληρώθηκε χωρίς blocking σφάλματα. Το κουμπί ανεβάσματος εμφανίστηκε από κάτω.
+                </div>
+              )}
+
+              {!isUploadStepReady && isImportReady && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  Το ανέβασμα δεν μπορεί να ξεκινήσει ακόμη. Διορθώστε πρώτα τα προβλήματα που εμφανίζονται στον έλεγχο.
+                </div>
+              )}
+
+              {showUploadTimeline && (
+                <div className="space-y-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-sm font-semibold text-slate-900">Timeline ανεβάσματος</div>
+                      <div
+                        className={[
+                          "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+                          syncStage === "done"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : syncStage === "error"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-blue-100 text-blue-800",
+                        ].join(" ")}
                       >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Ανέβασμα
-                      </Button>
-                    )}
+                        {syncStageLabel(syncStage)}
+                      </div>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-yellow-500 via-blue-500 to-emerald-500 transition-all duration-500"
+                        style={{ width: `${uploadProgressValue}%` }}
+                      />
+                    </div>
                   </div>
 
-                  {!showUploadProgress && (
-                    <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
-                      Επιλέξατε το βήμα ανεβάσματος. Η εισαγωγή δεν ξεκινά αυτόματα. Πατήστε το κουμπί
-                      {" "}«Ανέβασμα» για να συνεχίσετε.
-                    </div>
-                  )}
-
-                  {showUploadProgress && (
-                    <div className="space-y-3">
-                      {(["creating_jobs", "updating_users"] as SyncStage[]).map((stage) => {
-                        const isActive = syncStage === stage
-                        const isComplete = syncStage === "done" || (syncStage === "updating_users" && stage === "creating_jobs")
-                        return (
-                          <div key={stage} className="flex items-center gap-3 rounded-xl border bg-slate-50 px-4 py-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white">
-                              {isComplete ? (
-                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                              ) : isActive ? (
-                                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                  <div className="space-y-1">
+                    {UPLOAD_TIMELINE_STEPS.map((step, index) => {
+                      const checkpointState = getTimelineCheckpointState(step.key)
+                      const isConnectorComplete = index < activeTimelineIndex
+                      return (
+                        <div key={step.key} className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div
+                              className={[
+                                "flex h-10 w-10 items-center justify-center rounded-full border bg-white",
+                                checkpointState === "complete" ? "border-emerald-500 bg-emerald-500 text-white" : "",
+                                checkpointState === "active" ? "border-blue-500 text-blue-600" : "",
+                                checkpointState === "error" ? "border-red-500 bg-red-50 text-red-600" : "",
+                                checkpointState === "pending" ? "border-slate-200 text-slate-400" : "",
+                              ].join(" ")}
+                            >
+                              {checkpointState === "complete" ? (
+                                <CheckCircle2 className="h-5 w-5" />
+                              ) : checkpointState === "active" ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                              ) : checkpointState === "error" ? (
+                                <AlertCircle className="h-5 w-5" />
                               ) : (
-                                <ShieldAlert className="h-5 w-5 text-slate-400" />
+                                <span className="text-sm font-semibold">{index + 1}</span>
                               )}
                             </div>
-                            <div>
-                              <div className="font-medium text-slate-900">{syncStageLabel(stage)}</div>
-                            </div>
+                            {index < UPLOAD_TIMELINE_STEPS.length - 1 && (
+                              <div
+                                className={[
+                                  "my-1 h-10 w-px",
+                                  isConnectorComplete ? "bg-emerald-300" : "bg-slate-200",
+                                ].join(" ")}
+                              />
+                            )}
                           </div>
-                        )
-                      })}
+                          <div className="pb-3 pt-1">
+                            <div className="font-medium text-slate-900">{step.title}</div>
+                            <div className="text-sm text-slate-600">{step.description}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {syncStage === "done" && importRun && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                      Το ανέβασμα ολοκληρώθηκε για την περίοδο {importRun.periodLabel}. Μπορείτε να ξεκινήσετε νέα εισαγωγή.
                     </div>
                   )}
 
                   {syncStage === "error" && (
                     <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                      Η εισαγωγή δεν ολοκληρώθηκε. Δοκιμάστε ξανά.
+                      Η εισαγωγή σταμάτησε στο checkpoint «{syncStageLabel(lastActiveSyncStageRef.current ?? "starting")}».
+                      Διορθώστε το πρόβλημα και δοκιμάστε ξανά.
                     </div>
                   )}
-                </>
+                </div>
               )}
             </div>
           )}

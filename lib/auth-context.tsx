@@ -12,6 +12,9 @@ type FirebaseAuthUser = {
   uid: string
 } | null
 
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 3000
+const USER_LOOKUP_TIMEOUT_MS = 3000
+
 interface AuthContextType {
   user: FirebaseUser | null
   loading: boolean
@@ -152,22 +155,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (fbUser: FirebaseAuthUser) => {
+    let isMounted = true
+    let settled = false
+    let unsubscribe: (() => void) | undefined
+
+    const settle = (nextUser: FirebaseUser | null) => {
+      if (!isMounted || settled) return
+      settled = true
+      setUser(nextUser)
+      setLoading(false)
+    }
+
+    const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
       try {
-        if (fbUser?.uid) {
-          const u = await fetchUserById(fbUser.uid)
-          if (u) setUser(u as any)
-          else setUser(null)
-        } else {
-          setUser(null)
-        }
-      } catch (e) {
-        console.error(e)
+        return await Promise.race([
+          promise,
+          new Promise<T>((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+          }),
+        ])
       } finally {
-        setLoading(false)
+        if (timeoutId) clearTimeout(timeoutId)
       }
-    })
-    return () => { if (unsub) unsub() }
+    }
+
+    const bootstrapTimeoutId = setTimeout(() => {
+      console.warn("Firebase auth state did not settle in time; falling back to signed-out state.")
+      settle(null)
+    }, AUTH_BOOTSTRAP_TIMEOUT_MS)
+
+    try {
+      unsubscribe = onAuthStateChanged(
+        auth,
+        async (fbUser: FirebaseAuthUser) => {
+          try {
+            if (fbUser?.uid) {
+              const u = await withTimeout(fetchUserById(fbUser.uid), USER_LOOKUP_TIMEOUT_MS, "fetchUserById")
+              settle((u as FirebaseUser | null) ?? null)
+            } else {
+              settle(null)
+            }
+          } catch (error) {
+            console.error("Failed to resolve auth state:", error)
+            settle(null)
+          } finally {
+            clearTimeout(bootstrapTimeoutId)
+          }
+        },
+        (error) => {
+          console.error("Firebase auth listener failed:", error)
+          clearTimeout(bootstrapTimeoutId)
+          settle(null)
+        }
+      )
+    } catch (error) {
+      console.error("Failed to initialize Firebase auth listener:", error)
+      clearTimeout(bootstrapTimeoutId)
+      settle(null)
+    }
+
+    return () => {
+      isMounted = false
+      clearTimeout(bootstrapTimeoutId)
+      if (unsubscribe) unsubscribe()
+    }
   }, [])
 
   const signIn = async (username: string, password: string): Promise<{ ok: true } | { ok: false; code: string; httpStatus?: number }> => {
