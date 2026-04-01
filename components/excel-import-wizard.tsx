@@ -440,7 +440,6 @@ export function ExcelImportWizard({
     }
   }
 
-  const isImportReady = Boolean(photoValidation && photoFile && importPreview && laminationFile)
   const blockingErrors = plan?.blockingErrors ?? []
   const isUploadStepReady = Boolean(plan && blockingErrors.length === 0 && users.length > 0)
   const hasUploadStarted =
@@ -746,44 +745,6 @@ export function ExcelImportWizard({
 
           {plan && (
             <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="space-y-1">
-                  <div className="text-lg font-semibold text-slate-900">Έλεγχος συγχώνευσης</div>
-                  <div className="text-sm text-slate-600">
-                    Τα δύο Excel διασταυρώθηκαν. Ελέγξτε τα αποτελέσματα πριν προχωρήσετε σε ανέβασμα.
-                  </div>
-                </div>
-                <div
-                  className={[
-                    "inline-flex items-center rounded-full px-3 py-1 text-sm font-medium",
-                    isUploadStepReady
-                      ? "bg-emerald-100 text-emerald-800"
-                      : "bg-red-100 text-red-800",
-                  ].join(" ")}
-                >
-                  {isUploadStepReady ? "Έτοιμο για ανέβασμα" : "Χρειάζεται διόρθωση"}
-                </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-2xl border bg-white px-4 py-4">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Νέες εκτυπωτικές χρεώσεις</div>
-                  <div className="mt-2 text-2xl font-semibold text-slate-900">{formatMoney(plan.totals.newPrintCharge)}</div>
-                </div>
-                <div className="rounded-2xl border bg-white px-4 py-4">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Νέες χρεώσεις πλαστικοποιητή</div>
-                  <div className="mt-2 text-2xl font-semibold text-slate-900">{formatMoney(plan.totals.newLaminationCharge)}</div>
-                </div>
-                <div className="rounded-2xl border bg-white px-4 py-4">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Γραμμές έτοιμες για import</div>
-                  <div className="mt-2 text-2xl font-semibold text-slate-900">{plan.totals.importableRows}</div>
-                </div>
-                <div className="rounded-2xl border bg-white px-4 py-4">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Codes που λείπουν</div>
-                  <div className="mt-2 text-2xl font-semibold text-slate-900">{plan.totals.missingUsers}</div>
-                </div>
-              </div>
-
               {blockingErrors.length > 0 && (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                   <div className="space-y-1">
@@ -862,20 +823,10 @@ export function ExcelImportWizard({
             </div>
           )}
 
-          {plan && (
-            <div className="space-y-4 rounded-2xl border bg-white p-5 sm:p-6">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div className="space-y-2">
-                  <div className="text-lg font-semibold text-slate-900">Ανέβασμα</div>
-                  <div className="text-sm text-slate-600">
-                    {isUploadStepReady
-                      ? "Τα αρχεία πέρασαν τον έλεγχο. Μπορείτε να ξεκινήσετε το ανέβασμα."
-                      : isImportReady
-                        ? "Το ανέβασμα παραμένει κλειδωμένο μέχρι να λυθούν τα σφάλματα του ελέγχου."
-                        : "Ανεβάστε και τα δύο αρχεία για να ενεργοποιηθεί το ανέβασμα."}
-                  </div>
-                </div>
-                {canStartUpload && (
+          {plan && (canStartUpload || showUploadTimeline) && (
+            <div className="space-y-4">
+              {canStartUpload && !showUploadTimeline && (
+                <div className="flex justify-end">
                   <Button
                     type="button"
                     onClick={() => void handleStartUpload()}
@@ -884,18 +835,6 @@ export function ExcelImportWizard({
                     <Upload className="mr-2 h-4 w-4" />
                     Ανέβασμα
                   </Button>
-                )}
-              </div>
-
-              {isUploadStepReady && !showUploadTimeline && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                  Ο έλεγχος ολοκληρώθηκε χωρίς blocking σφάλματα. Το κουμπί ανεβάσματος εμφανίστηκε από κάτω.
-                </div>
-              )}
-
-              {!isUploadStepReady && isImportReady && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                  Το ανέβασμα δεν μπορεί να ξεκινήσει ακόμη. Διορθώστε πρώτα τα προβλήματα που εμφανίζονται στον έλεγχο.
                 </div>
               )}
 
