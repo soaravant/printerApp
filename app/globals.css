@@ -122,12 +122,22 @@
 
 @layer utilities {
   .summary-debt-stroke {
-    -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.95);
-    paint-order: stroke fill;
     text-shadow:
-      1px 0 0 rgba(255, 255, 255, 0.8),
-      -1px 0 0 rgba(255, 255, 255, 0.8),
-      0 1px 0 rgba(255, 255, 255, 0.8),
-      0 -1px 0 rgba(255, 255, 255, 0.8);
+      1px 0 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
+      -1px 0 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
+      0 1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
+      0 -1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
+      1px 1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
+      -1px 1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
+      1px -1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
+      -1px -1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24));
+  }
+
+  .summary-debt-stroke-red {
+    --summary-debt-outline: rgba(127, 29, 29, 0.28);
+  }
+
+  .summary-debt-stroke-green {
+    --summary-debt-outline: rgba(22, 101, 52, 0.28);
   }
 }
