@@ -1983,10 +1983,8 @@ export default function DashboardPage() {
                 <div className="p-6">
                   <div className="flex justify-between items-center">
                     <div
-                      className={`text-3xl font-bold rounded-lg px-3 py-1 border-2 ${
-                        printCurrentDebt > 0
-                          ? "text-red-600 border-blue-400"
-                          : "text-green-600 border-transparent"
+                      className={`summary-debt-stroke text-3xl font-bold ${
+                        printCurrentDebt > 0 ? "text-red-600" : "text-green-600"
                       }`}
                     >
                       {formatBalance(printCurrentDebt)}
@@ -2052,10 +2050,8 @@ export default function DashboardPage() {
                 <div className="p-6">
                   <div className="flex justify-between items-center">
                     <div
-                      className={`text-3xl font-bold rounded-lg px-3 py-1 border-2 ${
-                        laminationCurrentDebt > 0
-                          ? "text-red-600 border-green-400"
-                          : "text-green-600 border-transparent"
+                      className={`summary-debt-stroke text-3xl font-bold ${
+                        laminationCurrentDebt > 0 ? "text-red-600" : "text-green-600"
                       }`}
                     >
                       {formatBalance(laminationCurrentDebt)}
