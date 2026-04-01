@@ -1919,13 +1919,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div
-                      className={`summary-debt-stroke text-3xl font-bold ${
-                        totalCurrentDebt > 0
-                          ? "summary-debt-stroke-red text-red-600"
-                          : "summary-debt-stroke-green text-green-600"
-                      }`}
-                    >
+                    <div className={`text-3xl font-bold ${totalCurrentDebt > 0 ? "text-red-600" : "text-green-600"}`}>
                       {formatBalance(totalCurrentDebt)}
                     </div>
                     {user.accessLevel === "Διαχειριστής" && (
@@ -1988,13 +1982,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div
-                      className={`summary-debt-stroke text-3xl font-bold ${
-                        printCurrentDebt > 0
-                          ? "summary-debt-stroke-red text-red-600"
-                          : "summary-debt-stroke-green text-green-600"
-                      }`}
-                    >
+                    <div className="text-3xl font-bold text-red-600">
                       {formatBalance(printCurrentDebt)}
                     </div>
                     {user.accessLevel === "Διαχειριστής" && (
@@ -2057,13 +2045,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-center">
-                    <div
-                      className={`summary-debt-stroke text-3xl font-bold ${
-                        laminationCurrentDebt > 0
-                          ? "summary-debt-stroke-red text-red-600"
-                          : "summary-debt-stroke-green text-green-600"
-                      }`}
-                    >
+                    <div className="text-3xl font-bold text-red-600">
                       {formatBalance(laminationCurrentDebt)}
                     </div>
                     {user.accessLevel === "Διαχειριστής" && (
