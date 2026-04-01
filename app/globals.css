@@ -122,22 +122,26 @@
 
 @layer utilities {
   .summary-debt-stroke {
+    -webkit-text-stroke: 0.9px var(--summary-debt-outline, rgba(15, 23, 42, 0.4));
+    paint-order: stroke fill;
     text-shadow:
-      1px 0 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
-      -1px 0 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
-      0 1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
-      0 -1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
-      1px 1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
-      -1px 1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
-      1px -1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24)),
-      -1px -1px 0 var(--summary-debt-outline, rgba(15, 23, 42, 0.24));
+      1px 0 0 var(--summary-debt-shadow, rgba(15, 23, 42, 0.3)),
+      -1px 0 0 var(--summary-debt-shadow, rgba(15, 23, 42, 0.3)),
+      0 1px 0 var(--summary-debt-shadow, rgba(15, 23, 42, 0.3)),
+      0 -1px 0 var(--summary-debt-shadow, rgba(15, 23, 42, 0.3)),
+      1.25px 1.25px 0 var(--summary-debt-shadow, rgba(15, 23, 42, 0.3)),
+      -1.25px 1.25px 0 var(--summary-debt-shadow, rgba(15, 23, 42, 0.3)),
+      1.25px -1.25px 0 var(--summary-debt-shadow, rgba(15, 23, 42, 0.3)),
+      -1.25px -1.25px 0 var(--summary-debt-shadow, rgba(15, 23, 42, 0.3));
   }
 
   .summary-debt-stroke-red {
-    --summary-debt-outline: rgba(127, 29, 29, 0.28);
+    --summary-debt-outline: rgba(127, 29, 29, 0.52);
+    --summary-debt-shadow: rgba(127, 29, 29, 0.34);
   }
 
   .summary-debt-stroke-green {
-    --summary-debt-outline: rgba(22, 101, 52, 0.28);
+    --summary-debt-outline: rgba(22, 101, 52, 0.52);
+    --summary-debt-shadow: rgba(22, 101, 52, 0.34);
   }
 }
